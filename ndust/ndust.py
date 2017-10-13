@@ -1,0 +1,491 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Tue Sep 26 14:52:43 EDT 2017
+
+@author: ben
+"""
+__author__ = "Benjamin Santos"
+__copyright__ = "Copyright 2017, Benjamin Santos"
+__license__ = "MIT"
+__version__ = "0.1.0"
+__email__ = "caos21@gmail.com"
+__status__ = "Development"
+
+
+import sys
+import os
+#from PyQt5 import QtGui, QtCore
+#from PyQt5.QtCore import SIGNAL
+#from PyQt5.QtCore import *
+#from PyQt5.QtGui import *
+from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtCore import *
+from PyQt5.QtGui import *
+from PyQt5.QtWidgets import *
+
+from ndustgui import Ui_MainWindow
+
+import h5py
+
+#import grid model
+import mgrid as mg
+
+#import plasma model
+import mplasma as mp
+
+#import plasma model
+import mnano as mn
+
+# import hdf5 library wrappers
+
+
+class Window(QMainWindow, Ui_MainWindow):
+  """ Main window
+  """
+  def __init__(self, parent = None):
+    """
+    """
+    super(Window, self).__init__(parent)
+    self.ui = Ui_MainWindow()
+    self.ui.setupUi(self)
+
+  # connections
+    # grid tab
+    grid_save_btn = self.ui.buttonBox_grid_save.button(QtWidgets.QDialogButtonBox.Save)
+    grid_save_btn.clicked.connect(self.grid_save)
+
+    self.radiobutton_mpc = self.ui.radioButton_MPC
+    self.radiobutton_mpc.toggled.connect(self.toggle_terms)
+
+    self.checkbox_tunnel = self.ui.checkBox_tunnel
+    self.checkbox_tunnel.toggled.connect(self.toggle_eaffinity)
+
+    self.checkbox_wnu = self.ui.checkBox_wnu
+    self.checkbox_wnu.toggled.connect(self.toggle_nucleation)
+
+    self.checkbox_wsg = self.ui.checkBox_wsg
+    self.checkbox_wsg.toggled.connect(self.toggle_sgrowth)
+    
+    self.checkbox_wco = self.ui.checkBox_wco
+    self.checkbox_wco.toggled.connect(self.toggle_coagulation)
+    
+    self.checkbox_wch = self.ui.checkBox_wch
+    self.checkbox_wch.toggled.connect(self.toggle_charging)
+    
+    # plasma tab
+    plasma_save_btn = self.ui.buttonBox_plasma_save.button(QtWidgets.QDialogButtonBox.Save)
+    plasma_save_btn.clicked.connect(self.plasma_save)
+
+    # nano tab
+    nano_save_btn = self.ui.buttonBox_nano_save.button(QtWidgets.QDialogButtonBox.Save)
+    nano_save_btn.clicked.connect(self.nano_save)
+
+    # show window
+    self.show()
+
+    self.prefix = ""
+    self.dirname = "../data/"
+    
+    self.server = [" guillimin:~/duster/results/", " cottos:~/duster/results/"]
+
+  # grid
+    # h5 filename for grid
+    self.gridfilename = ""
+    
+    # container for GridSystem   
+    self.gsys = []
+
+    # container for volume sections
+    self.vsections = []
+
+    # container for charge sections
+    self.qsections = []
+
+    # container for description
+    self.gdescription = []
+
+    # container for electrostatic interaction
+    self.einteraction = []
+    #
+  # plasma
+    # h5 filename for plasma
+    self.plasmafilename = ""
+    
+    # container for parameters
+    self.parameters = []
+
+    # container for electrons
+    self.electrons = []
+
+    # container for ions
+    self.ions = []
+
+    # container for metastables
+    self.metastables = []
+
+    # container for description
+    self.pdescription = []
+    #
+  # nano
+    # h5 filename for nano
+    self.nanofilename = ""
+    
+    # container for nanoparticle parameters
+    self.nanoparticles = []
+    
+    # container for rates
+    self.rates = []
+    
+    # container for time
+    self.time = []
+    
+    # container for constants
+    self.constants = []
+    
+    # container for description
+    self.ndescription = []
+  #
+  def grid_save(self):
+    """ Save grid file
+    """      
+    print("\n[ii] saving grid file\n")
+    self.gridfilename = str(self.ui.lineEdit_grid_save_name.displayText())
+    # WARNING must check for empty file FIXME
+    #if self.gridfilename <> "":
+        #self.prefix += "-"
+        
+    h5f = h5py.File(self.dirname+self.gridfilename, "w")
+    #h5f.attrs["gtime"] = 0.0
+    
+    #profile_rerr = le2float(self.ui.lineEdit_ptol)
+    #h5f.attrs["profile_rerr"] = profile_rerr
+
+    # Nanoparticle temperature
+    temperature = le2float(self.ui.lineEdit_temp)
+    
+    # Nanoparticle mass density
+    nmdensity = le2float(self.ui.lineEdit_nmdens)
+
+    # instantiate the group GridSystem
+    self.gsys = mg.GridSystem(h5f, temperature, nmdensity)
+    
+    # write group
+    self.gsys.toHDF5()
+
+    # volume sections
+    nvsections = self.ui.spinBox_vsecs.value()
+    rmin = le2float(self.ui.lineEdit_minrad)*1e-9
+    
+    base = le2float(self.ui.lineEdit_base)
+    power = le2float(self.ui.lineEdit_power)
+    self.vsections = mg.VSections(h5f, nvsections, rmin, base, power)
+    self.vsections.toHDF5()
+    vmin = self.vsections.ifaces[0]
+    strvmin = "{:.4e}".format(vmin)
+    value2le(self.ui.lineEdit_minvol, strvmin)
+    vmax = self.vsections.ifaces[-1]
+    strvmax = "{:.4e}".format(vmax)
+    value2le(self.ui.lineEdit_maxvol, strvmax)
+    rmax = self.vsections.rads[-1]*1e9
+    strrmax = "{:.4f}".format(rmax)
+    value2le(self.ui.lineEdit_maxrad, strrmax)
+
+    # charge sections
+    max_positive = self.ui.spinBox_maxpos.value()
+    max_negative = self.ui.spinBox_maxneg.value()
+    nqsections = max_positive + max_negative + 1
+    value2le(self.ui.lineEdit_qsecs, nqsections)
+    
+    self.qsections = mg.QSections(h5f, nqsections, max_positive, max_negative)
+    self.qsections.toHDF5()
+
+    # description for grid
+    description_text = qte2string(self.ui.textEdit_grid_desc)
+    
+    self.gdescription = mg.Description(h5f, description_text)
+    self.gdescription.toHDF5()
+
+    # electrostatic interaction
+    multiplier = le2float(self.ui.lineEdit_mult)
+    dconstant = le2float(self.ui.lineEdit_die)      
+    terms = self.ui.spinBox_terms.value()
+    #
+    method = 0# MPC
+    if self.ui.radioButton_IPA.isChecked():
+      method = 1# IPA
+    elif self.ui.radioButton_coul.isChecked():
+      method = 2# Coulomb
+    #
+    self.einteraction = mg.EInteraction(h5f, multiplier, dconstant, method,
+                                        terms)
+    self.einteraction.toHDF5()
+    # close file
+    h5f.close()
+    #
+  def toggle_terms(self):
+    """ Toggle spin box terms if MPC method is selected
+    """
+    if self.radiobutton_mpc.isChecked():
+      #print("MPC Checked")
+      self.ui.label_terms.setEnabled(1)
+      self.ui.spinBox_terms.setEnabled(1)
+    else:
+      #print("MPC UNChecked")
+      self.ui.label_terms.setEnabled(0)
+      self.ui.spinBox_terms.setEnabled(0)
+#
+  def toggle_eaffinity(self):
+    """ Toggle eaffinity box if tunnel is checked
+    """
+    if self.checkbox_tunnel.isChecked():
+      self.ui.label_tunnel.setEnabled(1)
+      self.ui.label_eaffinity.setEnabled(1)
+      self.ui.lineEdit_eaffinity.setEnabled(1)
+    else:
+      self.ui.label_tunnel.setEnabled(0)
+      self.ui.label_eaffinity.setEnabled(0)
+      self.ui.lineEdit_eaffinity.setEnabled(0)
+#
+  def toggle_nucleation(self):
+    """ Toggle nucleation_rate box if nucleation is checked
+    """
+    if self.checkbox_wnu.isChecked():
+      self.ui.label_nucleation.setEnabled(1)
+      self.ui.lineEdit_nucleation_rate.setEnabled(1)
+    else:
+      self.ui.label_nucleation.setEnabled(0)
+      self.ui.lineEdit_nucleation_rate.setEnabled(0)
+#
+  def toggle_sgrowth(self):
+    """ Toggle sgrowth_rate box if sgrowth is checked
+    """
+    if self.checkbox_wsg.isChecked():
+      self.ui.label_sgrowth.setEnabled(1)
+      self.ui.lineEdit_sgrowth.setEnabled(1)
+    else:
+      self.ui.label_sgrowth.setEnabled(0)
+      self.ui.lineEdit_sgrowth.setEnabled(0)
+#
+  def toggle_coagulation(self):
+    """ Toggle coagulation label if coagulation is checked
+    """
+    if self.checkbox_wco.isChecked():
+      self.ui.label_wco.setEnabled(1)
+    else:
+      self.ui.label_wco.setEnabled(0)
+#
+  def toggle_charging(self):
+    """ Toggle charging label if charging is checked
+    """
+    if self.checkbox_wch.isChecked():
+      self.ui.label_wch.setEnabled(1)
+    else:
+      self.ui.label_wch.setEnabled(0)
+#
+
+  def plasma_save(self):
+    """ Save plasma file
+    """      
+    print("\n[ii] saving plasma file\n")
+    self.plasmafilename = str(self.ui.lineEdit_plasma_save_name.displayText())
+    # WARNING must check for empty file FIXME
+        
+    h5f = h5py.File(self.dirname+self.plasmafilename, "w")
+
+  # Parameters
+    # Fixed plasma check
+    pfixed = self.ui.checkBox_pfixed.isChecked()
+
+    # Length
+    length = le2float(self.ui.lineEdit_length)
+    
+    # Temperature
+    temperature = le2float(self.ui.lineEdit_temp_gas)
+    
+    # Pressure
+    pressure = le2float(self.ui.lineEdit_pressure)
+
+    # instantiate the group Parameters
+    self.parameters = mp.Parameters(h5f, pfixed, length, temperature, pressure)
+    
+    # fill line edit with gas density
+    strng = "{:.4e}".format(self.parameters.neutral_density())
+    value2le(self.ui.lineEdit_ng, strng)
+    
+    # write group
+    self.parameters.toHDF5()
+
+  # Electrons
+    # Electron mean energy
+    emean = le2float(self.ui.lineEdit_emean)
+
+    # Electron density
+    ne = le2float(self.ui.lineEdit_ne)
+
+    # instantiate the group Electrons
+    self.electrons = mp.Electrons(h5f, emean, ne)
+
+    # write group
+    self.electrons.toHDF5()
+
+  # Ions
+    # Ion temperature
+    itemp = le2float(self.ui.lineEdit_itemp)
+
+    # Ion density
+    ni = le2float(self.ui.lineEdit_ni)
+
+    imass = le2float(self.ui.lineEdit_imass)
+
+    # instantiate the group Ions
+    self.ions = mp.Ions(h5f, itemp, ni, imass)
+
+    # write group
+    self.ions.toHDF5()
+
+  # Metastables
+    # Metastable density
+    nm = le2float(self.ui.lineEdit_nm)
+
+    # instantiate the group Electrons
+    self.metastables = mp.Metastables(h5f, nm)
+
+    # write group
+    self.metastables.toHDF5()
+
+  # Description
+    # description for plasma
+    description_text = qte2string(self.ui.textEdit_plasma_desc)
+    
+    self.pdescription = mp.Description(h5f, description_text)
+    
+    # write description
+    self.pdescription.toHDF5()
+
+    # close file
+    h5f.close()
+#  
+  def nano_save(self):
+    """ Save nano file
+    """      
+    print("\n[ii] saving nano file\n")
+    self.nanofilename = str(self.ui.lineEdit_nano_save_name.displayText())
+    # WARNING must check for empty file FIXME
+        
+    h5f = h5py.File(self.dirname+self.nanofilename, "w")
+
+  # Nanoparticles
+    # Tunnel current check
+    tunnel = self.ui.checkBox_tunnel.isChecked()
+
+    # Electron affinity
+    eaffinity = le2float(self.ui.lineEdit_eaffinity)
+    
+    # Accomodation factor
+    accfactor = le2float(self.ui.lineEdit_acc)
+
+    # instantiate the group Nanoparticles
+    self.nanoparticles = mn.Nanoparticles(h5f, tunnel, eaffinity, accfactor)
+
+    # write group
+    self.nanoparticles.toHDF5()
+
+  # Rates
+    # with nucleation
+    wnu = self.ui.checkBox_wnu.isChecked()
+
+    # nucleation rate
+    nucleation_rate = le2float(self.ui.lineEdit_nucleation_rate)
+    
+    # with surface growth
+    wsg = self.ui.checkBox_wsg.isChecked()
+
+    # surface growth rate
+    sgrowth_rate = le2float(self.ui.lineEdit_sgrowth)
+    
+    # with coagulation
+    wco = self.ui.checkBox_wco.isChecked()
+    
+    # with charging
+    wch = self.ui.checkBox_wch.isChecked()
+
+    # instantiate the group Nanoparticles
+    self.rates = mn.Rates(h5f, wnu, nucleation_rate,
+                          wsg, sgrowth_rate,
+                          wco, wch)
+    
+    # write group
+    self.rates.toHDF5()
+
+  # Time
+    # nanoparticle growth delta time
+    ndeltat = le2float(self.ui.lineEdit_ndeltat)
+    
+    # nanoparticle charging delta time
+    qdeltat = le2float(self.ui.lineEdit_qdeltat)
+
+    # stop time
+    tstop = le2float(self.ui.lineEdit_tstop)
+    
+    # instantiate the group Time
+    self.time = mn.Time(h5f, ndeltat, qdeltat, tstop)
+    
+    # write group
+    self.time.toHDF5()
+
+  # Constants
+  # nanoparticle initial density
+    indens = le2float(self.ui.lineEdit_indens)
+    
+    # nanoparticle qtol
+    qtol = le2float(self.ui.lineEdit_qtol)
+   
+    # instantiate the group Time
+    self.constants = mn.Constants(h5f, indens, qtol)
+    
+    # write group
+    self.constants.toHDF5()
+    
+  # Description
+    # description for nano
+    description_text = qte2string(self.ui.textEdit_nano_desc)
+    
+    self.ndescription = mn.Description(h5f, description_text)
+    
+    # write description
+    self.ndescription.toHDF5()
+
+    # close file
+    h5f.close()
+#
+def le2int(leobj):
+  """ Qt LineEdit to integer
+  """
+  return int(leobj.displayText())
+
+def le2float(leobj):
+  """ Qt LineEdit to float
+  """
+  # WARNING TODO QValidator or exceptions for inputs
+  #try:
+    #number = float(leobj.displayText())
+  #except Exception:
+    #QtGui.QMessageBox.about(self, 'Error','Input can only be a number')
+    #pass  
+  return float(leobj.displayText())
+
+def value2le(leobj, value):
+  """ Set value to Qt LineEdit
+  """
+  leobj.setText(str(value))
+
+def qte2string(qteobj):
+  """ Qt LineEdit to integer
+  """
+  return str(qteobj.toPlainText())
+
+# instantiation
+app = QApplication(sys.argv)
+window = Window(None)
+
+sys.exit(app.exec_())

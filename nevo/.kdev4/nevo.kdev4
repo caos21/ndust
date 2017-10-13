@@ -1,0 +1,18 @@
+[CMake]
+Build Directory Count=1
+Current Build Directory Index=0
+
+[CMake][CMake Build Directory 0]
+Build Directory Path=/home/ben/PhD-INRS/inrs-sources/C++/ndust/nevo/build
+Build Type=Debug
+CMake Binary=/usr/bin/cmake
+Environment Profile=
+Extra Arguments=
+Install Directory=
+
+[MakeBuilder]
+Number Of Jobs=10
+Override Number Of Jobs=true
+
+[Project]
+VersionControlSupport=

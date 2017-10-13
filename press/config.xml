@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Template
+-->
+<plot>
+    <figure>Coagulation</figure>
+    <title>Number density</title>
+    <title_fontsize>24</title_fontsize>
+    <tick_fontsize>18</tick_fontsize>
+    <minortick_fontsize>15</minortick_fontsize>
+    <legend_fontsize>18</legend_fontsize>
+    <legend_markers>2</legend_markers>
+    <axes axis="x">
+        <label>$v(u.a.)$</label>
+        <label_fontsize>25</label_fontsize>
+        <autoscale>False</autoscale>
+        <scale>log</scale>
+        <lim_low>1E-3</lim_low>
+        <lim_up>1E3</lim_up>
+    </axes>
+    <axes axis="y">
+        <label>$N_l(u.a.)$</label>
+        <label_fontsize>25</label_fontsize>
+        <autoscale>True</autoscale>
+<!--        <scale>log</xscale>
+        <lim_low>1E-3</lim_low>
+        <lim_up>1E3</lim_up>  -->
+    </axes>
+    <results name="initial">
+        <filename>../build/initial_distribution.dat</filename>
+<!--        <marker>o</marker>
+        <markersize>10</markersize>
+        <markeredgecolor>b</markeredgecolor>
+        <markerfacecolor>None</markerfacecolor>
+        <markeredgewidth>2</markeredgewidth>-->
+        <color>k</color>
+        <linewidth>2</linewidth>
+        <linestyle>--</linestyle>
+    </results>
+    <results name="final">
+        <filename>../build/final_distribution.dat</filename>
+        <marker>x</marker>
+        <markersize>10</markersize>
+        <markeredgecolor>r</markeredgecolor>
+        <markerfacecolor>None</markerfacecolor>
+        <markeredgewidth>2</markeredgewidth>
+        <color>r</color>
+        <linewidth>2</linewidth>
+        <linestyle>-</linestyle>
+    </results>
+    <results name="exact">
+        <filename>../build/exact_distribution.dat</filename>
+        <marker>o</marker>
+        <markersize>10</markersize>
+        <markeredgecolor>b</markeredgecolor>
+        <markerfacecolor>None</markerfacecolor>
+        <markeredgewidth>2</markeredgewidth>
+        <color>b</color>
+        <linewidth>2</linewidth>
+        <linestyle>-</linestyle>
+    </results>
+</plot>
