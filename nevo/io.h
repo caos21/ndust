@@ -59,12 +59,11 @@ typedef boost::variant<double, unsigned int, bool, std::string> boost_variant;
 
 inline
 void print_header(std::ostream& stream) {
-  stream << std::endl;
-  stream << std::endl << "####################################################";
-  stream << std::endl << "######                 NEvo                  #######";
-  stream << std::endl << "####################################################";
-  stream << std::endl;
-  stream << std::endl;
+  stream << '\n' << "####################################################";
+  stream << '\n' << "######                 NEvo                  #######";
+  stream << '\n' << "####################################################";
+  stream << '\n';
+  stream << '\n';
 }
 
 inline
@@ -73,33 +72,29 @@ void print_parameters(std::ostream& stream, const std::map<std::string,
   std::map<std::string, boost_variant >::const_iterator it;
 
   for (it = mappar.begin(); it != mappar.end(); ++it) {
-      stream << std::endl << "#<] " << it->first << " = " << it->second;
-//              << std::endl;
+      stream << '\n' << "#<] " << it->first << " = " << it->second;
+//           << '\n';
   }
-  stream << std::endl;
+  stream << '\n';
 }
 
 inline
-char* get_cmd_option(char** begin, char** end, const std::string & option)
-{
+char* get_cmd_option(char** begin, char** end, const std::string & option) {
     char ** itr = std::find(begin, end, option);
-    if (itr != end && ++itr != end)
-    {
+    if (itr != end && ++itr != end) {
         return *itr;
     }
     return 0;
 }
 
 inline
-bool cmd_option_exists(char** begin, char** end, const std::string& option)
-{
+bool cmd_option_exists(char** begin, char** end, const std::string& option) {
     return std::find(begin, end, option) != end;
 }
 
 template <class T>
 void param_input(const char type, T *par_Value, const T def_Value,
-                 const std::string & option_Value, int argc, char** argv)
-{
+                 const std::string & option_Value, int argc, char** argv) {
   // Store input option
   char *input_opt;
 
@@ -108,8 +103,7 @@ void param_input(const char type, T *par_Value, const T def_Value,
 
   // Add exceptions bad_cast
 
-  if(input_opt)
-  {
+  if(input_opt) {
     switch(type)
     {
 //       // Integer value for parameter
@@ -137,19 +131,19 @@ void param_input(const char type, T *par_Value, const T def_Value,
         break;*/
 
       default:
-        std::cout << std::endl << "!! Error: bad type input for param_input. "
-                  << std::endl;
+        std::cout << '\n' << "!! Error: bad type input for param_input. "
+                  << '\n';
         exit(-1);
 
     };
-    std::cout << std::endl << "!! Using " << option_Value << " = "
-              << *par_Value << std::endl;
+    std::cout << '\n' << "!! Using " << option_Value << " = "
+              << *par_Value << '\n';
   }
   else
   {
     *par_Value = def_Value;
-    std::cout << std::endl << "!! Using default value "
-              << option_Value << " = " << *par_Value << std::endl;
+    std::cout << '\n' << "!! Using default value "
+              << option_Value << " = " << *par_Value << '\n';
   }
 }
 
@@ -158,11 +152,13 @@ void show_help(int argc, char** argv)
 {
   if(cmd_option_exists(argv, argv+argc, "-h"))
   {
-    std::cout << std::endl << "Options:" << std::endl;
-    std::cout << '\t' << "-d Directory for input/output files" << std::endl;
-    std::cout << '\t' << "-o Prefix for input/output files" << std::endl;
-    std::cout << '\t' << "-t Number of OpenMP threads" << std::endl;
-    std::cout << std::endl;
+    std::cout << '\n' << "Options:" << '\n';
+    std::cout << '\t' << "-d Directory for input/output files" << '\n';
+    std::cout << '\t' << "-g Prefix for grid file" << '\n';
+    std::cout << '\t' << "-p Prefix for plasma file" << '\n';
+    std::cout << '\t' << "-n Prefix for nano file" << '\n';
+    std::cout << '\t' << "-t Number of OpenMP threads" << '\n';
+    std::cout << '\n';
     exit(0);
   }
 }

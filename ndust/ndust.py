@@ -3,6 +3,8 @@
 Created on Tue Sep 26 14:52:43 EDT 2017
 
 @author: ben
+
+Genrate ui pyuic5 -x ndust.ui -o ndustgui.py
 """
 __author__ = "Benjamin Santos"
 __copyright__ = "Copyright 2017, Benjamin Santos"
@@ -17,7 +19,7 @@ import os
 #from PyQt5 import QtGui, QtCore
 #from PyQt5.QtCore import SIGNAL
 #from PyQt5.QtCore import *
-#from PyQt5.QtGui import *
+#from PyQt5.QtGui import 
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
@@ -65,13 +67,13 @@ class Window(QMainWindow, Ui_MainWindow):
 
     self.checkbox_wsg = self.ui.checkBox_wsg
     self.checkbox_wsg.toggled.connect(self.toggle_sgrowth)
-    
+
     self.checkbox_wco = self.ui.checkBox_wco
     self.checkbox_wco.toggled.connect(self.toggle_coagulation)
-    
+
     self.checkbox_wch = self.ui.checkBox_wch
     self.checkbox_wch.toggled.connect(self.toggle_charging)
-    
+
     # plasma tab
     plasma_save_btn = self.ui.buttonBox_plasma_save.button(QtWidgets.QDialogButtonBox.Save)
     plasma_save_btn.clicked.connect(self.plasma_save)
@@ -85,18 +87,22 @@ class Window(QMainWindow, Ui_MainWindow):
 
     self.prefix = ""
     self.dirname = "../data/"
-    
+
     self.server = [" guillimin:~/duster/results/", " cottos:~/duster/results/"]
 
   # grid
     # h5 filename for grid
     self.gridfilename = ""
-    
-    # container for GridSystem   
+
+    # container for GridSystem
     self.gsys = []
 
     # container for volume sections
     self.vsections = []
+    self.update_vsections()
+
+    self.spinbox_peakpos = self.ui.spinBox_peakpos
+    self.spinbox_peakpos.valueChanged.connect(self.update_peakradius)
 
     # container for charge sections
     self.qsections = []
@@ -110,7 +116,7 @@ class Window(QMainWindow, Ui_MainWindow):
   # plasma
     # h5 filename for plasma
     self.plasmafilename = ""
-    
+
     # container for parameters
     self.parameters = []
 
@@ -129,79 +135,106 @@ class Window(QMainWindow, Ui_MainWindow):
   # nano
     # h5 filename for nano
     self.nanofilename = ""
-    
+
     # container for nanoparticle parameters
     self.nanoparticles = []
-    
+
     # container for rates
     self.rates = []
-    
+
     # container for time
     self.time = []
-    
-    # container for constants
-    self.constants = []
-    
+
+    # container for density
+    self.density = []
+    self.update_peakradius()
+
     # container for description
     self.ndescription = []
   #
+  # WARNING TODO update charge sections too
+  def update_vsections(self):
+    nvsections = self.ui.spinBox_vsecs.value()
+    rmin = le2float(self.ui.lineEdit_minrad)*1e-9
+
+    base = le2float(self.ui.lineEdit_base)
+    power = le2float(self.ui.lineEdit_power)
+    minvoliface, ifaces, vols, self.rads, diams = mg.compute_sections(nvsections, rmin, base, power)
+    vmin = ifaces[0]
+    strvmin = "{:.4e}".format(vmin)
+    value2le(self.ui.lineEdit_minvol, strvmin)
+    vmax = ifaces[-1]
+    strvmax = "{:.4e}".format(vmax)
+    value2le(self.ui.lineEdit_maxvol, strvmax)
+    rmax = self.rads[-1]*1e9
+    strrmax = "{:.4f}".format(rmax)
+    value2le(self.ui.lineEdit_maxrad, strrmax)
+
+
+  def update_peakradius(self):
+    """ update peakradius line edit
+    """
+    peakpos = self.ui.spinBox_peakpos.value()
+    if peakpos > len(self.rads)-1:
+      peakpos = len(self.rads)-1
+      self.ui.spinBox_peakpos.setValue(peakpos)
+    radius_peakpos = self.rads[peakpos]*1e9
+    strrad = "{:.4f}".format(radius_peakpos)
+    value2le(self.ui.lineEdit_radius, strrad)
+    return peakpos
+
   def grid_save(self):
-    """ Save grid file
+    """ Save grid files
     """      
     print("\n[ii] saving grid file\n")
     self.gridfilename = str(self.ui.lineEdit_grid_save_name.displayText())
     # WARNING must check for empty file FIXME
     #if self.gridfilename <> "":
         #self.prefix += "-"
-        
+
     h5f = h5py.File(self.dirname+self.gridfilename, "w")
     #h5f.attrs["gtime"] = 0.0
-    
+
     #profile_rerr = le2float(self.ui.lineEdit_ptol)
     #h5f.attrs["profile_rerr"] = profile_rerr
 
     # Nanoparticle temperature
     temperature = le2float(self.ui.lineEdit_temp)
-    
+
     # Nanoparticle mass density
     nmdensity = le2float(self.ui.lineEdit_nmdens)
 
     # instantiate the group GridSystem
     self.gsys = mg.GridSystem(h5f, temperature, nmdensity)
-    
+
     # write group
     self.gsys.toHDF5()
 
     # volume sections
+    self.update_vsections()
+
+    # volume sections
     nvsections = self.ui.spinBox_vsecs.value()
     rmin = le2float(self.ui.lineEdit_minrad)*1e-9
-    
+
     base = le2float(self.ui.lineEdit_base)
     power = le2float(self.ui.lineEdit_power)
     self.vsections = mg.VSections(h5f, nvsections, rmin, base, power)
+
     self.vsections.toHDF5()
-    vmin = self.vsections.ifaces[0]
-    strvmin = "{:.4e}".format(vmin)
-    value2le(self.ui.lineEdit_minvol, strvmin)
-    vmax = self.vsections.ifaces[-1]
-    strvmax = "{:.4e}".format(vmax)
-    value2le(self.ui.lineEdit_maxvol, strvmax)
-    rmax = self.vsections.rads[-1]*1e9
-    strrmax = "{:.4f}".format(rmax)
-    value2le(self.ui.lineEdit_maxrad, strrmax)
 
     # charge sections
     max_positive = self.ui.spinBox_maxpos.value()
     max_negative = self.ui.spinBox_maxneg.value()
     nqsections = max_positive + max_negative + 1
     value2le(self.ui.lineEdit_qsecs, nqsections)
-    
+
     self.qsections = mg.QSections(h5f, nqsections, max_positive, max_negative)
     self.qsections.toHDF5()
 
     # description for grid
     description_text = qte2string(self.ui.textEdit_grid_desc)
-    
+
     self.gdescription = mg.Description(h5f, description_text)
     self.gdescription.toHDF5()
 
@@ -289,7 +322,7 @@ class Window(QMainWindow, Ui_MainWindow):
     print("\n[ii] saving plasma file\n")
     self.plasmafilename = str(self.ui.lineEdit_plasma_save_name.displayText())
     # WARNING must check for empty file FIXME
-        
+
     h5f = h5py.File(self.dirname+self.plasmafilename, "w")
 
   # Parameters
@@ -298,20 +331,20 @@ class Window(QMainWindow, Ui_MainWindow):
 
     # Length
     length = le2float(self.ui.lineEdit_length)
-    
+
     # Temperature
     temperature = le2float(self.ui.lineEdit_temp_gas)
-    
+
     # Pressure
     pressure = le2float(self.ui.lineEdit_pressure)
 
     # instantiate the group Parameters
     self.parameters = mp.Parameters(h5f, pfixed, length, temperature, pressure)
-    
+
     # fill line edit with gas density
     strng = "{:.4e}".format(self.parameters.neutral_density())
     value2le(self.ui.lineEdit_ng, strng)
-    
+
     # write group
     self.parameters.toHDF5()
 
@@ -356,22 +389,22 @@ class Window(QMainWindow, Ui_MainWindow):
   # Description
     # description for plasma
     description_text = qte2string(self.ui.textEdit_plasma_desc)
-    
+
     self.pdescription = mp.Description(h5f, description_text)
-    
+
     # write description
     self.pdescription.toHDF5()
 
     # close file
     h5f.close()
-#  
+#
   def nano_save(self):
     """ Save nano file
-    """      
+    """
     print("\n[ii] saving nano file\n")
     self.nanofilename = str(self.ui.lineEdit_nano_save_name.displayText())
     # WARNING must check for empty file FIXME
-        
+
     h5f = h5py.File(self.dirname+self.nanofilename, "w")
 
   # Nanoparticles
@@ -380,7 +413,7 @@ class Window(QMainWindow, Ui_MainWindow):
 
     # Electron affinity
     eaffinity = le2float(self.ui.lineEdit_eaffinity)
-    
+
     # Accomodation factor
     accfactor = le2float(self.ui.lineEdit_acc)
 
@@ -396,16 +429,16 @@ class Window(QMainWindow, Ui_MainWindow):
 
     # nucleation rate
     nucleation_rate = le2float(self.ui.lineEdit_nucleation_rate)
-    
+
     # with surface growth
     wsg = self.ui.checkBox_wsg.isChecked()
 
     # surface growth rate
     sgrowth_rate = le2float(self.ui.lineEdit_sgrowth)
-    
+
     # with coagulation
     wco = self.ui.checkBox_wco.isChecked()
-    
+
     # with charging
     wch = self.ui.checkBox_wch.isChecked()
 
@@ -413,45 +446,56 @@ class Window(QMainWindow, Ui_MainWindow):
     self.rates = mn.Rates(h5f, wnu, nucleation_rate,
                           wsg, sgrowth_rate,
                           wco, wch)
-    
+
     # write group
     self.rates.toHDF5()
 
   # Time
     # nanoparticle growth delta time
     ndeltat = le2float(self.ui.lineEdit_ndeltat)
-    
+
     # nanoparticle charging delta time
     qdeltat = le2float(self.ui.lineEdit_qdeltat)
 
     # stop time
     tstop = le2float(self.ui.lineEdit_tstop)
-    
+
     # instantiate the group Time
     self.time = mn.Time(h5f, ndeltat, qdeltat, tstop)
-    
+
     # write group
     self.time.toHDF5()
 
-  # Constants
+  # Density
   # nanoparticle initial density
     indens = le2float(self.ui.lineEdit_indens)
-    
+
     # nanoparticle qtol
     qtol = le2float(self.ui.lineEdit_qtol)
-   
+
+    # volume sections
+    #
+    distribution = 0# delta default
+    if self.ui.radioButton_step.isChecked():
+      distribution = 1# step
+    elif self.ui.radioButton_gaussian.isChecked():
+      distribution = 2# Gaussian
+
+    peakpos = self.update_peakradius()
+    width = self.ui.spinBox_width.value()
+
     # instantiate the group Time
-    self.constants = mn.Constants(h5f, indens, qtol)
-    
+    self.density = mn.Density(h5f, indens, qtol, distribution, peakpos, width)
+
     # write group
-    self.constants.toHDF5()
-    
+    self.density.toHDF5()
+
   # Description
     # description for nano
     description_text = qte2string(self.ui.textEdit_nano_desc)
-    
+
     self.ndescription = mn.Description(h5f, description_text)
-    
+
     # write description
     self.ndescription.toHDF5()
 

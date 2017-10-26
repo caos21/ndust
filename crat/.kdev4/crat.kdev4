@@ -6,7 +6,7 @@ Build Directory Count=1
 Current Build Directory Index=0
 
 [CMake][CMake Build Directory 0]
-Build Directory Path=/home/ben/PhD-INRS/inrs-sources/C++/ndust/crat/build
+Build Directory Path=/home/ben/git/ndust/crat/build
 Build Type=Debug
 CMake Binary=/usr/bin/cmake
 Environment Profile=

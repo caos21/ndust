@@ -21,6 +21,7 @@
 #include <boost/log/utility/setup/common_attributes.hpp>
 #include <boost/log/support/date_time.hpp>
 #include <boost/log/sinks/text_file_backend.hpp>
+#include <boost/thread/thread.hpp>
 
 namespace logging = boost::log;
 namespace src = boost::log::sources;
@@ -62,11 +63,12 @@ namespace blog {
 //   }
 //   static boost::shared_ptr< sinks::synchronous_sink< sinks::text_file_backend > > pLogSink;
 // //   shared_ptr< synchronous_sink< text_file_backend > > pLogSink;
-//   
+//
    inline
   void init(std::string logname) {
     auto sink = logging::add_file_log (
       keywords::file_name = logname+".log",
+      keywords::auto_flush = true,//Write after each call
       // This makes the sink to write log records that look like this:
       // YYYY-MM-DD HH:MI:SS: [normal] A normal severity message, etc
       keywords::format = (

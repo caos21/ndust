@@ -16,14 +16,14 @@
  */
 
 #include "GridModel.h"
-  
+
 int GridModel::read() {
 
   int err;
-  
+
   BOOST_LOG_SEV(lg, info) << "Reading file. Id: "
                           << h5obj.getId();
-  
+
   // description attributes
   err = read_description();
 
@@ -32,7 +32,7 @@ int GridModel::read() {
 
   // vsections attributes
   err = read_vsections();
-  
+
   // qsections attributes
   err = read_qsections();
 
@@ -52,22 +52,22 @@ int GridModel::read() {
 int GridModel::read_description() {
   int err = 0;
   BOOST_LOG_SEV(lg, info) << "Sysinfo and description: ";
-  
+
   err = read_str_attrib_hdf5(h5obj, "/", "Nodename", desc.nodename);
   BOOST_LOG_SEV(lg, info) << "--> Nodename: " << desc.nodename;
-  
+
   err = read_str_attrib_hdf5(h5obj, "/", "Sysname", desc.sysname);
   BOOST_LOG_SEV(lg, info) << "--> Sysname: " << desc.sysname;
-  
+
   err = read_str_attrib_hdf5(h5obj, "/", "Machine", desc.machine);
   BOOST_LOG_SEV(lg, info) << "--> Machine: " << desc.machine;
-  
+
   err = read_str_attrib_hdf5(h5obj, "/", "Release", desc.release);
   BOOST_LOG_SEV(lg, info) << "--> Release: " << desc.release;
-  
+
   err = read_str_attrib_hdf5(h5obj, "/", "Version", desc.version);
   BOOST_LOG_SEV(lg, info) << "--> Version: " << desc.version;
-  
+
   err = read_str_attrib_hdf5(h5obj, "/", "Timestamp", desc.timestamp);
   BOOST_LOG_SEV(lg, info) << "--> Timestamp: " << desc.timestamp;
 
@@ -82,11 +82,11 @@ int GridModel::read_description() {
 int GridModel::read_gridsystem() {
   int err = 0;
   BOOST_LOG_SEV(lg, info) << "Grid system: ";
-  
+
   err = read_attrib_hdf5<double>(h5obj, "/Grid_system", "Temperature",
                          gsys.temperature);
   BOOST_LOG_SEV(lg, info) << "--> Temperature: " << gsys.temperature;
-  
+
   err = read_attrib_hdf5<double>(h5obj, "/Grid_system", "Mass_density",
                          gsys.nmdensity);
   BOOST_LOG_SEV(lg, info) << "--> Nanoparticle mass density: "
@@ -100,7 +100,7 @@ int GridModel::read_gridsystem() {
 int GridModel::read_vsections() {
   int err = 0;
   BOOST_LOG_SEV(lg, info) << "Volume sections: ";
-  
+
   err = read_attrib_hdf5<unsigned int>(h5obj, "/Volume_sections", "NSections",
                          vols.nsections);
   BOOST_LOG_SEV(lg, info) << "--> Number of sections: " << vols.nsections;

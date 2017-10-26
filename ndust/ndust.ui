@@ -42,7 +42,7 @@
         <bool>true</bool>
        </property>
        <property name="currentIndex">
-        <number>2</number>
+        <number>0</number>
        </property>
        <widget class="QWidget" name="Grid">
         <attribute name="title">
@@ -1589,7 +1589,7 @@
               <bool>false</bool>
              </property>
              <property name="placeholderText">
-              <string>Enter here a description for this set of plasma parameters</string>
+              <string>Enter here a description for the set of plasma parameters</string>
              </property>
             </widget>
            </item>
@@ -1610,7 +1610,7 @@
            <x>10</x>
            <y>200</y>
            <width>380</width>
-           <height>220</height>
+           <height>261</height>
           </rect>
          </property>
          <property name="title">
@@ -1622,7 +1622,7 @@
             <x>10</x>
             <y>40</y>
             <width>361</width>
-            <height>171</height>
+            <height>211</height>
            </rect>
           </property>
           <layout class="QGridLayout" name="gridLayout_4">
@@ -1737,7 +1737,7 @@
          <property name="geometry">
           <rect>
            <x>10</x>
-           <y>430</y>
+           <y>470</y>
            <width>380</width>
            <height>220</height>
           </rect>
@@ -1928,7 +1928,7 @@
           </property>
          </widget>
         </widget>
-        <widget class="QGroupBox" name="groupBox_nconst">
+        <widget class="QGroupBox" name="groupBox_ndensity">
          <property name="enabled">
           <bool>true</bool>
          </property>
@@ -1937,11 +1937,11 @@
            <x>400</x>
            <y>10</y>
            <width>380</width>
-           <height>141</height>
+           <height>381</height>
           </rect>
          </property>
          <property name="title">
-          <string>Constants</string>
+          <string>Density</string>
          </property>
          <widget class="QWidget" name="gridLayoutWidget_7">
           <property name="geometry">
@@ -1949,11 +1949,49 @@
             <x>10</x>
             <y>40</y>
             <width>361</width>
-            <height>91</height>
+            <height>331</height>
            </rect>
           </property>
           <layout class="QGridLayout" name="gridLayout_7">
-           <item row="1" column="0">
+           <item row="4" column="2">
+            <widget class="QSpinBox" name="spinBox_width">
+             <property name="alignment">
+              <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+             </property>
+             <property name="minimum">
+              <number>0</number>
+             </property>
+             <property name="maximum">
+              <number>250</number>
+             </property>
+             <property name="singleStep">
+              <number>1</number>
+             </property>
+             <property name="value">
+              <number>10</number>
+             </property>
+            </widget>
+           </item>
+           <item row="2" column="2">
+            <widget class="QSpinBox" name="spinBox_peakpos">
+             <property name="alignment">
+              <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+             </property>
+             <property name="minimum">
+              <number>0</number>
+             </property>
+             <property name="maximum">
+              <number>250</number>
+             </property>
+             <property name="singleStep">
+              <number>1</number>
+             </property>
+             <property name="value">
+              <number>0</number>
+             </property>
+            </widget>
+           </item>
+           <item row="5" column="0">
             <widget class="QLabel" name="label_qtol">
              <property name="text">
               <string>%Rel. error total part charge</string>
@@ -1967,7 +2005,7 @@
              </property>
             </widget>
            </item>
-           <item row="1" column="2">
+           <item row="5" column="2">
             <widget class="QLineEdit" name="lineEdit_qtol">
              <property name="text">
               <string>0.01</string>
@@ -1999,6 +2037,90 @@
               </size>
              </property>
             </spacer>
+           </item>
+           <item row="1" column="0">
+            <widget class="QLabel" name="label_distribution">
+             <property name="text">
+              <string>Distribution type</string>
+             </property>
+            </widget>
+           </item>
+           <item row="4" column="0">
+            <widget class="QLabel" name="label_width">
+             <property name="text">
+              <string>Width</string>
+             </property>
+            </widget>
+           </item>
+           <item row="1" column="2">
+            <layout class="QGridLayout" name="gridLayout_21">
+             <item row="0" column="0">
+              <widget class="QRadioButton" name="radioButton_delta">
+               <property name="layoutDirection">
+                <enum>Qt::RightToLeft</enum>
+               </property>
+               <property name="text">
+                <string>&amp;Delta</string>
+               </property>
+               <property name="checked">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="0">
+              <widget class="QRadioButton" name="radioButton_step">
+               <property name="layoutDirection">
+                <enum>Qt::RightToLeft</enum>
+               </property>
+               <property name="text">
+                <string>Step</string>
+               </property>
+              </widget>
+             </item>
+             <item row="2" column="0">
+              <widget class="QRadioButton" name="radioButton_gaussian">
+               <property name="layoutDirection">
+                <enum>Qt::RightToLeft</enum>
+               </property>
+               <property name="text">
+                <string>Ga&amp;ussian</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </item>
+           <item row="2" column="0">
+            <widget class="QLabel" name="label_peakpos">
+             <property name="text">
+              <string>Peak in section</string>
+             </property>
+            </widget>
+           </item>
+           <item row="3" column="0">
+            <widget class="QLabel" name="label_radius">
+             <property name="toolTip">
+              <string>Minimum mean radius</string>
+             </property>
+             <property name="text">
+              <string>Radius (nm)</string>
+             </property>
+            </widget>
+           </item>
+           <item row="3" column="2">
+            <widget class="QLineEdit" name="lineEdit_radius">
+             <property name="toolTip">
+              <string>Minimum mean radius</string>
+             </property>
+             <property name="text">
+              <string/>
+             </property>
+             <property name="alignment">
+              <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+             </property>
+             <property name="readOnly">
+              <bool>true</bool>
+             </property>
+            </widget>
            </item>
           </layout>
          </widget>

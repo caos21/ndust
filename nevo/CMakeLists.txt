@@ -3,9 +3,9 @@ cmake_minimum_required(VERSION 3.0)
 
 project(nevo)
 
-# defines variable SRCS to include cpp files
-file(GLOB SRCS *.cpp)
-file(GLOB INCSRCS RELATIVE "../include/" "*.cpp")
+# # defines variable SRCS to include cpp files
+# file(GLOB SRCS *.cpp)
+# file(GLOB INCSRCS RELATIVE "../include/" "*.cpp")
 
 set(CVODE_LIB sundials_cvode)
 set(NVECS_LIB sundials_nvecserial)
@@ -15,33 +15,24 @@ set(SUNDIALS_LIBS ${CVODE_LIB} ${NVECS_LIB} ${EXTRA_LINK_LIBS})
 
 include_directories("../include/")
 
+link_directories("../build/")
+
 add_library(GridModel STATIC ../include/GridModel.cpp)
 add_library(CRate STATIC ../include/CRate.cpp)
 add_library(PlasmaModel STATIC ../include/PlasmaModel.cpp)
 add_library(NanoModel STATIC ../include/NanoModel.cpp)
+add_library(NEvo STATIC ../NEvo.cpp)
 
 # GSL
-set(LIBS "-lgsl -lgslcblas -lm -llapack -lumfpack -lboost_log -lboost_thread -lboost_system -lboost_log_setup")
+set(LIBS "-lgsl -lgslcblas -lm -llapack -lumfpack -lboost_log -lboost_thread -lboost_system -lboost_log_setup -lhdf5_cpp -lhdf5 -lpthread -lz -ldl -lm")
 
-# HDF5
-set (LIBS "${LIBS} -I/usr/include/hdf5/ -lhdf5_cpp -lhdf5")
-set (LIBS "${LIBS} -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE -D_BSD_SOURCE -D_FORTIFY_SOURCE=2 -fstack-protector --param=ssp-buffer-size=4 -Wformat -Werror=format-security -lpthread -lz -ldl -lm")
+set(CMAKE_CXX_COMPILE_FLAGS "${CMAKE_CXX_COMPILE_FLAGS} -ftree-vectorizer-verbose=3 -std=gnu++14 -march=znver1 -O3 -ftree-vectorize -fstack-protector --param=ssp-buffer-size=4 -Wformat -Werror=format-security")
 
-# include_directories(${INC_DIR})
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -ftree-vectorizer-verbose=3 -std=gnu++14 -march=znver1 -O3 -ftree-vectorize -fopt-info-vec-missed=vec.miss -fstack-protector --param=ssp-buffer-size=4 -Wformat -Werror=format-security")
 
-set(CMAKE_CXX_COMPILE_FLAGS "${CMAKE_CXX_COMPILE_FLAGS} -O2 -ftree-vectorizer-verbose=3 ")
-
-set(CMAKE_CXX_LINK_FLAGS "${CMAKE_CXX_LINK_FLAGS} ")
-
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -std=gnu++11 -mtune=athlon-fx -O2 ")
-#
 # RELEASE ADD -DNDEBUG for boost performance
-#
-# set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DNDEBUG -fopenmp -DBOOST_LOG_DYN_LINK")
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fopenmp -DBOOST_LOG_DYN_LINK")
-#set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fopenmp")
+add_definitions(-DBOOST_LOG_DYN_LINK -DNDEBUG -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE -D_DEFAULT_SOURCE)
 
-list(APPEND ${CMAKE_CXX_COMPILE_FLAGS} ${LIBS})
 
 # WARNING not working
 find_package(OpenMP)
@@ -53,13 +44,15 @@ if(OPENMP_FOUND)
   add_definitions(-DOPENMP)
 endif()
 
-add_executable(nevo ${SRCS} ${INCSRCS})
+add_executable(nevo main.cpp)
 
-target_link_libraries(CRate
+target_link_libraries(NEvo
                       GridModel
+                      NanoModel
                       ${LIBS})
-                      
+
 target_link_libraries(nevo
+                      NEvo
                       CRate
                       PlasmaModel
                       NanoModel

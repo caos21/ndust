@@ -118,25 +118,37 @@ class Time(mh5u.H5Writable):
                           self.qdeltat,
                           self.tstop]
 #
-# ------ Constants class ------
-class Constants(mh5u.H5Writable):
-  """ Represents the constant parameters
+# ------ Density class ------
+class Density(mh5u.H5Writable):
+  """ Represents the nanoparticle density parameters
   """
-  def __init__(self, h5obj, indens, qtol):
+  def __init__(self, h5obj, indens, qtol, distribution, peakpos, width):
     """ Initial values
     """
     # hdf5 file object
     self.h5obj = h5obj
     # hdf5 path
-    self.h5path = self.h5obj.create_group("Constants")
+    self.h5path = self.h5obj.create_group("Density")
     # Set nanoparticle initial density
     self.indens = mh5u.Attrib("indens", indens)
     #
     # Set qtol
     self.qtol = mh5u.Attrib("qtol", qtol)
     #
+    # Set distribution
+    self.distribution = mh5u.Attrib("distribution", distribution)
+    #
+    # Set peakpos
+    self.peakpos = mh5u.Attrib("peakpos", peakpos)
+    #
+    # Set width (in terms of section number)
+    self.width = mh5u.Attrib("width", width)
+
     self.writable_list = [self.indens,
-                          self.qtol]
+                          self.qtol,
+                          self.distribution,
+                          self.peakpos,
+                          self.width]
 #
 # ------ Description class ------
 class Description(mh5u.H5Writable):

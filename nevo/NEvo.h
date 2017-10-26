@@ -126,18 +126,18 @@ public:
   std::string nano_filename;        //!< string for prefix for output.
   src::severity_logger< severity_level > lg; //!< Logger instance.
   H5::H5File h5obj;                   //!< HDF5 writable object.
-  
+
   H5::H5File h5obj_plasma;                   //!< HDF5 writable object.
 
   H5::H5File h5obj_nano;                   //!< HDF5 writable object.
-  
+
 //   GridModel gm;                       //!< Data model for a grid.
   CRate cr;                           //!< Coagulation rate object.
-  
+
   PlasmaModel pm;                     //!< Plasma model for calculations.
-  
+
   NanoModel nm;                       //!< Nano model for calculations.
-  
+
   double ctime;                       //!< Current time of simulation.
 
   boost_array2d idens;
@@ -152,13 +152,13 @@ public:
 
   // tunnel current
   boost_array2d tfreq;
-  
+
   // nanoparticle potential
   boost_array2d phid;
-  
+
   double efreqfactor;
   double ifreqfactor;
-  
+
   darray adim_srate;// surface rate 1/s
 
   darray surface_rate;// surface rate growth in m3/s
@@ -167,24 +167,24 @@ public:
   boost_array2d kcoagulation;
   boost_array2d cfrequency;
   boost_array2d jnucleation;
-  
+
   // vector of birth of particles in section
   boost_array2d birth_vector;
   // vector of death of particles in section
   boost_array2d death_vector;
 
   std::fstream* moments_file;
-  
+
   darray moments;
-  
+
 //   state_type nqdens;
 //   friend struct qsystem;
   qsystem* qsys;
-  
+
   friend class Solver;
 
   Solver* sol;
-  
+
   int check;
 //
 private:
@@ -208,20 +208,19 @@ private:
    * Compute nanoparticle potential
   */
   int compute_nanoparticle_potential();
-  
+
   //! Compute collision frequencies
   /*! 
    * Compute collision frequencies
   */
   int compute_collisionfreq();
 
-  
   int write_collisionfreq();
-  
+
   int compute_moments(boost_array2d dens);
-  
+
   int write_moments(double ctime);
-  
+
   int write_partial_results(double ctime);
 
   int compute_explicit_charging(double dt);
@@ -229,7 +228,7 @@ private:
   int advance_nocharging(const double ctime);
 
   int compute_sgrowth();
-  
+
   int compute_coagulation();
 
   inline
@@ -271,23 +270,23 @@ double rt_affinity(double R, double Z){
                    * cr.gm.gsys.temperature/eCharge)*(0.5/R);
     double rt = rt_affinity(R, Z);
     return prefac1*tunnel(rt, R, Z);
-  }  
+  }
 //
 // Private attributes
-// 
+//
 //   bgrid2d grid;                       //!< Grid vsecs x qsecs
-//     
+//
 //   bgrid4d grid4;                      //!< Grid vsecs x qsecs x vsecs x qsecs
 //   boost_array4d efactor;              //!< Array for enhancement factor.
 //   boost_array4d rcoag;                //!< Coagulation rate.
-//   
+//
 //   double electhermratio;          //!< Electrostatic energy to thermal ratio.
-// 
+//
 //   double beta0;                   //!< Coagulation rate beta0 prefactor.
-//   
+//
 //   //!< Container for EtaCreationFactor.
 //   std::vector<EtaCreationFactor> eta_factor_vector;
-// 
+//
 //   //!< Container for DeathFactor.
 //   std::vector<DeathFactor> death_factor_vector;
 };
@@ -327,7 +326,7 @@ struct qsystem{
 // //      nano = n;
 //      }
   qsystem(NEvo* nanoparent): nano(nanoparent) {
-    double tun = 0.0;
+    tun = 0.0;
     if(nano->nm.nano.tunnel==1) {
       tun = 1.0;
     }
@@ -338,20 +337,20 @@ struct qsystem{
 
         dndt[q] = (nano->ifreq[l][q-1]+tun*nano->tfreq[l][q-1])*n[q-1]
                 + nano->efreq[l][q+1]*n[q+1]
-                - n[q] *((nano->ifreq[l][q]+tun*nano->tfreq[l][q]) + nano->efreq[l][q]); 
+                - n[q] *((nano->ifreq[l][q]+tun*nano->tfreq[l][q]) + nano->efreq[l][q]);
 //       std::cerr << "\n dndt " << dndt[q] << "\t n " << n[q];
       }
       unsigned int q = 0;
       dndt[q] = nano->efreq[l][q+1]*n[q+1]
               - n[q] * ((nano->ifreq[l][q]+tun*nano->tfreq[l][q])); 
 //       std::cerr << "\n dndt " << dndt[q] << "\t n " << n[q];
-      
+
       q = nano->cr.gm.chrgs.nsections-1;
-      dndt[q] = (nano->ifreq[l][q-1]+tun*nano->tfreq[l][q-1])*n[q-1]                
+      dndt[q] = (nano->ifreq[l][q-1]+tun*nano->tfreq[l][q-1])*n[q-1]
               - n[q] * nano->efreq[l][q]; 
 //       std::cerr << "\n dndt " << dndt[q] << "\t n " << n[q];
   }
-  
+
   NEvo* nano;
   unsigned int l;
   double tun;
@@ -397,13 +396,13 @@ public:
     flag = CVDlsSetDenseJacFn(cvode_mem, NULL);
 //     flag = CVDiag(cvode_mem);
     std::cerr << "\n[ii] flag : " << flag << "\n";
-    
+
     std::cerr << "\n[ii] nsecs : " << nano->cr.gm.vols.nsections << "\n";
     // allocate vector for output
     y = NULL;
     y = N_VNew_Serial(2);
   }
-  
+
   ~Solver() {
     N_VDestroy_Serial(y);
     CVodeFree(&cvode_mem);
@@ -413,7 +412,7 @@ public:
   }
   // declaring friend function grants access to a and b from class
   friend int function(realtype t, N_Vector x, N_Vector dxdt, void *user_data);  
-  
+
   realtype a;
   realtype b;
   realtype reltol;
@@ -431,20 +430,20 @@ public:
       if (flag != CV_SUCCESS) {
         std::cerr << "\n[ee] Terminate. Flag : " << flag << "\n";
         std::terminate();
-      }      
+      }
     }
-    
+
   }
-  
+
   void compute_step(realtype ts, realtype dt) {
     flag = CVode(cvode_mem, ts+dt, y, &t, CV_NORMAL);
     std::cerr << t << '\t' << NV_Ith_S(y,0) << '\t' << NV_Ith_S(y,1) << '\n'; 
     if (flag != CV_SUCCESS) {
       std::cerr << "\n[ee] Terminate. Flag : " << flag << "\n";
       std::terminate();
-    }    
+    }
   }
-  
+
 private:
   void *cvode_mem = NULL;
   int flag;
@@ -455,19 +454,27 @@ private:
 
 // function to integrate
 int function(realtype t, N_Vector x, N_Vector dxdt, void *user_data) {
-  
+
   // static_cast user_data to class Solver 
   Solver* s = static_cast< Solver* >(user_data); 
-  
+
   realtype x0, x1;
-  
+
   x0 = NV_Ith_S(x, 0);
   x1 = NV_Ith_S(x, 1);
-  
+
   NV_Ith_S(dxdt, 0) = s->a*x0 + s->b*x1; // in boost dxdt[ 0 ] = -101.0 * x[ 0 ] - 100.0 * x[ 1 ];
   NV_Ith_S(dxdt, 1) = x0; // in boost dxdt[ 1 ] = x[ 0 ];
 
   return(0);
-} 
+}
 
+inline
+double gaussian_distribution(double x, double mu, double sigma){
+  // mu -> mean
+  // sigma -> standard deviation
+  double prefac = 1.0/sqrt(2.0*pi*sigma*sigma);
+  double arg = -0.5*pow((x-mu)/sigma, 2);
+  return prefac*exp(arg);
+}
 #endif // NEVO_H

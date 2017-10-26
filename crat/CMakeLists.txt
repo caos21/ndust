@@ -9,6 +9,8 @@ file(GLOB INCSRCS RELATIVE "../include/" "*.cpp")
 
 include_directories("../include/")
 
+add_definitions(-DBOOST_LOG_DYN_LINK)
+
 add_library(GridModel STATIC ../include/GridModel.cpp)
 add_library(CRate STATIC ../include/CRate.cpp)
 
@@ -21,11 +23,11 @@ set (LIBS "${LIBS} -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE -D_BSD_SOURCE -D_FO
 
 # include_directories(${INC_DIR})
 
-set(CMAKE_CXX_COMPILE_FLAGS "${CMAKE_CXX_COMPILE_FLAGS} -O2 -ftree-vectorizer-verbose=3 ")
+set(CMAKE_CXX_COMPILE_FLAGS "${CMAKE_CXX_COMPILE_FLAGS} -O2 ")
 
 set(CMAKE_CXX_LINK_FLAGS "${CMAKE_CXX_LINK_FLAGS} ")
 
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -std=gnu++11 -mtune=athlon-fx -O2 ")
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -std=gnu++14 -march=znver1 -O3 -ftree-vectorize -fopt-info-vec-missed=vec.miss  ")
 #
 # RELEASE ADD -DNDEBUG for boost performance
 #
@@ -50,7 +52,7 @@ target_link_libraries(CRate
                       GridModel
                       ${LIBS})
 
-target_link_libraries(crat                      
+target_link_libraries(crat
                       CRate
                       ${LIBS})
 

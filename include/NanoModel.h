@@ -70,15 +70,19 @@ struct times {
 };
 
 /**
-  * struct constants
+  * struct density
   *
-  * Stores constants parameters 
+  * Stores density parameters 
   *
   */
-struct constants {
+struct density {
   double indens;                   //!< Initial nanoparticle density
   double qtol;                     //!< Charging qtol
-
+  int distribution;                /*!< Type of distribution:
+                                        0->delta, 1->step, 2->Gaussian*/
+  unsigned int peakpos;            /*!< Number section for peak of initial
+                                        Nanoparticle distribution*/
+  unsigned int width;              //!< Number section for peak of initial
 };
 
 
@@ -94,8 +98,8 @@ public:
 //
   //! Constructor for NanoModel
   /*!
-    @param  h5obj HDF5 writable object.
-    @param  lg_ Logger instance.
+   * @param  h5obj HDF5 writable object.
+   * @param  lg_ Logger instance.
   */
   NanoModel(H5::H5File h5obj_, src::severity_logger< severity_level > lg_)
         : h5obj(h5obj_), lg(lg_)  {
@@ -107,11 +111,11 @@ public:
 // Public methods
 //
   //! Read h5 datafile
-  /*! 
+  /*!
    * Read the plasma model
   */
   int read();
-  
+
 // Public attributes
 //
   H5::H5File h5obj;                   //!< HDF5 writable object.
@@ -120,38 +124,38 @@ public:
   description desc;               //!< Data and file description.
   nanoparticles nano;             //!< Nanoparticle parameters.
   rates rs;                       //!< Growth rate information.
-  constants cs;                   //!< Constants parameters.
+  density ds;                     //!< Initial density parameters.
   times tm;                       //!< Time parameters.
   //
 private:
 // Private methods
 //
   //! Read h5 datafile description
-  /*! 
+  /*!
    * Read the datafile description text and sysinfo attributes
   */
   int read_description();
 
   //! Read h5 datafile nanoparticle parameters
-  /*! 
+  /*!
    * Read the datafile nanoparticle attributes
   */
   int read_nanoparticles();
-  
+
   //! Read h5 datafile rates
-  /*! 
+  /*!
    * Read the datafile rates attributes
   */
   int read_rates();
 
-  //! Read h5 datafile constants
-  /*! 
-   * Read the datafile constants attributes
+  //! Read h5 datafile density group
+  /*!
+   * Read the datafile density attributes
   */
-  int read_constants();
-  
+  int read_density();
+
   //! Read h5 datafile time
-  /*! 
+  /*!
    * Read the datafile time attributes
   */
   int read_time();

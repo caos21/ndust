@@ -56,6 +56,23 @@ class GridSystem(mh5u.H5Writable):
     #
     self.writable_list = [self.temperature, self.nmdensity]
 #
+#
+def compute_sections(nsections, rmin, base, power):
+  """ Compute sections
+  """
+  #
+  vmin = cvol(rmin)
+  # the minimum volume interface that gives vmin = (v0+v1)/2
+  minvoliface = 2.0*vmin/(1.0+base) #vmin = (vo+v1)/2 = vo+base*vo/2
+  # Create sections
+  ifaces = minvoliface*np.power(base, np.arange(0, nsections+1))
+  #
+  vols = 0.5*(ifaces[1:]+ifaces[:-1])
+  rads = crad(vols)
+  diams = 2.0*rads
+  #
+  return minvoliface, ifaces, vols, rads, diams
+#
 # ------ Volume Sections class ------
 class VSections(mh5u.H5Writable):
   """ Represents the volumes of nanoparticles
@@ -67,9 +84,9 @@ class VSections(mh5u.H5Writable):
     #
     self.nsections = mh5u.Attrib("NSections", nsections)
     #
-    vmin = cvol(rmin)
-    # the minimum volume interface that gives vmin = (v0+v1)/2
-    minvoliface = 2.0*vmin/(1.0+base) #vmin = (vo+v1)/2 = vo+base*vo/2
+    minvoliface, self.ifaces, self.vols, self.rads, self.diams = compute_sections(nsections, rmin,
+                                                                             base, power)
+
     self.miniface = mh5u.Attrib("Min_interface", minvoliface)
     #
     self.base = mh5u.Attrib("Base", base)
@@ -77,19 +94,16 @@ class VSections(mh5u.H5Writable):
     self.power = mh5u.Attrib("Power", power)
     #
     # Create sections
-    self.ifaces = minvoliface*np.power(base, np.arange(0, nsections+1))
     self.interfaces = mh5u.DataSet("Interfaces",
                                     (nsections+1, ),
                                     "f",
                                     self.ifaces)
     #
-    self.vols = 0.5*(self.ifaces[1:]+self.ifaces[:-1])
     self.volumes = mh5u.DataSet("Volumes",
                                 (nsections, ),
                                 "f",
                                 self.vols)
     #
-    self.rads = crad(self.vols)
     self.radii = mh5u.DataSet("Radii",
                               (nsections, ),
                               "f",
@@ -98,8 +112,11 @@ class VSections(mh5u.H5Writable):
     self.diameters = mh5u.DataSet("Diameters",
                                   (nsections, ),
                                   "f",
-                                  2.0*self.rads)
+                                  self.diams)
+    # WARNING FIXME horrible hack
+
     self.h5path = self.h5obj.create_group("Volume_sections")
+
     self.writable_list = [self.nsections,
                           self.miniface,
                           self.base,
@@ -108,6 +125,7 @@ class VSections(mh5u.H5Writable):
                           self.volumes,
                           self.radii,
                           self.diameters]
+  #
 #
 # ------ Charge Sections class ------
 class QSections(mh5u.H5Writable):
@@ -165,7 +183,7 @@ class Description(mh5u.H5Writable):
     self.sysinfo = [None]*5
     for i, si in enumerate(sysinfostr):
       self.sysinfo[i] = mh5u.Attrib(si, str(os.uname()[i]))
-    
+
     # list of lists
     writlist = [[self.description, self.timestamp], self.sysinfo]
     # flatten list

@@ -40,7 +40,7 @@ int main(int argc, char **argv) {
 //   BOOST_LOG_SEV(lg, info) << "Prefix for output files: " << prefix_filename;
   // add hyphen
 //   prefix_filename += "-";
-  
+
   // Check environment variable dir
   std::string dirname = get_environment_variable("NDUST_DATA");
   if(dirname.empty()) {
@@ -49,7 +49,7 @@ int main(int argc, char **argv) {
   else {
     std::cerr <<  "\n[ii] Environment variable NDUST_DATA = " << dirname << '\n';
   }
-  
+
   // Checks if option -o is called
   input_opt = get_cmd_option(argv, argv + argc, "-d");
   if(input_opt) {
@@ -60,25 +60,25 @@ int main(int argc, char **argv) {
       std::string dirname = "";
     }
   }
- 
+
   std::cerr << "\n[ii] Prefix for output files: " << prefix_filename << '\n';
-  
+
   // init logger
   blog::init(dirname+prefix_filename);
-   
+
   logging::add_common_attributes();
 
   src::severity_logger< severity_level > lg;
   BOOST_LOG_SEV(lg, info) << "Logging started for CRat";
-  
+
   BOOST_LOG_SEV(lg, info) << "Prefix for output files: " << prefix_filename;
-  
+
   BOOST_LOG_SEV(lg, info) << "Output directory: " << dirname;
     // init logger
 //   blog::close();
   // add /
 //   dirname += "/";
-  
+
   // get num threads
   int num_threads = omp_get_num_threads();
   BOOST_LOG_SEV(lg, info) << "Number of threads = " << num_threads;
@@ -86,7 +86,7 @@ int main(int argc, char **argv) {
   // get max threads
   int max_num_threads = omp_get_max_threads();
   BOOST_LOG_SEV(lg, info) <<  "Max number of threads = " << max_num_threads;
-  
+
   input_opt = get_cmd_option(argv, argv + argc, "-t");  
   if(input_opt) {
     // get num threads from input
@@ -102,18 +102,11 @@ int main(int argc, char **argv) {
       #pragma omp single
       BOOST_LOG_SEV(lg, info) << "Set number of threads = " << num_threads;
     }
-  }  
-  
+  }
+
   BOOST_LOG_SEV(lg, info) <<  "Get omp nested = " << omp_get_nested();
   BOOST_LOG_SEV(lg, info) <<  "Get omp cancellation = " << omp_get_cancellation();
-  
-//   BOOST_LOG_SEV(lg, trace) << "A trace severity message";
-//   BOOST_LOG_SEV(lg, debug) << "A debug severity message";
-//   BOOST_LOG_SEV(lg, info) << "An informational severity message";
-//   BOOST_LOG_SEV(lg, warning) << "A warning severity message";
-//   BOOST_LOG_SEV(lg, error) << "An error severity message";
-//   BOOST_LOG_SEV(lg, fatal) << "A fatal severity message";  
-  
+
   clock_t begin_crate = std::clock();
 
   CRate crate(dirname, prefix_filename, lg);
@@ -128,6 +121,6 @@ int main(int argc, char **argv) {
   std::cout << "\n[ii] CRat elapsed time: "
             << elapsed_secs << '\n';
   BOOST_LOG_SEV(lg, info)<< "CRat elapsed time: " << elapsed_secs;
-  
+
   return 0;
 }

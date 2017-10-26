@@ -1,9 +1,12 @@
+[Buildset]
+BuildItems=@Variant(\x00\x00\x00\t\x00\x00\x00\x00\x01\x00\x00\x00\x0b\x00\x00\x00\x00\x01\x00\x00\x00\x08\x00n\x00e\x00v\x00o)
+
 [CMake]
 Build Directory Count=1
 Current Build Directory Index=0
 
 [CMake][CMake Build Directory 0]
-Build Directory Path=/home/ben/PhD-INRS/inrs-sources/C++/ndust/nevo/build
+Build Directory Path=/home/ben/git/ndust/nevo/build
 Build Type=Debug
 CMake Binary=/usr/bin/cmake
 Environment Profile=

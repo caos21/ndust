@@ -19,7 +19,7 @@
 
 int NEvo::open() {
   std::string fullname = dirname + grid_filename + ".h5";
-  
+
   int err = open_hdf5(fullname, h5obj, "write");
   if(err!=0) {
     BOOST_LOG_SEV(lg, error) << "h5 I/O error opening file. Terminate.";
@@ -28,7 +28,7 @@ int NEvo::open() {
   BOOST_LOG_SEV(lg, info) << "Open file for read/write: "
                           << fullname << " -> Success. Id: "
                           << h5obj.getId();
-  
+
   fullname = dirname + plasma_filename + ".h5";
   err = open_hdf5(fullname, h5obj_plasma, "write");
   if(err!=0) {
@@ -48,23 +48,23 @@ int NEvo::open() {
   BOOST_LOG_SEV(lg, info) << "Open file for read/write: "
                           << fullname << " -> Success. Id: "
                           << h5obj_nano.getId();
-                          
+
   return 0;
 }
 
 int NEvo::close() {
   delete(qsys);
   delete(sol);
-  
+
   hid_t id = h5obj.getId();
-  
-  int err = close_hdf5(h5obj);    
+
+  int err = close_hdf5(h5obj);
   if(err!=0) {
     BOOST_LOG_SEV(lg, error) << "h5 I/O error closing file. Terminate.";
     std::terminate();
   }
   BOOST_LOG_SEV(lg, info) << "Closed file Id: " << id;
-  
+
   id = h5obj_plasma.getId();
   err = close_hdf5(h5obj_plasma);
   if(err!=0) {
@@ -80,7 +80,7 @@ int NEvo::close() {
     std::terminate();
   }
   BOOST_LOG_SEV(lg, info) << "Closed file Id: " << id;
-  
+
   moments_file->close();
   delete(moments_file);
   BOOST_LOG_SEV(lg, info) << "Closed file moments";
@@ -88,13 +88,13 @@ int NEvo::close() {
 
 int NEvo::read() {
   hid_t id = h5obj.getId();
-  
+
   cr = CRate(h5obj, lg);
   cr.read_results();
-  
+
   pm = PlasmaModel(h5obj_plasma, lg);
   pm.read();
-  
+
   nm = NanoModel(h5obj_nano, lg);
   nm.read();
 
@@ -115,7 +115,7 @@ int NEvo::write() {
 // 
 //   BOOST_LOG_SEV(lg, info) << "Writing coagulation rate";
 //   write_rcoagulation();
-  
+
   return 0;
 }
 
@@ -127,10 +127,10 @@ int NEvo::evolve() {
   xini = N_VNew_Serial(cr.gm.chrgs.nsections);
   NV_Ith_S(xini, 0) = RCONST(2.0);
   NV_Ith_S(xini, 1) = RCONST(1.0);
- 
+
     std::cerr << "\n Initial condition : "
               << NV_Ith_S(xini,0) << '\t' << NV_Ith_S(xini,1) << '\n' << NV_LENGTH_S(xini) << "\n"; 
-              
+
   // Instantiate the solver
   sol = new Solver(this, xini, 0.0);
 //  Solver sol(xini, 0.0);
@@ -146,34 +146,39 @@ int NEvo::evolve() {
 
   // or solve one step
 //   sol.compute_step(0.0, dt);
-  
+
   // free memory for xini
   N_VDestroy_Serial(xini);
-  
+
   int err;
-  
+
   unsigned int npcount = 0;
 
   err = compute_precompute();
 
   qsys = new qsystem(this);
-  
+
   auto stepper = odeint::make_controlled( 1.0e-6, 1.0e-6,
                                           odeint::runge_kutta_dopri5< state_type >() );
 
-  
+
   clock_t begin_sim = std::clock();
   ctime = 0.0;
   for(unsigned int t=0; ; ++t, ++npcount) {
     ctime += nm.tm.ndeltat;
-    
+
     evolve_one_step(ctime);
-    
+
     if(npcount>static_cast<unsigned int>((0.01*nm.tm.tstop)/nm.tm.ndeltat)) {
+      clock_t elapsed_sim = std::clock();
+      double elapsed_secs = double(elapsed_sim - begin_sim) / CLOCKS_PER_SEC;
+      BOOST_LOG_SEV(lg, info) << "Writing results at simulation time = "
+                              << ctime << " [elapsed secs = " 
+                              << elapsed_secs << "]";
       err=write_partial_results(ctime);
       npcount=0;
     }
-    
+
     if(ctime>nm.tm.tstop-nm.tm.ndeltat) {
       BOOST_LOG_SEV(lg, info) << "Done!, time = " << ctime;
       clock_t end_sim = std::clock();
@@ -188,14 +193,14 @@ int NEvo::evolve() {
     }
     pdens = ndens;
   }
-  
+
   return -1;
 }
 
 int NEvo::compute_precompute() {
 
   int err;
-  
+
   // Nanoparticle potential
   phid.resize(cr.grid);
 
@@ -203,7 +208,7 @@ int NEvo::compute_precompute() {
   efreq.resize(cr.grid);
   ifreq.resize(cr.grid);
   tfreq.resize(cr.grid);
-  
+
   compute_nanoparticle_potential();
   BOOST_LOG_SEV(lg, info) << "Writing nanoparticle potential to file.";
   err = write_dataset2d_hdf5(h5obj_nano, "Potential", "phid", phid,
@@ -212,16 +217,53 @@ int NEvo::compute_precompute() {
   compute_collisionfreq();
 
   err = write_collisionfreq();
-  
+
   // initial density
   idens.resize(cr.grid);
-  idens[0][cr.gm.chrgs.maxnegative] = nm.cs.indens;
+
+  if (nm.ds.peakpos>cr.gm.vols.nsections) {
+    BOOST_LOG_SEV(lg, fatal)
+      << "Section number for peak of distribution is greater than max section"
+      << " number " << nm.ds.peakpos << " > " << cr.gm.vols.nsections;
+  }
+  switch(nm.ds.distribution) {
+    // Step distribution
+    case 1:
+    {
+      int halfwidth = nm.ds.width / 2;
+      for(unsigned int i=0; i<nm.ds.width; ++i) {
+        idens[nm.ds.peakpos-halfwidth+i][cr.gm.chrgs.maxnegative] =
+                              nm.ds.indens/static_cast<double>(nm.ds.width);
+      }
+      break;
+    }
+    // Gaussian distribution
+    case 2:
+    {
+      // FIXME compute number density in sections to get Ntotal=sum Ni
+      int halfwidth = nm.ds.width / 2;
+      double vpeak  = cr.gm.vols.volumes[nm.ds.peakpos];
+      double vsigma = vpeak
+                    - cr.gm.vols.volumes[nm.ds.peakpos-halfwidth];
+      for(unsigned int i=0; i<nm.ds.width; ++i) {
+        unsigned int ix = static_cast<unsigned int>(nm.ds.peakpos-halfwidth+i);
+        double v = cr.gm.vols.volumes[ix];
+
+        idens[ix][cr.gm.chrgs.maxnegative] = gaussian_distribution(v, vpeak, vsigma);
+      }
+      break;
+    }
+    case 0:
+//     default:
+      idens[nm.ds.peakpos][cr.gm.chrgs.maxnegative] = nm.ds.indens;
+      break;
+  }
 
   // auxiliar densities
   pdens.resize(cr.grid);
   pdens = idens;
   ndens.resize(cr.grid);
-  
+
   moments_file = new std::fstream(dirname + nano_filename + "-moments.dat", std::fstream::out);
   *moments_file << "#Time\tNumber\tVolume\tCharge\tmu11\tmu20\tmu02\tmu21\tmu12\tmu30\tmu03";
 
@@ -250,17 +292,17 @@ int NEvo::compute_precompute() {
                                     "surface_rate");
   err = create_attrib_hdf5(h5obj_nano, "/Rates", "srate_max", adim_srate.max());
   err = create_attrib_hdf5(h5obj_nano, "/Rates", "srate_min", adim_srate.min());
-  
+
   gsurfacegrowth.resize(cr.grid);
   kcoagulation.resize(cr.grid);
   cfrequency.resize(cr.grid);
   jnucleation.resize(cr.grid);
-  
+
   // vector of birth of particles in section
   birth_vector.resize(cr.grid);
   // vector of death of particles in section
   death_vector.resize(cr.grid);
-  
+
 //   nqdens.resize(cr.gm.chrgs.nsections);
 
   return err;
@@ -282,29 +324,29 @@ int NEvo::compute_collisionfreq() {
   double min_ifreq = 1.0e15;
 
   // From 1.Allen, J. E. Probe theory - the orbital motion approach. Phys. Scr. 45, 497 (1992).
-  
+
   // FIXME optimization use a vector of areas instead of M_PI radii2[l]
   double kte = (2.0/3.0)*pm.es.emean*eCharge;
   efreqfactor = 4.0 * M_PI * pm.es.ne * eCharge * sqrt(kte/(2.0*M_PI*eMass));
 
   BOOST_LOG_SEV(lg, info) << "Electron frequency prefactor: "
                           << efreqfactor;
-                              
+
   double ion_energy_from_temperature = (3.0/2.0) * Kboltz * pm.is.itemp;
   // WARNING ion_velocity not defined TODO
   double ion_velocity = 0.0;
   double ion_energy = ion_energy_from_temperature 
                     + 0.5*pm.is.imass*ion_velocity*ion_velocity;
   double kti = (2.0/3.0)*ion_energy;
-  
+
   // ifreq factor
   ifreqfactor = 4.0 * M_PI * pm.is.ni * eCharge * sqrt(kti/(2.0*M_PI*pm.is.imass));
 
   BOOST_LOG_SEV(lg, info) << "Ion frequency prefactor: "
                           << ifreqfactor;
-                          
+
   darray radii2 = cr.gm.chrgs.charges*cr.gm.chrgs.charges;
-  
+
 //   std::cerr << "\n[ii] ifreqfactor" << ifreqfactor;
 // #pragma omp parallel for collapse(2)
   for (unsigned int l = 0; l < cr.gm.vols.nsections; ++l) {
@@ -344,7 +386,7 @@ int NEvo::compute_collisionfreq() {
     }
 
   }
-  
+
   double max_tfreq = 0.0;
   double min_tfreq = 1.0e20;
 
@@ -380,9 +422,11 @@ int NEvo::compute_collisionfreq() {
 //           if ((tfreq[l][q] > efreq[l][q])/*&&(tfreq[l][q] > max_ifreq)*/) {
 //             tfreq[l][q] = efreq[l][q];
 //           }
+          //WARNING if tunnel frequency is too higher
+          // FIXME these allow to accelerate the calculations
           if ((tfreq[l][q] > efreq[l][q])/*&&(tfreq[l][q] > max_ifreq)*/) {
-//              efreq[l][q] = 0.0;
-//              tfreq[l][q] = 0.0;
+             efreq[l][q] = 0.0;
+             tfreq[l][q] = 0.0;
           }
         }
       }
@@ -411,7 +455,7 @@ int NEvo::compute_collisionfreq() {
 
 int NEvo::write_collisionfreq() {
   int err;
-  
+
   BOOST_LOG_SEV(lg, info) << "Writing electron frequency to file.";
   err = write_dataset2d_hdf5(h5obj_nano, "Collision_frequencies",
                              "efreq",
@@ -437,8 +481,8 @@ int NEvo::write_collisionfreq() {
   double rion_min = *std::min_element(ifreq.origin(), ifreq.origin()
                                                       + ifreq.num_elements());
   err = create_attrib_hdf5(h5obj_nano, "/Collision_frequencies", "rion_min", rion_min);
-  
-  
+
+
   BOOST_LOG_SEV(lg, info) << "Writing tunnel frequency to file.";
   err = write_dataset2d_hdf5(h5obj_nano, "Collision_frequencies",
                              "tfreq",
@@ -451,7 +495,7 @@ int NEvo::write_collisionfreq() {
   double rtun_min = *std::min_element(tfreq.origin(), tfreq.origin()
                                                       + tfreq.num_elements());
   err = create_attrib_hdf5(h5obj_nano, "/Collision_frequencies", "rtun_min", rtun_min);
-  
+
   return err;
 }
 
@@ -512,13 +556,13 @@ int NEvo::compute_explicit_charging(double dt) {
           dens = pdens[l][q] *(1.0 - hdt*((ifreq[l][q]+tun*tfreq[l][q]) + efreq[l][q]))
                 + hdt *((ifreq[l][q-1]+tun*tfreq[l][q-1])*pdens[l][q-1]
                       + efreq[l][q+1]*pdens[l][q+1]);
-        }          
-        hdt *= 0.25;          
+        }
+        hdt *= 0.25;
       } while(dens<0.0);
       ndens[l][q] = dens;
-    }      
+    }
   }
-  
+
   for (unsigned int l = 0; l < cr.gm.vols.nsections; ++l) {
 //     ndens[l][0] = pdens[l][0]
 //                          + dt *(efreq[l][1]*pdens[l][1]
@@ -537,7 +581,7 @@ int NEvo::compute_explicit_charging(double dt) {
     ndens[l][0] = dens;
 
     hdt = dt;
-    
+
     do {
       for(double tp=0.0; tp<dt; tp+=hdt) {
         dens = pdens[l][cr.gm.chrgs.nsections-1]
@@ -547,10 +591,10 @@ int NEvo::compute_explicit_charging(double dt) {
                             - efreq[l][cr.gm.chrgs.nsections-1]
                             *pdens[l][cr.gm.chrgs.nsections-1]);
       }
-      hdt *= 0.5;          
+      hdt *= 0.5;
     } while(dens<0.0);
-    ndens[l][cr.gm.chrgs.nsections-1] = dens;     
-      
+    ndens[l][cr.gm.chrgs.nsections-1] = dens;
+
   }
 
 //   bool negative_density = false;

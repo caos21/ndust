@@ -188,7 +188,7 @@ class plot():
     if xc is None:
       self.xc = xmlcfg()
 
-    self.defpath = r'/home/ben/ndust/data/'
+    self.defpath = r'/home/ben/git/ndust/data/'
     
     self.h5nanoprefix = h5nanoprefix
     #os.chdir(self.defpath)
@@ -277,6 +277,8 @@ class plot():
 
     self.nanofile.close()
     self.gridfile.close()
+
+    self.levelsf = None
 
     self.extents_linear = [0, len(self.dpivots), 0, len(self.qpivots)]
 
@@ -408,7 +410,7 @@ class plot():
   def plot_pdens(self):
     self.pcolor_dens(self.log10res, u"Density")
 
-  def plot_fcontours(self, data, msg="Filled contours", levelsf=None, cmap=cm.viridis,
+  def plot_fcontours(self, data, msg="Filled contours", cmap=cm.viridis,
                     axislabel=[r'Diameter $(\mathrm{nm)}$', r'$q(\# e)$', r'$\log N$'],
                     savename="figc.png"):
     """
@@ -416,19 +418,19 @@ class plot():
     fig = plt.figure(msg, figsize=(12, 9))
     #fig.suptitle(msg, size=self.xc.title_fontsize)
 
-    if levelsf is None:
-      levelsf = np.arange(1, 18, 2)
+    if self.levelsf is None:
+      self.levelsf = np.arange(1, 18, 2)
 
     self.axis(axislabel)
     self.minorticks(fig)
 
-    CSF = plt.contourf(self.X, self.Y, data, levelsf, cmap=cmap, origin='lower',
+    CSF = plt.contourf(self.X, self.Y, data, levels=self.levelsf, cmap=cmap, origin='lower',
                       extent=self.extents_linear)
 
-    CS = plt.contour(self.X, self.Y, data, levels=levelsf, origin='lower',
+    CS = plt.contour(self.X, self.Y, data, levels=self.levelsf, origin='lower',
                      colors='k', linewidths=1.5, extent=self.extents_linear)
 
-    plt.clabel(CS, levelsf, inline=1, fmt='%d', fontsize=self.xc.tick_fontsize,
+    plt.clabel(CS, self.levelsf, inline=1, fmt='%d', fontsize=self.xc.tick_fontsize,
               colors='k')
 
     # Color bar
@@ -461,7 +463,8 @@ class plot():
 
   def plot_bars(self, pivots, data, width, log=True, msg=u"Size distribution",
                 axislabel=[r'$Diameter (\text{nm)}$', r'$N(1/m^3)$'],
-                savename="dbars.png", color=current_palette[0], figname="ddiam"):
+                savename="dbars.png", color=current_palette[0], figname="ddiam",
+                ylim=None):
     """
     """
     # Create the figure
@@ -471,7 +474,8 @@ class plot():
     self.axis1d(data, pivots, axislabel, log=log)
     self.minorticks(fig)
 
-    pbars = plt.bar(pivots-0.5*width, data, width, color=color, edgecolor=color, alpha=0.75, linewidth=3, align='center')
+    pbars = plt.bar(pivots, data, width, color=color,
+                    edgecolor=color, alpha=0.75, linewidth=3, align='center')
 
   #  pdens = plt.plot(pivots, data, '-', lw=2.5, color=color)
   # interpolation
@@ -492,17 +496,19 @@ class plot():
       #fint = interp1d(pivots, data, kind='zero')
       #plt.plot(pivnew, fint(pivnew), lw=2.5)
 
+    if ylim is not None:
+      plt.ylim(ylim)
     plt.savefig(savename, bbox_inches='tight')
     plt.show()
 
-  def plot_diams(self):
-    self.plot_bars(self.dpivots, self.ddens, self.width_vpivots)
+  def plot_diams(self, ylim=None):
+    self.plot_bars(self.dpivots, self.ddens, self.width_vpivots, ylim=ylim)
 
-  def plot_charges(self):
+  def plot_charges(self, ylim=None):
     self.plot_bars(self.qpivots, self.cdens, self.width_qpivots, log=False,
                    msg=u"Charge distribution",
                    axislabel=[r'$q(e)$', r'$N(1/m^3)$'], savename="cbars.png",
-                   color=current_palette[1], figname="qbar")
+                   color=current_palette[1], figname="qbar", ylim=ylim)
 
 
   def plot_charges_at_volume(self, sect_indexes, zorders, colors, fills,
@@ -513,7 +519,7 @@ class plot():
     ttitle = "Charge distribution"
     fig = plt.figure(figname, figsize=(12, 9))
     fig.suptitle(ttitle, size=self.xc.title_fontsize)
-    axislabel=[r'Diameter $(\mathrm{nm)}$', r'$N(1/m^3)$']
+    axislabel=[r'$q(e)$', r'$N(1/m^3)$']
     plt.xlabel(axislabel[0], fontsize=self.xc.label_fontsize0)
     plt.ylabel(axislabel[1], fontsize=self.xc.label_fontsize1)
 
@@ -538,6 +544,10 @@ class plot():
       #pbars = plt.bar(self.qpivots, charge_dens,
                       #self.width_qpivots, color=colors[i], zorder=zorders[i],
                       #label=label, align='center')
+      #pbars = plt.bar(self.qpivots, charge_dens,
+                      #1, edgecolor=colors[i], color=colors[i], zorder=zorders[i],
+                      #label=label, align='center',fill=fills[i],
+                      #hatch=hatches[i], alpha=alphas[i], linewidth=lwidths[i])
       pbars = plt.bar(self.qpivots, charge_dens,
                       1, edgecolor=colors[i], color=colors[i], zorder=zorders[i],
                       label=label, align='center',fill=fills[i],

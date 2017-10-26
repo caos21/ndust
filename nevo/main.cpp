@@ -111,13 +111,13 @@ int main(int argc, char **argv) {
       #pragma omp master
       BOOST_LOG_SEV(lg, info) << "Set number of threads = " << num_threads;
     }
-  }  
-  
+  }
+
   BOOST_LOG_SEV(lg, info) <<  "Get omp nested = " << omp_get_nested();
   BOOST_LOG_SEV(lg, info) <<  "Get omp cancellation = " << omp_get_cancellation();
-  
+
   clock_t begin_nevo = std::clock();
-  
+
   NEvo nevo(dirname, grid_filename, plasma_filename, nano_filename, lg);
   nevo.open();
   nevo.read();
@@ -130,6 +130,6 @@ int main(int argc, char **argv) {
   std::cout << "\n[ii] NEvo elapsed time: "
             << elapsed_secs << "\n\n";
   BOOST_LOG_SEV(lg, info)<< "NEvo elapsed time: " << elapsed_secs;
-  
+
   return 0;
 }

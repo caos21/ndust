@@ -20,6 +20,10 @@
 
 #include <cmath>
 
+
+// math constants, pi
+#include <boost/math/constants/constants.hpp>
+
 #include <gsl/gsl_const_mksa.h>
 #include <gsl/gsl_const_num.h>
 
@@ -28,12 +32,15 @@
 #define EPSILONZETA 1.0e-250
 #define EPSILON 1.0e-150
 // #define EPSILONETA 1.0e-50
-#define EPSILONETA 1.0e-50
+#define EPSILONETA 1.0e-18
 // #define EPSILONDEATH 1.0e-50
-#define EPSILONDEATH 1.0e-50//1.0e-30
+#define EPSILONDEATH 1.0e-18//1.0e-30
 //
 #define ZETA1_12 0.0833333333333
 #define ZETA1_720 0.00138888888889
+
+// pi from boost
+const double pi = boost::math::double_constants::pi;
 
 // TODO use boost
 
