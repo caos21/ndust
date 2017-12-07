@@ -12,6 +12,7 @@ CMake Binary=/usr/bin/cmake
 Environment Profile=
 Extra Arguments=
 Install Directory=
+Runtime=Host System
 
 [MakeBuilder]
 Number Of Jobs=10

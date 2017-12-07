@@ -19,7 +19,7 @@
 
 int CRate::open() {
   std::string fullname = dirname + prefix_filename + ".h5";
-  
+
   int err = open_hdf5(fullname, h5obj, "write");
   if(err!=0) {
     BOOST_LOG_SEV(lg, error) << "h5 I/O error opening file. Terminate.";
@@ -33,8 +33,8 @@ int CRate::open() {
 
 int CRate::close() {
   hid_t id = h5obj.getId();
-  
-  int err = close_hdf5(h5obj);    
+
+  int err = close_hdf5(h5obj);
   if(err!=0) {
     BOOST_LOG_SEV(lg, error) << "h5 I/O error closing file. Terminate.";
     std::terminate();
@@ -45,9 +45,9 @@ int CRate::close() {
 
 int CRate::read() {
   hid_t id = h5obj.getId();
-  
+
   gm = GridModel(h5obj, lg);
-  
+
   gm.read();
 
   // grid definition
@@ -59,18 +59,18 @@ int CRate::read() {
 }
 
 int CRate::read_results() {
-  
+
   int err;
 
   BOOST_LOG_SEV(lg, info) << "Reading grid";
   err = read();
-  
+
   BOOST_LOG_SEV(lg, info) << "Reading eta creation factor";
   read_etafactor();
- 
+
   BOOST_LOG_SEV(lg, info) << "Reading death factor";
   read_deathfactor();
-  
+
   return 0;
 }
 
@@ -88,7 +88,7 @@ int CRate::write() {
 
   BOOST_LOG_SEV(lg, info) << "Writing coagulation rate";
   write_rcoagulation();
-  
+
   return 0;
 }
 
@@ -111,27 +111,27 @@ void CRate::bind_efactorfunc(){
       BOOST_LOG_SEV(lg, error) << "Method " << gm.einter.method
                                << " not known";
       std::terminate();
-  }  
+  }
 }
 
 int CRate::compute() {
 
   // bind efactorfunc
   bind_efactorfunc();
-  
+
   // grid definition
   grid = {{gm.vols.nsections, gm.chrgs.nsections}};
   grid4 = {{gm.vols.nsections, gm.chrgs.nsections,
             gm.vols.nsections, gm.chrgs.nsections}};
-  
+
   // resizing
   efactor.resize(grid4); 
   rcoag.resize(grid4);
-  
+
   // Compute electrostatic to thermal ratio
   electhermratio = 1.0*eCharge*eCharge
                   / (4.0*M_PI*EpsilonZero*Kboltz*gm.gsys.temperature);
-  
+
   BOOST_LOG_SEV(lg, info) << "Electrostatic to thermal ratio: "
                           << electhermratio;
 
@@ -142,7 +142,7 @@ int CRate::compute() {
   BOOST_LOG_SEV(lg, info) << "Computing enhancement factor grid";
   compute_efactor_grid();
   BOOST_LOG_SEV(lg, info) << "Done... ehancement factor grid";
-  
+
   BOOST_LOG_SEV(lg, info) << "Computing coagulation rate";
   compute_rcoagulation();
   BOOST_LOG_SEV(lg, info) << "Done... coagulation rate";
@@ -154,17 +154,17 @@ int CRate::compute() {
   BOOST_LOG_SEV(lg, info) << "Computing death rate";
   compute_deathfactor();
   BOOST_LOG_SEV(lg, info) << "Done... death";
-  
+
   return 0;
 }
 
 void CRate::compute_efactor_grid() {
-  // iterate in radii particle 1 
+  // iterate in radii particle 1
 #pragma omp parallel for collapse(4) schedule(runtime)
   for (unsigned int l=0; l<gm.vols.nsections; ++l) {
     // iterate in charges particle 1
     for (unsigned int q=0; q<gm.chrgs.nsections; ++q) {
-      // iterate in radii particle 2 
+      // iterate in radii particle 2
       for (unsigned int m=0; m<gm.vols.nsections; ++m) {
         // iterate in charges particle 2
         for (unsigned int p=0; p<gm.chrgs.nsections; ++p) {
@@ -197,7 +197,7 @@ void CRate::compute_rcoagulation() {
                             * beta_free(gm.vols.volumes[l],
                                         gm.vols.volumes[m],
                                         beta0);
-          
+
           if(rcoag[l][q][m][p]<0.0) {
             BOOST_LOG_SEV(lg, error) << "Negative coagulation rate. Terminate";
             std::terminate();

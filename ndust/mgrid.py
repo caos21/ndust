@@ -57,9 +57,19 @@ class GridSystem(mh5u.H5Writable):
     self.writable_list = [self.temperature, self.nmdensity]
 #
 #
-def compute_sections(nsections, rmin, base, power):
+def compute_sections(nsections, rmin, base, power, linear):
   """ Compute sections
+      [rmin] = metre
   """
+  if linear:
+    rads = np.linspace(rmin, base*nsections*1e-9, nsections)
+    rifaces = rads-base*1e-9*0.5
+    rifaces = np.append(rifaces, rads[-1]+base*1e-9*0.5)
+    diams = 2.0*rads
+    vols = cvol(rads)
+    ifaces = cvol(rifaces)
+    minvoliface = ifaces[0]
+    return minvoliface, ifaces, vols, rads, diams
   #
   vmin = cvol(rmin)
   # the minimum volume interface that gives vmin = (v0+v1)/2
@@ -77,7 +87,7 @@ def compute_sections(nsections, rmin, base, power):
 class VSections(mh5u.H5Writable):
   """ Represents the volumes of nanoparticles
   """
-  def __init__(self, h5obj, nsections, rmin, base, power):
+  def __init__(self, h5obj, nsections, rmin, base, power, linear=False):
     """ Initial values
     """
     self.h5obj = h5obj
@@ -85,7 +95,7 @@ class VSections(mh5u.H5Writable):
     self.nsections = mh5u.Attrib("NSections", nsections)
     #
     minvoliface, self.ifaces, self.vols, self.rads, self.diams = compute_sections(nsections, rmin,
-                                                                             base, power)
+                                                                             base, power, linear)
 
     self.miniface = mh5u.Attrib("Min_interface", minvoliface)
     #

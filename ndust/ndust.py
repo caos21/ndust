@@ -159,26 +159,28 @@ class Window(QMainWindow, Ui_MainWindow):
 
     base = le2float(self.ui.lineEdit_base)
     power = le2float(self.ui.lineEdit_power)
-    minvoliface, ifaces, vols, self.rads, diams = mg.compute_sections(nvsections, rmin, base, power)
-    vmin = ifaces[0]
+    linear = False
+    if self.ui.checkBox_linear.isChecked():
+      linear = True
+    minvoliface, mg.ifaces, mg.vols, mg.rads, mg.diams = mg.compute_sections(nvsections, rmin, base, power, linear)
+    vmin = mg.ifaces[0]
     strvmin = "{:.4e}".format(vmin)
     value2le(self.ui.lineEdit_minvol, strvmin)
-    vmax = ifaces[-1]
+    vmax = mg.ifaces[-1]
     strvmax = "{:.4e}".format(vmax)
     value2le(self.ui.lineEdit_maxvol, strvmax)
-    rmax = self.rads[-1]*1e9
+    rmax = mg.rads[-1]*1e9
     strrmax = "{:.4f}".format(rmax)
     value2le(self.ui.lineEdit_maxrad, strrmax)
-
 
   def update_peakradius(self):
     """ update peakradius line edit
     """
     peakpos = self.ui.spinBox_peakpos.value()
-    if peakpos > len(self.rads)-1:
-      peakpos = len(self.rads)-1
+    if peakpos > len(mg.rads)-1:
+      peakpos = len(mg.rads)-1
       self.ui.spinBox_peakpos.setValue(peakpos)
-    radius_peakpos = self.rads[peakpos]*1e9
+    radius_peakpos = mg.rads[peakpos]*1e9
     strrad = "{:.4f}".format(radius_peakpos)
     value2le(self.ui.lineEdit_radius, strrad)
     return peakpos
@@ -219,7 +221,10 @@ class Window(QMainWindow, Ui_MainWindow):
 
     base = le2float(self.ui.lineEdit_base)
     power = le2float(self.ui.lineEdit_power)
-    self.vsections = mg.VSections(h5f, nvsections, rmin, base, power)
+    linear = False
+    if self.ui.checkBox_linear.isChecked():
+      linear = True
+    self.vsections = mg.VSections(h5f, nvsections, rmin, base, power, linear)
 
     self.vsections.toHDF5()
 

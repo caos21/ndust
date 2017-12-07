@@ -356,12 +356,27 @@ namespace eint {
     double eps;
   };
 
+  struct force_ipa_funct
+  {
+    force_ipa_funct(double r21_, double q21_, double eps_):
+                        r21(r21_), q21(q21_), eps(eps_){
+    }
+
+    double operator()(double const& rt) {
+      return force_ipa_fact(rt, r21, q21, eps);
+    }
+
+    double r21;
+    double q21;
+    double eps;
+  };
+
   // compute ipa enhancement factor for a pair of particles
   inline
   double efactor_ipa(double r1, double r2,
                     double q1, double q2,
                     double eps, double temperature) {
-    
+
     double r21 = r2/r1;
     double q21 = q2/q1;
     // check q1==0
@@ -376,22 +391,27 @@ namespace eint {
       r21 = r2/r1;
       q21 = 0.0;
     }
-    
+
     double max = 500.0;
     boost::uintmax_t max_iter = 1000;
     tools::eps_tolerance<double> tol(30);
-      
+
     double rt = 1.0 + r21;
-    
-    double min = rt;        
-    
+
+    double min = rt;
+
+    // potential function
     potential_ipa_funct pipafunct(r21, q21, eps);
     double pipa = pipafunct(rt);
+
+    // force function
+    force_ipa_funct forceipafunct(r21, q21, eps);
 
     std::pair<double, double> pair_pipa;
     bool failed = false;
     try {
-      pair_pipa = tools::toms748_solve(pipafunct, min, max, tol, max_iter);
+//       pair_pipa = tools::toms748_solve(pipafunct, min, max, tol, max_iter);
+      pair_pipa = tools::toms748_solve(forceipafunct, min, max, tol, max_iter);
     }
     catch(const std::exception& e) {
       failed = true;
@@ -406,9 +426,18 @@ namespace eint {
     double phimin = potprefactor*pipa;
 
     if(withphimax){
-      double phimax = potprefactor*pair_pipa.first;
+//       double phimax = potprefactor*pair_pipa.first;
+      double phimax = 0.0;
+      if (pair_pipa.first>0.0){
+        phimax = potprefactor*pipafunct(pair_pipa.first);
+      }
+
       eta = exp(-phimax/(Kboltz*temperature))
           *(1.0+(phimax-phimin)/(Kboltz*temperature));
+    std::cout << std::endl
+              << "\t pipa.first = " << pair_pipa.first
+              << "\t pipa.second = " << pair_pipa.second;
+
     }
     if(fullatt){
       eta = 1.0 - phimin /(Kboltz*temperature);
@@ -417,9 +446,10 @@ namespace eint {
       eta = exp(-phimin/(Kboltz*temperature));
     }
 
-  //   std::cout << std::endl << r21 << "\t" << q21 << "\t" << potprefactor*pair_pmpc.first
-  //             << "\t" << phimin << "\t" << attcontact << "\t"
-  //             << fullatt << "\t" << eta;
+//     std::cout << std::endl << "r21 = " << r21 << "\tq21 = " << q21 
+//               << "\t phimax = " << potprefactor*pair_pipa.first
+//               << "\t phimin = " << phimin << "\tcontact = " << attcontact
+//               << "\tfullatt = " << fullatt << "\teta = " << eta;
     return eta;
   }
 
@@ -448,7 +478,7 @@ namespace eint {
                             r21, q21, rt, eps, j1max, j2max);
       // solve linear system
       lapack::gesv(coefficients, independent);
-      
+
       // fill acoefficients
       acoefficients[0] = A10;
       for(unsigned int l=0; l<independent.size(); ++l){
@@ -471,13 +501,60 @@ namespace eint {
     ubvector acoefficients;
   };
 
+  // multipolar coefficients force functor
+  struct force_mpc_funct
+  {
+    force_mpc_funct(double r21_,
+                        double q21_,
+                        double eps_,
+                        unsigned int j1max_,
+                        unsigned int j2max_):
+                        r21(r21_), q21(q21_), eps(eps_),
+                        j1max(j1max_), j2max(j2max_){
+
+      coefficients = ublas::zero_matrix<double>(j1max-1, j1max-1);
+      independent = ublas::zero_vector<double>(j1max-1);
+      acoefficients = ublas::zero_vector<double>(j1max);
+    }
+
+    double operator()(double const& rt) {
+      double A10=0.0;
+
+      // compute coefficients
+      compute_Acoefficients(coefficients, independent, A10, 1.0, 1.0,
+                            r21, q21, rt, eps, j1max, j2max);
+      // solve linear system
+      lapack::gesv(coefficients, independent);
+
+      // fill acoefficients
+      acoefficients[0] = A10;
+      for(unsigned int l=0; l<independent.size(); ++l){
+        acoefficients[l+1] = independent[l];
+      }
+
+      // compute Bichoutskaia force
+      return force_bichoutskaia(1.0, 1.0, r21, q21, rt,
+                                    acoefficients, eps);
+
+    }
+
+    double r21;
+    double q21;
+    double eps;
+    unsigned int j1max;
+    unsigned int j2max;
+    ubmatrix coefficients;
+    ubvector independent;
+    ubvector acoefficients;
+  };
+
   // compute eta factor for a pair of particles
   inline
   double efactor_mpc(double r1, double r2,
                     double q1, double q2,
                     double eps, double temperature,
                     unsigned int j1max, unsigned int j2max) {
-    
+
     double r21 = r2/r1;
     double q21 = q2/q1;
     // check q1==0
@@ -492,23 +569,27 @@ namespace eint {
       r21 = r2/r1;
       q21 = 0.0;
     }
-    
+
     double max = 500.0;
     boost::uintmax_t max_iter = 1000;
     tools::eps_tolerance<double> tol(30);
-      
+
     double rt = 1.0 + r21;
-    
-    double min = rt;        
-    
-    potential_mpc_funct pmpcfunct(r21, q21, eps, 
+
+    double min = rt;
+
+    potential_mpc_funct pmpcfunct(r21, q21, eps,
                                   j1max, j2max);
     double pmpc = pmpcfunct(rt);
+
+    force_mpc_funct forcempcfunct(r21, q21, eps,
+                                  j1max, j2max);
 
     std::pair<double, double> pair_pmpc;
     bool failed = false;
     try {
-      pair_pmpc = tools::toms748_solve(pmpcfunct, min, max, tol, max_iter);
+//       pair_pmpc = tools::toms748_solve(pmpcfunct, min, max, tol, max_iter);
+      pair_pmpc = tools::toms748_solve(forcempcfunct, min, max, tol, max_iter);
     }
     catch(const std::exception& e) {
       failed = true;
@@ -523,7 +604,11 @@ namespace eint {
     double phimin = potprefactor*pmpc;
 
     if(withphimax){
-      double phimax = potprefactor*pair_pmpc.first;
+//       double phimax = potprefactor*pair_pmpc.first;
+      double phimax = 0.0;
+      if (pair_pmpc.first>0.0){
+        phimax = potprefactor*pmpcfunct(pair_pmpc.first);
+      }
       eta = exp(-phimax/(Kboltz*temperature))
           *(1.0+(phimax-phimin)/(Kboltz*temperature));
     }

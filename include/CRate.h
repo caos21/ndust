@@ -139,11 +139,11 @@ public:
 private:
 // Private methods
 //
-  //! Bind method to efactor func
-  /*! 
+  //! Bind method to efactor function
+  /*!
    *  Method to efactor funct
   */
-  void bind_efactorfunc();  
+  void bind_efactorfunc();
 
   //! Compute efactor
   /*! 
@@ -157,11 +157,11 @@ private:
                      double q1, double q2) {
     return (this->*efactorfunc)(r1, r2,
                                 q1, q2);
-  
+
   }
 
   //! Compute efactor using mpc method
-  /*! 
+  /*!
     Compute enhancement factor using multipolar coefficient expansion
     @param  r1 radius of particle 1
     @param  r2 radius of particle 2
@@ -176,11 +176,11 @@ private:
                              gm.einter.dconstant,
                              gm.gsys.temperature,
                              gm.einter.terms,
-                             gm.einter.terms); 
+                             gm.einter.terms);
   }
 
   //! Compute efactor using ipa method
-  /*! 
+  /*!
     Compute enhancement factor using image potential approximation expansion
     @param  r1 radius of particle 1
     @param  r2 radius of particle 2
@@ -193,7 +193,7 @@ private:
     return eint::efactor_ipa(r1, r2,
                              q1, q2,
                              gm.einter.dconstant,
-                             gm.gsys.temperature); 
+                             gm.gsys.temperature);
   }
 
   //! Compute efactor using Coulomb method
@@ -289,22 +289,22 @@ private:
 
   boost_array4d efactor;              //!< Array for enhancement factor.
   boost_array4d rcoag;                //!< Coagulation rate.
-  
+
   double electhermratio;          //!< Electrostatic energy to thermal ratio.
 
   //!< Type definition to pointer to function.
   typedef double ( CRate::*efactorfunc_t ) ( double, double, double, double );  
-  
+
   efactorfunc_t efactorfunc;      //!< Pointer to function.
 
   double beta0;                   //!< Coagulation rate beta0 prefactor.
-   
+
   //!< Container for EtaFactor.
   boost_array2d eta2d;
-  
+
   //!< Container for DeathFactor.
   boost_array2d death2d;
-  
+
   static const unsigned int neta = 8; //!< number of eta indices.
   static const unsigned int ndeath = 6;//!< number of death indices.
 };
