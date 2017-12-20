@@ -282,7 +282,8 @@ namespace eint {
     pot_3 *= -invK;
 
     // WARNING 0.5 double count?
-    return pot_coul + 0.5*pot_2 + 0.5*pot_3;
+    //return pot_coul + 0.5*pot_2 + 0.5*pot_3;
+    return pot_coul + pot_2 + pot_3;
   }
 
   //! Bichoutskaia force.
