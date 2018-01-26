@@ -234,11 +234,11 @@ namespace eint {
 
   //! Bichoutskaia potential.
   /*!
-  * 
-  *As defined in equation 9 of 
+   *
+   *As defined in equation A7 of
     Lindgren, E. B., Chan, H.-K., Stace, A. J. & Besley, E.
     Progress in the theory of electrostatic interactions between charged particles.
-    Phys. Chem. Chem. Phys. 18, 5883–5895 (2016) (and A7 of Bichoutskaia)
+    Phys. Chem. Chem. Phys. 18, 5883–5895 (2016)
     \param r1 radius of particle 1.
     \param r2 radius of particle 2.
     \param q1 charge of particle 1.
@@ -281,9 +281,9 @@ namespace eint {
     }
     pot_3 *= -invK;
 
-    // WARNING 0.5 double count?
-    //return pot_coul + 0.5*pot_2 + 0.5*pot_3;
-    return pot_coul + pot_2 + pot_3;
+    // WARNING 0.5 factor correction to potential
+    return pot_coul + 0.5*pot_2 + 0.5*pot_3;
+    //return pot_coul + pot_2 + pot_3;
   }
 
   //! Bichoutskaia force.

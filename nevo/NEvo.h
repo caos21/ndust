@@ -31,7 +31,9 @@
 #include <boost/multiprecision/cpp_dec_float.hpp>
 
 #include <cvode/cvode.h>
-#include <cvode/cvode_dense.h>
+// error, check version
+//#include <cvode/cvode_dense.h>
+#include <cvode/cvode_direct.h>
 #include <cvode/cvode_diag.h>
 #include <nvector/nvector_serial.h>
 #include <sundials/sundials_types.h>
@@ -391,12 +393,20 @@ public:
     std::cerr << "\n[ii] flag : " << flag << "\n";
     flag = CVodeSetUserData(cvode_mem, static_cast< void* >(this));
     std::cerr << "\n[ii] flag : " << flag << "\n";
-    flag = CVDense(cvode_mem, 2);
-    std::cerr << "\n[ii] flag : " << flag << "\n";
-    flag = CVDlsSetDenseJacFn(cvode_mem, NULL);
-//     flag = CVDiag(cvode_mem);
-    std::cerr << "\n[ii] flag : " << flag << "\n";
 
+    // ERROR WARNING check version
+    //flag = CVDense(cvode_mem, 2);
+    //std::cerr << "\n[ii] flag : " << flag << "\n";
+    //flag = CVDlsSetDenseJacFn(cvode_mem, NULL);
+//     flag = CVDiag(cvode_mem);
+    //std::cerr << "\n[ii] flag : " << flag << "\n";
+    //------------------
+    // Alternative to previous error FIXME
+    flag = CVDlsSetJacFn(cvode_mem, NULL);
+    std::cerr << "\n[ii] flag : " << flag << "\n";
+    //------------------
+    
+    
     std::cerr << "\n[ii] nsecs : " << nano->cr.gm.vols.nsections << "\n";
     // allocate vector for output
     y = NULL;
