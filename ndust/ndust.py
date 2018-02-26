@@ -162,7 +162,15 @@ class Window(QMainWindow, Ui_MainWindow):
     linear = False
     if self.ui.checkBox_linear.isChecked():
       linear = True
-    minvoliface, mg.ifaces, mg.vols, mg.rads, mg.diams = mg.compute_sections(nvsections, rmin, base, power, linear)
+    special = False
+    if self.ui.checkBox_special.isChecked():
+      special = True
+      # update number of sections
+      nvsections = 40
+      self.ui.spinBox_vsecs.setValue(nvsections)
+    minvoliface, mg.ifaces, mg.vols, mg.rads, mg.diams = mg.compute_sections(nvsections, rmin,
+                                                                             base, power, linear,
+                                                                             special)
     vmin = mg.ifaces[0]
     strvmin = "{:.4e}".format(vmin)
     value2le(self.ui.lineEdit_minvol, strvmin)
@@ -222,19 +230,35 @@ class Window(QMainWindow, Ui_MainWindow):
     base = le2float(self.ui.lineEdit_base)
     power = le2float(self.ui.lineEdit_power)
     linear = False
+    special = False
     if self.ui.checkBox_linear.isChecked():
       linear = True
-    self.vsections = mg.VSections(h5f, nvsections, rmin, base, power, linear)
+      self.ui.checkBox_special.setChecked(False)
+    if self.ui.checkBox_special.isChecked():
+      special = True
+    self.vsections = mg.VSections(h5f, nvsections, rmin, base, power, linear, special)
 
     self.vsections.toHDF5()
 
     # charge sections
+      ##FIXME 
+    #if self.ui.checkBox_special.isChecked():
+      #special = True
     max_positive = self.ui.spinBox_maxpos.value()
     max_negative = self.ui.spinBox_maxneg.value()
-    nqsections = max_positive + max_negative + 1
-    value2le(self.ui.lineEdit_qsecs, nqsections)
+    if not special:
+      nqsections = max_positive + max_negative + 1
+      print('not special ', nqsections)
+    else:
+      nqsections = 50
+      print('special ', nqsections)
+      max_positive = 5
+      max_negative = 296
+      self.ui.spinBox_maxneg.setValue(max_negative)
+      self.ui.spinBox_maxpos.setValue(max_positive)
 
-    self.qsections = mg.QSections(h5f, nqsections, max_positive, max_negative)
+    value2le(self.ui.lineEdit_qsecs, nqsections)
+    self.qsections = mg.QSections(h5f, nqsections, max_positive, max_negative, special)
     self.qsections.toHDF5()
 
     # description for grid
@@ -245,7 +269,7 @@ class Window(QMainWindow, Ui_MainWindow):
 
     # electrostatic interaction
     multiplier = le2float(self.ui.lineEdit_mult)
-    dconstant = le2float(self.ui.lineEdit_die)      
+    dconstant = le2float(self.ui.lineEdit_die)
     terms = self.ui.spinBox_terms.value()
     #
     method = 0# MPC

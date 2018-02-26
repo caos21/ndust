@@ -281,9 +281,12 @@ namespace eint {
     }
     pot_3 *= -invK;
 
-    // WARNING 0.5 factor correction to potential
+    // NOTE 1/2 factor correction to potential as stated in
+    // 1.Stace, A. J. & Bichoutskaia, E. Reply to the ‘Comment on “Treating
+    // highly charged carbon and fullerene clusters as dielectric particles”’
+    // by H. Zettergren and H. Cederquist, Phys. Chem. Chem. Phys., 2012, 14,
+    // DOI: 10.1039/c2cp42883k. Phys. Chem. Chem. Phys. 14, 16771–16772 (2012).
     return pot_coul + 0.5*pot_2 + 0.5*pot_3;
-    //return pot_coul + pot_2 + pot_3;
   }
 
   //! Bichoutskaia force.
@@ -372,87 +375,89 @@ namespace eint {
     double eps;
   };
 
-  // compute ipa enhancement factor for a pair of particles
-  inline
-  double efactor_ipa(double r1, double r2,
-                    double q1, double q2,
-                    double eps, double temperature) {
 
-    double r21 = r2/r1;
-    double q21 = q2/q1;
-    // check q1==0
-    if(fabs(q1)<1.e-200){
-      // q1=0, permute particle 1 with 2
-      double raux = r2;
-      r2 = r1;
-      r1 = raux;
-      double qaux = q2;
-      q2 = q1;
-      q1 = qaux;
-      r21 = r2/r1;
-      q21 = 0.0;
-    }
-
-    double max = 500.0;
-    boost::uintmax_t max_iter = 1000;
-    tools::eps_tolerance<double> tol(30);
-
-    double rt = 1.0 + r21;
-
-    double min = rt;
-
-    // potential function
-    potential_ipa_funct pipafunct(r21, q21, eps);
-    double pipa = pipafunct(rt);
-
-    // force function
-    force_ipa_funct forceipafunct(r21, q21, eps);
-
-    std::pair<double, double> pair_pipa;
-    bool failed = false;
-    try {
-//       pair_pipa = tools::toms748_solve(pipafunct, min, max, tol, max_iter);
-      pair_pipa = tools::toms748_solve(forceipafunct, min, max, tol, max_iter);
-    }
-    catch(const std::exception& e) {
-      failed = true;
-      pair_pipa.first = 0.0;
-    }
-    bool attcontact = (pipa<0.0? true: false);
-    bool fullatt = attcontact && failed;
-    bool withphimax = !failed || attcontact;
-
-    double potprefactor = q1*q1*eCharge*eCharge/r1;
-    double eta = 0.0;
-    double phimin = potprefactor*pipa;
-
-    if(withphimax){
-//       double phimax = potprefactor*pair_pipa.first;
-      double phimax = 0.0;
-      if (pair_pipa.first>0.0){
-        phimax = potprefactor*pipafunct(pair_pipa.first);
-      }
-
-      eta = exp(-phimax/(Kboltz*temperature))
-          *(1.0+(phimax-phimin)/(Kboltz*temperature));
-    std::cout << std::endl
-              << "\t pipa.first = " << pair_pipa.first
-              << "\t pipa.second = " << pair_pipa.second;
-
-    }
-    if(fullatt){
-      eta = 1.0 - phimin /(Kboltz*temperature);
-    }
-    if(!attcontact){
-      eta = exp(-phimin/(Kboltz*temperature));
-    }
-
-//     std::cout << std::endl << "r21 = " << r21 << "\tq21 = " << q21 
-//               << "\t phimax = " << potprefactor*pair_pipa.first
-//               << "\t phimin = " << phimin << "\tcontact = " << attcontact
-//               << "\tfullatt = " << fullatt << "\teta = " << eta;
-    return eta;
-  }
+//   // compute ipa enhancement factor for a pair of particles
+//   inline
+//   double efactor_ipa(double r1, double r2,
+//                     double q1, double q2,
+//                     double eps, double temperature) {
+// 
+//     double r21 = r2/r1;
+//     double q21 = q2/q1;
+//     // check q1==0
+//     if(fabs(q1)<1.e-200){
+//       // q1=0, permute particle 1 with 2
+//       double raux = r2;
+//       r2 = r1;
+//       r1 = raux;
+//       double qaux = q2;
+//       q2 = q1;
+//       q1 = qaux;
+//       r21 = r2/r1;
+//       q21 = 0.0;
+//     }
+// 
+//     double max = 500.0;
+//     boost::uintmax_t max_iter = 1000;
+//     tools::eps_tolerance<double> tol(30);
+// 
+//     double rt = 1.0 + r21;
+// 
+//     double min = rt;
+// 
+//     // potential function
+//     potential_ipa_funct pipafunct(r21, q21, eps);
+//     double pipa = pipafunct(rt);
+// 
+//     // force function
+//     force_ipa_funct forceipafunct(r21, q21, eps);
+// 
+//     std::pair<double, double> pair_pipa;
+//     bool failed = false;
+//     try {
+// //       pair_pipa = tools::toms748_solve(pipafunct, min, max, tol, max_iter);
+//       pair_pipa = tools::toms748_solve(forceipafunct, min, max, tol, max_iter);
+//     }
+//     catch(const std::exception& e) {
+//       failed = true;
+//       pair_pipa.first = 0.0;
+//     }
+//     bool attcontact = (pipa<0.0? true: false);
+//     bool fullatt = attcontact && failed;
+//     bool withphimax = !failed || attcontact;
+// 
+//     double potprefactor = q1*q1*eCharge*eCharge/r1;
+//     double eta = 0.0;
+//     double phimin = potprefactor*pipa;
+// 
+//     if(withphimax){
+// //       double phimax = potprefactor*pair_pipa.first;
+//       double phimax = 0.0;
+//       if (pair_pipa.first>0.0){
+//         phimax = potprefactor*pipafunct(pair_pipa.first);
+//       }
+//       // WARNING 2.0*phimin
+//       eta = exp(-phimax/(Kboltz*temperature))
+//           *(1.0+(phimax-2.0*phimin)/(Kboltz*temperature));
+//     std::cout << std::endl
+//               << "\t pipa.first = " << pair_pipa.first
+//               << "\t pipa.second = " << pair_pipa.second;
+// 
+//     }
+//     if(fullatt){// WARNING 2.0*phimin
+//       eta = 1.0 - 2.0*phimin /(Kboltz*temperature);
+//     }
+//     if(!attcontact){
+//       eta = exp(-phimin/(Kboltz*temperature));
+//     }
+// 
+// //     std::cout << std::endl << "r21 = " << r21 << "\tq21 = " << q21 
+// //               << "\t phimax = " << potprefactor*pair_pipa.first
+// //               << "\t phimin = " << phimin << "\tcontact = " << attcontact
+// //               << "\tfullatt = " << fullatt << "\teta = " << eta;
+//     return eta;
+//   }
+// 
 
 
   // multipolar coefficients potential functor
@@ -623,6 +628,99 @@ namespace eint {
   //   std::cout << std::endl << r21 << "\t" << q21 << "\t" << potprefactor*pair_pmpc.first
   //             << "\t" << phimin << "\t" << attcontact << "\t"
   //             << fullatt << "\t" << eta;
+    return eta;
+  }
+
+
+  // compute ipa enhancement factor for a pair of particles
+  // WARNING using pmpc instead of pipa
+  inline
+  double efactor_ipa(double r1, double r2,
+                    double q1, double q2,
+                    double eps, double temperature) {
+
+    double r21 = r2/r1;
+    double q21 = q2/q1;
+    // check q1==0
+    if(fabs(q1)<1.e-200){
+      // q1=0, permute particle 1 with 2
+      double raux = r2;
+      r2 = r1;
+      r1 = raux;
+      double qaux = q2;
+      q2 = q1;
+      q1 = qaux;
+      r21 = r2/r1;
+      q21 = 0.0;
+    }
+
+    double max = 500.0;
+    boost::uintmax_t max_iter = 1000;
+    tools::eps_tolerance<double> tol(30);
+
+    double rt = 1.0 + r21;
+
+    double min = rt;
+
+    // potential function
+    potential_ipa_funct pipafunct(r21, q21, eps);
+    double pipa = pipafunct(rt);
+
+    potential_mpc_funct pmpcfunct(r21, q21, eps,
+                                  25, 25);
+    double pmpc = pmpcfunct(rt);
+
+    // force function
+    force_ipa_funct forceipafunct(r21, q21, eps);
+
+    std::pair<double, double> pair_pipa;
+    bool failed = false;
+    try {
+//       pair_pipa = tools::toms748_solve(pipafunct, min, max, tol, max_iter);
+      pair_pipa = tools::toms748_solve(forceipafunct, min, max, tol, max_iter);
+    }
+    catch(const std::exception& e) {
+      failed = true;
+      pair_pipa.first = 0.0;
+//       std::cout << "\nMessage from thrown exception was:\n  " << e.what() << std::endl;
+//       std::cout << "\nmax_iter = " << max_iter;
+    }
+    bool attcontact = (pmpc<0.0? true: false);
+    bool fullatt = attcontact && failed;
+    bool withphimax = !failed || attcontact;
+
+    double potprefactor = q1*q1*eCharge*eCharge/r1;
+    double eta = 0.0;
+    double phimin = potprefactor*pmpc;
+
+    if(withphimax){
+//       double phimax = potprefactor*pair_pipa.first;
+      double phimax = 0.0;
+      if (pair_pipa.first>0.0){
+        // NOTE could be better midpoint
+        // pair_pipa.first + (pair_pipa.second - pair_pipa.first)/2;
+        phimax = potprefactor*pmpcfunct(pair_pipa.first);
+      }
+
+      eta = exp(-phimax/(Kboltz*temperature))
+          *(1.0+(phimax-phimin)/(Kboltz*temperature));
+//       std::cout << std::endl
+//               << "\t pipa.first = " << pair_pipa.first
+//               << "\t pipa.second = " << pair_pipa.second
+//               << "\t max_iter = " << max_iter;
+
+    }
+    if(fullatt){
+      eta = 1.0 - phimin /(Kboltz*temperature);
+    }
+    if(!attcontact){
+      eta = exp(-phimin/(Kboltz*temperature));
+    }
+
+//     std::cout << std::endl << "r21 = " << r21 << "\tq21 = " << q21 
+//               << "\t phimax = " << potprefactor*pair_pipa.first
+//               << "\t phimin = " << phimin << "\tcontact = " << attcontact
+//               << "\tfullatt = " << fullatt << "\teta = " << eta;
     return eta;
   }
 }

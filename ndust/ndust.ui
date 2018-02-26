@@ -83,7 +83,7 @@
            </rect>
           </property>
           <layout class="QGridLayout" name="gridLayout">
-           <item row="2" column="2">
+           <item row="3" column="2">
             <widget class="QLineEdit" name="lineEdit_maxrad">
              <property name="toolTip">
               <string>Maximum mean radius</string>
@@ -99,7 +99,7 @@
              </property>
             </widget>
            </item>
-           <item row="1" column="2">
+           <item row="2" column="2">
             <widget class="QLineEdit" name="lineEdit_minvol">
              <property name="toolTip">
               <string>Minimum volume at interface</string>
@@ -112,21 +112,21 @@
              </property>
             </widget>
            </item>
-           <item row="5" column="0">
+           <item row="6" column="0">
             <widget class="QLabel" name="label_numvsecs">
              <property name="text">
               <string>Number of sections</string>
              </property>
             </widget>
            </item>
-           <item row="6" column="0">
+           <item row="7" column="0">
             <widget class="QLabel" name="label_base">
              <property name="text">
               <string>Base</string>
              </property>
             </widget>
            </item>
-           <item row="5" column="2">
+           <item row="6" column="2">
             <widget class="QSpinBox" name="spinBox_vsecs">
              <property name="alignment">
               <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
@@ -145,7 +145,7 @@
              </property>
             </widget>
            </item>
-           <item row="2" column="0">
+           <item row="3" column="0">
             <widget class="QLabel" name="label_maxrad">
              <property name="toolTip">
               <string>Maximum mean radius</string>
@@ -155,7 +155,7 @@
              </property>
             </widget>
            </item>
-           <item row="3" column="2">
+           <item row="4" column="2">
             <widget class="QLineEdit" name="lineEdit_maxvol">
              <property name="toolTip">
               <string>Maximum volume at interface</string>
@@ -168,7 +168,7 @@
              </property>
             </widget>
            </item>
-           <item row="1" column="0">
+           <item row="2" column="0">
             <widget class="QLabel" name="label_minvol">
              <property name="toolTip">
               <string>Minimum volume at interface</string>
@@ -178,7 +178,7 @@
              </property>
             </widget>
            </item>
-           <item row="0" column="1">
+           <item row="1" column="1">
             <spacer name="horizontalSpacer">
              <property name="orientation">
               <enum>Qt::Horizontal</enum>
@@ -191,7 +191,7 @@
              </property>
             </spacer>
            </item>
-           <item row="6" column="2">
+           <item row="7" column="2">
             <widget class="QLineEdit" name="lineEdit_base">
              <property name="text">
               <string>1.5</string>
@@ -201,7 +201,7 @@
              </property>
             </widget>
            </item>
-           <item row="3" column="0">
+           <item row="4" column="0">
             <widget class="QLabel" name="label_maxvol">
              <property name="toolTip">
               <string>Maximum volume at interface</string>
@@ -211,14 +211,14 @@
              </property>
             </widget>
            </item>
-           <item row="7" column="0">
+           <item row="8" column="0">
             <widget class="QLabel" name="label_power">
              <property name="text">
               <string>Power</string>
              </property>
             </widget>
            </item>
-           <item row="0" column="2">
+           <item row="1" column="2">
             <widget class="QLineEdit" name="lineEdit_minrad">
              <property name="toolTip">
               <string>Minimum mean radius</string>
@@ -231,7 +231,7 @@
              </property>
             </widget>
            </item>
-           <item row="7" column="2">
+           <item row="8" column="2">
             <widget class="QLineEdit" name="lineEdit_power">
              <property name="text">
               <string>1</string>
@@ -241,7 +241,7 @@
              </property>
             </widget>
            </item>
-           <item row="0" column="0">
+           <item row="1" column="0">
             <widget class="QLabel" name="label_minrad">
              <property name="toolTip">
               <string>Minimum mean radius</string>
@@ -251,15 +251,35 @@
              </property>
             </widget>
            </item>
-           <item row="4" column="0">
+           <item row="5" column="0">
             <widget class="QLabel" name="label_linear">
              <property name="text">
               <string>Linear sections</string>
              </property>
             </widget>
            </item>
-           <item row="4" column="2">
+           <item row="5" column="2">
             <widget class="QCheckBox" name="checkBox_linear">
+             <property name="layoutDirection">
+              <enum>Qt::RightToLeft</enum>
+             </property>
+             <property name="text">
+              <string/>
+             </property>
+             <property name="checked">
+              <bool>false</bool>
+             </property>
+            </widget>
+           </item>
+           <item row="0" column="0">
+            <widget class="QLabel" name="label_special">
+             <property name="text">
+              <string>Special sections</string>
+             </property>
+            </widget>
+           </item>
+           <item row="0" column="2">
+            <widget class="QCheckBox" name="checkBox_special">
              <property name="layoutDirection">
               <enum>Qt::RightToLeft</enum>
              </property>

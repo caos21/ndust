@@ -57,12 +57,24 @@ class GridSystem(mh5u.H5Writable):
     self.writable_list = [self.temperature, self.nmdensity]
 #
 #
-def compute_sections(nsections, rmin, base, power, linear):
+def compute_sections(nsections, rmin, base, power, linear, special):
   """ Compute sections
       [rmin] = metre
   """
-  if linear:
+  if linear and not special:
     rads = np.linspace(rmin, base*nsections*1e-9, nsections)
+    rifaces = rads-base*1e-9*0.5
+    rifaces = np.append(rifaces, rads[-1]+base*1e-9*0.5)
+    diams = 2.0*rads
+    vols = cvol(rads)
+    ifaces = cvol(rifaces)
+    minvoliface = ifaces[0]
+    return minvoliface, ifaces, vols, rads, diams
+
+  if special:
+    rlow = np.arange(1, 10.5, 0.5)*1e-9*0.5
+    rhigh = np.arange(90, 100.5, 0.5)*1e-9*0.5
+    rads = np.concatenate((rlow, rhigh))
     rifaces = rads-base*1e-9*0.5
     rifaces = np.append(rifaces, rads[-1]+base*1e-9*0.5)
     diams = 2.0*rads
@@ -87,15 +99,16 @@ def compute_sections(nsections, rmin, base, power, linear):
 class VSections(mh5u.H5Writable):
   """ Represents the volumes of nanoparticles
   """
-  def __init__(self, h5obj, nsections, rmin, base, power, linear=False):
+  def __init__(self, h5obj, nsections, rmin, base, power, linear=False, special=False):
     """ Initial values
     """
     self.h5obj = h5obj
     #
     self.nsections = mh5u.Attrib("NSections", nsections)
     #
-    minvoliface, self.ifaces, self.vols, self.rads, self.diams = compute_sections(nsections, rmin,
-                                                                             base, power, linear)
+    minvoliface, self.ifaces, self.vols, self.rads, self.diams = compute_sections(nsections,
+                                                                                  rmin,base, power,
+                                                                                  linear, special)
 
     self.miniface = mh5u.Attrib("Min_interface", minvoliface)
     #
@@ -141,7 +154,7 @@ class VSections(mh5u.H5Writable):
 class QSections(mh5u.H5Writable):
   """ Represents the charges of nanoparticles
   """
-  def __init__(self, h5obj, nsections, maxpositive, maxnegative):
+  def __init__(self, h5obj, nsections, maxpositive, maxnegative, special):
     """ Initial values
     """
     self.h5obj = h5obj
@@ -153,12 +166,18 @@ class QSections(mh5u.H5Writable):
     self.maxpositive = mh5u.Attrib("Max_positive", maxpositive)
     #
     self.maxnegative = mh5u.Attrib("Max_negative", maxnegative)
-    # charges
-    charges = np.arange(-maxnegative, maxpositive+1)
+    if not special:
+      # charges
+      charges = np.arange(-maxnegative, maxpositive+1)
+    else:
+      # charges
+      charges = np.concatenate((np.arange(-maxnegative, -maxnegative+30),
+                                np.arange(-14, 6)))
+
     self.charges = mh5u.DataSet("Charges",
                                 (nsections, ),
                                 "f",
-                                charges)    
+                                charges)
     #
     self.writable_list = [self.nsections,
                           self.maxpositive,
