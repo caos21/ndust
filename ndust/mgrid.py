@@ -171,8 +171,13 @@ class QSections(mh5u.H5Writable):
       charges = np.arange(-maxnegative, maxpositive+1)
     else:
       # charges
+      #charges = np.concatenate((np.arange(-maxnegative, -maxnegative+30),
+                                #np.arange(-14, 6)))
+
       charges = np.concatenate((np.arange(-maxnegative, -maxnegative+30),
-                                np.arange(-14, 6)))
+                np.arange(-maxnegative+32, -14, 5),
+                np.arange(-14, 6)))
+
 
     self.charges = mh5u.DataSet("Charges",
                                 (nsections, ),

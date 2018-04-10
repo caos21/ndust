@@ -233,7 +233,7 @@ class Window(QMainWindow, Ui_MainWindow):
     special = False
     if self.ui.checkBox_linear.isChecked():
       linear = True
-      self.ui.checkBox_special.setChecked(False)
+      #self.ui.checkBox_special.setChecked(False)
     if self.ui.checkBox_special.isChecked():
       special = True
     self.vsections = mg.VSections(h5f, nvsections, rmin, base, power, linear, special)
@@ -242,15 +242,21 @@ class Window(QMainWindow, Ui_MainWindow):
 
     # charge sections
       ##FIXME 
-    #if self.ui.checkBox_special.isChecked():
-      #special = True
+    if self.ui.checkBox_special.isChecked():
+      special = True
     max_positive = self.ui.spinBox_maxpos.value()
     max_negative = self.ui.spinBox_maxneg.value()
     if not special:
       nqsections = max_positive + max_negative + 1
       print('not special ', nqsections)
     else:
-      nqsections = 50
+      #nqsections = 50
+      #print('special ', nqsections)
+      #max_positive = 5
+      #max_negative = 296
+      #self.ui.spinBox_maxneg.setValue(max_negative)
+      #self.ui.spinBox_maxpos.setValue(max_positive)
+      nqsections = 100
       print('special ', nqsections)
       max_positive = 5
       max_negative = 296
