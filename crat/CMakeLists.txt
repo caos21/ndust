@@ -10,6 +10,7 @@ file(GLOB INCSRCS RELATIVE "../include/" "*.cpp")
 include_directories("../include/")
 
 add_definitions(-DBOOST_LOG_DYN_LINK)
+add_definitions(-DNDEBUG)
 
 add_library(GridModel STATIC ../include/GridModel.cpp)
 add_library(CRate STATIC ../include/CRate.cpp)
@@ -23,11 +24,14 @@ set (LIBS "${LIBS} -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE -D_BSD_SOURCE -D_FO
 
 # include_directories(${INC_DIR})
 
-set(CMAKE_CXX_COMPILE_FLAGS "${CMAKE_CXX_COMPILE_FLAGS} -O2 ")
+# -frecord-gcc-switches
+# records flags passed to gcc
+# can be retrieved by $readelf -p .GCC.command.line crat
+set(CMAKE_CXX_COMPILE_FLAGS "${CMAKE_CXX_COMPILE_FLAGS} -Ofast -frecord-gcc-switches -march=znver1")
 
-set(CMAKE_CXX_LINK_FLAGS "${CMAKE_CXX_LINK_FLAGS} ")
+set(CMAKE_CXX_LINK_FLAGS "${CMAKE_CXX_LINK_FLAGS} -Ofast -frecord-gcc-switches -march=znver1")
 
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -std=gnu++14 -march=znver1 -O3 -ftree-vectorize -fopt-info-vec-missed=vec.miss  ")
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -std=gnu++14 -march=znver1 -O3 -ftree-vectorize -fopt-info-vec-missed=vec.miss -frecord-gcc-switches")
 #
 # RELEASE ADD -DNDEBUG for boost performance
 #
@@ -45,6 +49,8 @@ if(OPENMP_FOUND)
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS} ")
   add_definitions(-DOPENMP)
 endif()
+
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Ofast -frecord-gcc-switches -march=znver1")
 
 add_executable(crat ${SRCS} ${INCSRCS})
 

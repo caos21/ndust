@@ -31,7 +31,7 @@
 #include <boost/math/tools/roots.hpp>
 // #include <boost/numeric/odeint.hpp>
 
-#include <boost/math/special_functions/factorials.hpp>
+//#include <boost/math/special_functions/factorials.hpp>
 
 #include <boost/numeric/ublas/matrix.hpp>
 #include <boost/numeric/ublas/io.hpp>
@@ -49,6 +49,12 @@ namespace ublas = boost::numeric::ublas;
 namespace lapack = boost::numeric::bindings::lapack;
 // namespace umf = boost::numeric::bindings::umfpack;
 namespace bmath = boost::math;
+
+struct TerminationCondition  {
+  bool operator() (double min, double max)  {
+    return abs((min - max)/min) <= 0.0001;
+  }
+};  
 
 namespace eint {
   typedef ublas::matrix<double, ublas::column_major> ubmatrix;
@@ -209,13 +215,13 @@ namespace eint {
       for(unsigned int j3=0; j3<j1max; ++j3){
         for(unsigned int j2=1; j2<j2max; ++j2){
           double prefac2 = (eps-1.0)*j2/((eps+1.0)*j2 + 1.0);
-          double denom = (bmath::factorial<double>(j1)
-                          *bmath::factorial<double>(j2)
-                          *bmath::factorial<double>(j2)
-                          *bmath::factorial<double>(j3))
+          double denom = (facts[j1]
+                          *facts[j2]
+                          *facts[j2]
+                          *facts[j3])
                           *pow(rn, j1+2*j2+j3+2);
-          double numer = prefac1 * prefac2 * bmath::factorial<double>(j1+j2)
-                      * bmath::factorial<double>(j2+j3)
+          double numer = prefac1 * prefac2 * facts[j1+j2]
+                      * facts[j2+j3]
                       * pow(r1, 2*j1+1) * pow(r2, 2*j2+1);
 
           if(j3!=0) {
@@ -265,9 +271,9 @@ namespace eint {
     for(unsigned int m=1; m<size; ++m) {// m:1 -> lns
       for(unsigned int l=0; l<size; ++l) {
         double numer = (acoefficients[l]*(eps-1.0)*m
-                      *bmath::factorial<double>(l+m)*pow(r2, 2*m+1));
-        double denom = ((eps+1.0)*m+1)*(bmath::factorial<double>(l)
-                      *bmath::factorial<double>(m))*pow(h, 2*m+l+2);
+                      *facts[l+m]*pow(r2, 2*m+1));
+        double denom = ((eps+1.0)*m+1)*(facts[l]
+                      *facts[m])*pow(h, 2*m+l+2);
         pot_2 += numer / denom;
       }
     }
@@ -321,9 +327,9 @@ namespace eint {
     for(unsigned int m=1; m<size; ++m) {// m:1 -> lns
       for(unsigned int l=0; l<size; ++l) {
         double numer = (acoefficients[l]*(eps-1.0)*m*(m+1)
-                      *bmath::factorial<double>(l+m)*pow(r2, 2*m+1));
-        double denom = ((eps+1.0)*m+1)*(bmath::factorial<double>(l)
-                      *bmath::factorial<double>(m))*pow(h, 2*m+l+3);
+                      *facts[l+m]*pow(r2, 2*m+1));
+        double denom = ((eps+1.0)*m+1)*(facts[l]
+                      *facts[m])*pow(h, 2*m+l+3);
         force_2 += numer / denom;
       }
     }
@@ -582,53 +588,207 @@ namespace eint {
 
     double rt = 1.0 + r21;
 
-    double min = rt;
+    //double min = rt;
 
     potential_mpc_funct pmpcfunct(r21, q21, eps,
                                   j1max, j2max);
-    double pmpc = pmpcfunct(rt);
+
+    // Potential at contact
+    double pmpc_rt = pmpcfunct(rt);
 
     force_mpc_funct forcempcfunct(r21, q21, eps,
                                   j1max, j2max);
 
-    std::pair<double, double> pair_pmpc;
-    bool failed = false;
-    try {
-//       pair_pmpc = tools::toms748_solve(pmpcfunct, min, max, tol, max_iter);
-      pair_pmpc = tools::toms748_solve(forcempcfunct, min, max, tol, max_iter);
-    }
-    catch(const std::exception& e) {
-      failed = true;
-      pair_pmpc.first = 0.0;
-    }
-    bool attcontact = (pmpc<0.0? true: false);
-    bool fullatt = attcontact && failed;
-    bool withphimax = !failed || attcontact;
+    // Force at contact
+    double forcempc_rt = forcempcfunct(rt);
 
     double potprefactor = q1*q1*eCharge*eCharge/r1;
-    double eta = 0.0;
-    double phimin = potprefactor*pmpc;
 
-    if(withphimax){
-//       double phimax = potprefactor*pair_pmpc.first;
-      double phimax = 0.0;
-      if (pair_pmpc.first>0.0){
-        phimax = potprefactor*pmpcfunct(pair_pmpc.first);
+    // Potential at contact
+    double phi_rt = potprefactor*pmpc_rt;
+
+    if(forcempc_rt>0){
+      double eta = exp(-phi_rt/(Kboltz*temperature));
+      /* if(phi_rt < 0){ */
+      /* 	std::terminate(); */
+      /* } */
+      return eta;
+    }
+    else {// force is negative (attractive) or zero at contact
+      
+      // Force at r max
+      double forcempc_max = forcempcfunct(max);
+      // checks if force is monotonically decreasing
+      if((forcempc_rt*forcempc_max>=0.0)){
+	double eta = 1.0 - phi_rt /(Kboltz*temperature);
+	/* if(phi_rt > 0){ */
+	/*   std::terminate(); */
+	/* } */
+	return eta;
       }
-      eta = exp(-phimax/(Kboltz*temperature))
-          *(1.0+(phimax-phimin)/(Kboltz*temperature));
-    }
-    if(fullatt){
-      eta = 1.0 - phimin /(Kboltz*temperature);
-    }
-    if(!attcontact){
-      eta = exp(-phimin/(Kboltz*temperature));
-    }
+      else {// find maximum	
+	std::pair<double, double> pair_pmpc;
+	try {
+	  pair_pmpc = tools::toms748_solve(forcempcfunct, rt, max, forcempc_rt, forcempc_max, tol, max_iter);
+	  //pair_pmpc = tools::toms748_solve(forcempcfunct, rt, max, tol, max_iter);
+	}
+	catch(const std::exception& exc) {
+	  
+	  pair_pmpc.first = 0.0;
+	  pair_pmpc.second = 0.0;
+	  std::cerr << '\n' << exc.what() << '\n';
 
-  //   std::cout << std::endl << r21 << "\t" << q21 << "\t" << potprefactor*pair_pmpc.first
-  //             << "\t" << phimin << "\t" << attcontact << "\t"
-  //             << fullatt << "\t" << eta;
-    return eta;
+	  int nst = 50;
+	  double st = (max-rt)/(nst-1);
+	  for(int i=0; i<50; ++i){
+	    double rr = rt + st*i;
+	    std::cerr << "\n" << rr << "\t" << pmpcfunct(rr) << "\t" << forcempcfunct(rr);
+	  }
+	  std::cerr << '\n';	
+	  std::terminate();
+	}
+	if(max_iter > 990){
+	  std::cerr << "\n ERROR max iter " << max_iter << "\n\n";
+	  std::terminate();
+	}
+	double rbarrier = 0.5*(pair_pmpc.first+pair_pmpc.second);
+	double phimax = pmpcfunct(rbarrier);
+	double eta = exp(-phimax/(Kboltz*temperature))
+	           *(1.0+(phimax-phi_rt)/(Kboltz*temperature));
+	return eta;
+      }
+    }
+    
+    /* // Force at r max */
+    /* double forcempc_max = forcempcfunct(max); */
+
+    /* double potprefactor = q1*q1*eCharge*eCharge/r1; */
+
+    /* // Potential at contact */
+    /* double phi_rt = potprefactor*pmpc_rt; */
+    
+    /* // checks if force is monotonically increasing or decreasing */
+    /* if((forcempc_rt*forcempc_max>=0.0)){ */
+    /*   if(forcempc_rt<0){ */
+    /* 	double eta = 1.0 - phi_rt /(Kboltz*temperature); */
+    /* 	if(phi_rt > 0){ */
+    /* 	  std::terminate(); */
+    /* 	} */
+    /* 	return eta; */
+    /*   } */
+    /*   else{ */
+    /* 	if(forcempc_rt>0){ */
+    /* 	  double eta = exp(-phi_rt/(Kboltz*temperature)); */
+    /* 	  if(phi_rt < 0){ */
+    /* 	    std::terminate(); */
+    /* 	  } */
+    /* 	  return eta; */
+    /* 	} */
+    /* 	else { */
+    /* 	  std::cerr << "\n ETA ZERO" << '\n'; */
+    /* 	  return 0.0; */
+    /* 	} */
+    /*   } */
+    /* } */
+    /* else { */
+    /*   std::pair<double, double> pair_pmpc; */
+    /*   bool failed = false; */
+    /*   try { */
+    /* 	pair_pmpc = tools::toms748_solve(forcempcfunct, rt, max, forcempc_rt, forcempc_max, tol, max_iter); */
+    /*   } */
+    /*   catch(const std::exception& exc) { */
+    /* 	failed = true; */
+    /* 	pair_pmpc.first = 0.0; */
+    /* 	pair_pmpc.second = 0.0; */
+    /* 	std::cerr << '\n' << exc.what() << '\n'; */
+
+    /* 	int nst = 50; */
+    /* 	double st = (max-rt)/(nst-1); */
+    /* 	for(int i=0; i<50; ++i){ */
+    /* 	  double rr = rt + st*i; */
+    /* 	  std::cerr << "\n" << rr << "\t" << pmpcfunct(rr) << "\t" << forcempcfunct(rr); */
+    /* 	} */
+    /* 	std::cerr << '\n';	 */
+    /* 	std::terminate(); */
+    /*   } */
+    /*   double rbarrier = 0.5*(pair_pmpc.first+pair_pmpc.second); */
+    /*   double phimax = pmpcfunct(rbarrier); */
+    /*   double eta = exp(-phimax/(Kboltz*temperature)) */
+    /*              *(1.0+(phimax-phi_rt)/(Kboltz*temperature)); */
+    /*   return eta; */
+    /* } */
+  
+      //std::cerr << "\n sign " << pmpc << "\t" << pmpcfunct(max) << "\n";
+      //std::terminate();
+      /* #pragma omp single */
+      /* { */
+      /* std::cerr << "\n sign " << pmpc << "\t" << pmpcfunct(max) << "\t from " << omp_get_thread_num() << '\n'; */
+
+      /* int nst = 50; */
+      /* double st = (max-min)/(nst-1); */
+      /* for(int i=0; i<50; ++i){ */
+      /* 	double rr = min + st*i; */
+      /* 	std::cerr << "\n" << rr << "\t" << pmpcfunct(rr) << "\t" << forcempcfunct(rr); */
+      /* } */
+      /* std::cerr << '\n'; */
+      /* std::terminate(); */
+      /* } */
+      
+      
+    //    std::cerr << "\n iter " << max_iter;// << '\t'
+/* #pragma omp single private(rt) */
+/* { */    
+/*   if(max_iter > 1990){ */
+/*     //std::cerr << "\n ERROR max iter " << max_iter << "\n\n"; */
+/* #pragma omp single private(rt) */
+/* {  */
+/*     /\* std::cerr << "\n sign " << pmpc << "\t" << pmpcfunct(max) << "\t from " << omp_get_thread_num() << '\n'; *\/ */
+
+/*     /\* int nst = 50; *\/ */
+/*     /\* double st = (max-min)/(nst-1); *\/ */
+/*     /\* for(int i=0; i<50; ++i){ *\/ */
+/*     /\* 	double rr = min + st*i; *\/ */
+/*     /\* 	std::cerr << "\n" << rr << "\t" << pmpcfunct(rr) << "\t" << forcempcfunct(rr); *\/ */
+/*     /\* } *\/ */
+/*     /\* std::cerr << '\n'; *\/ */
+/*     /\* std::terminate(); *\/ */
+/*     /\* } *\/ */
+/*     failed = true; */
+/*     pair_pmpc.first = 0.0; */
+/*     //std::terminate(); */
+/*     /\* #pragma omp single private(rt) *\/ */
+/*     /\* { *\/ */
+/*     double min = rt; */
+/*     double max = 500.0; */
+/*     if(forcempcfunct(min)*forcempcfunct(max)<0) { */
+
+/*       std::cerr << "\n max " << pair_pmpc.first << '\t' << rt << '\t' << pmpcfunct(min) << "\t" */
+/*    	        << pmpcfunct(max) << "\t from " << omp_get_thread_num() << '\n'; */
+/*       std::cerr << "\n max " << pair_pmpc.second << '\t' << rt << '\t' << forcempcfunct(min) << "\t" */
+/* 	        << forcempcfunct(max) << '\n'; */
+
+/*       int nst = 5000; */
+/*       double st = (max-min)/(nst-1); */
+/*       for(int i=0; i<nst; ++i){ */
+/*         double rr = min + st*i; */
+/*         std::cerr << "\n" << rr << "\t" << pmpcfunct(rr) << "\t" << forcempcfunct(rr); */
+/*        } */
+/*        std::cerr << '\n';   */
+/*        std::terminate(); */
+/*     } */
+/* } */
+/*   } */
+/*   else { */
+/* #pragma omp single private(rt) */
+/* {   */
+/*     std::cerr << "\n iter " << max_iter << '\t' << pair_pmpc.first << '\t' << rt << '\t' << forcempcfunct(min) << "\t" */
+/* 	      << forcempcfunct(pair_pmpc.first) << '\n'; */
+/* }    */
+/*   } */
+    //std::terminate();
+    //}// end pragma omp
+
+    return 1.0;
   }
 
 
@@ -723,6 +883,7 @@ namespace eint {
 //               << "\tfullatt = " << fullatt << "\teta = " << eta;
     return eta;
   }
+  
 }
 
 #endif//EINT_H
