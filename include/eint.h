@@ -215,13 +215,13 @@ namespace eint {
       for(unsigned int j3=0; j3<j1max; ++j3){
         for(unsigned int j2=1; j2<j2max; ++j2){
           double prefac2 = (eps-1.0)*j2/((eps+1.0)*j2 + 1.0);
-          double denom = (facts[j1]
-                          *facts[j2]
-                          *facts[j2]
-                          *facts[j3])
+          double denom = (Facts[j1]
+                          *Facts[j2]
+                          *Facts[j2]
+                          *Facts[j3])
                           *pow(rn, j1+2*j2+j3+2);
-          double numer = prefac1 * prefac2 * facts[j1+j2]
-                      * facts[j2+j3]
+          double numer = prefac1 * prefac2 * Facts[j1+j2]
+                      * Facts[j2+j3]
                       * pow(r1, 2*j1+1) * pow(r2, 2*j2+1);
 
           if(j3!=0) {
@@ -271,9 +271,9 @@ namespace eint {
     for(unsigned int m=1; m<size; ++m) {// m:1 -> lns
       for(unsigned int l=0; l<size; ++l) {
         double numer = (acoefficients[l]*(eps-1.0)*m
-                      *facts[l+m]*pow(r2, 2*m+1));
-        double denom = ((eps+1.0)*m+1)*(facts[l]
-                      *facts[m])*pow(h, 2*m+l+2);
+                      *Facts[l+m]*pow(r2, 2*m+1));
+        double denom = ((eps+1.0)*m+1)*(Facts[l]
+                      *Facts[m])*pow(h, 2*m+l+2);
         pot_2 += numer / denom;
       }
     }
@@ -330,9 +330,9 @@ namespace eint {
     for(unsigned int m=1; m<size; ++m) {// m:1 -> lns
       for(unsigned int l=0; l<size; ++l) {
         double numer = (acoefficients[l]*(epsm)*m*(m+1)
-                      *facts[l+m]*pow(r2, 2*m+1));
-        double denom = ((epsp)*m+1)*(facts[l]
-                      *facts[m])*pow(h, 2*m+l+3);
+                      *Facts[l+m]*pow(r2, 2*m+1));
+        double denom = ((epsp)*m+1)*(Facts[l]
+                      *Facts[m])*pow(h, 2*m+l+3);
         force_2 += numer / denom;
       }
     }
@@ -907,9 +907,9 @@ namespace eint {
   // compute ipa enhancement factor for a pair of particles
   // WARNING using pmpc instead of pipa
   inline
-  double efactor_ipa(double r1, double r2,
-                    double q1, double q2,
-                    double eps, double temperature) {
+  double efactor_ipa2(double r1, double r2,
+                      double q1, double q2,
+                      double eps, double temperature) {
 
     double r21 = r2/r1;
     double q21 = q2/q1;
@@ -994,6 +994,125 @@ namespace eint {
 //               << "\t phimin = " << phimin << "\tcontact = " << attcontact
 //               << "\tfullatt = " << fullatt << "\teta = " << eta;
     return eta;
+  }
+
+  // compute ipa enhancement factor for a pair of particles
+  // WARNING using pmpc instead of pipa
+  // we use ipa force to find the location of the barrier if
+  // the mpc potential is attractive at contact
+  // then we compute the enhancement factor using the mpc potential
+  // at contact and at the barrier determined by zeroing the ipa force
+  inline
+  double efactor_ipa(double r1, double r2,
+                     double q1, double q2,
+                     const double eps, const double temperature,
+                     const unsigned int j1max=25,
+		     const unsigned int j2max=25) {
+
+    double r21 = r2/r1;
+    double q21 = q2/q1;
+    // check q1==0
+    if(fabs(q1)<1.e-200){
+      // q1=0, permute particle 1 with 2
+      double raux = r2;
+      r2 = r1;
+      r1 = raux;
+      double qaux = q2;
+      q2 = q1;
+      q1 = qaux;
+      r21 = r2/r1;
+      q21 = 0.0;
+    }
+
+    double max = 500.0;
+
+    double rt = 1.0 + r21;
+
+    double min = rt;
+
+    // // ipa functor
+    // potential_ipa_funct pipafunct(r21, q21, eps);
+
+    // // ipa at contact 
+    // double pipa_rt = pipafunct(rt)
+
+    // mpc functor
+    potential_mpc_funct pmpcfunct(r21, q21, eps,
+                                  j1max, j2max);
+
+    // mpc at contact
+    double pmpc_rt = pmpcfunct(rt);
+
+    // potential prefactor
+    double potprefactor = q1*q1*eCharge*eCharge/r1;
+
+    // Potential at contact in mks
+    double phi_rt = potprefactor*pmpc_rt;
+
+    // repulsive potential
+    if(pmpc_rt>0){
+      double eta = exp(-phi_rt/(Kboltz*temperature));
+      /* if(phi_rt < 0){ */
+      /* 	std::terminate(); */
+      /* } */
+      return eta;
+    }
+    else {// potential is negative (attractive) or zero at contact
+
+      // force functor
+      force_ipa_funct forceipafunct(r21, q21, eps);
+      
+      // Force at contact
+      double forceipa_rt = forceipafunct(rt);
+      
+      // Force at r max
+      double forceipa_max = forceipafunct(max);
+      
+      // checks if force is monotonically decreasing [non bracketed]
+      if(forceipa_rt*forceipa_max >= 0.0){
+	double eta = 1.0 - phi_rt /(Kboltz*temperature);
+	/* if(phi_rt > 0){ */
+	/*   std::terminate(); */
+	/* } */
+	return eta;
+      }
+      else {// find maximum, zero of force is bracketed between rt and max
+	std::pair<double, double> pair_pipa;
+	boost::uintmax_t max_iter = 1000;
+	tools::eps_tolerance<double> tol(30);
+	try {
+	  //#pragma omp critical
+	  //{	  
+	  pair_pipa = tools::toms748_solve(forceipafunct, min, max, forceipa_rt, forceipa_max, tol, max_iter);
+
+	  //pair_pipa = tools::toms748_solve(forcepipafunct, rt, max, tol, max_iter);
+	
+	 // std::cerr << "\n" << rt << "\t" << max << "\t" << 
+	 //}
+	}
+	catch(const std::exception& exc) {
+	  std::cerr << '\n' << exc.what() << '\n';
+	  std::terminate();
+	}
+	if(max_iter > 990){
+	  std::cerr << "\n ERROR max iter " << max_iter << "\n\n";
+	  std::terminate();
+	}
+	double rbarrier = 0.5*(pair_pipa.first+pair_pipa.second);
+	if(rbarrier>=0){
+	  double phimax = potprefactor * pmpcfunct(rbarrier);
+	  double eta = exp(-phimax/(Kboltz*temperature))
+	               *(1.0+(phimax-phi_rt)/(Kboltz*temperature));	  
+	  return eta;
+	}
+	else{
+	  std::cerr << "\n ERROR Negative rbarrier " << rbarrier << '\n';
+	  std::terminate();
+	}
+      }
+    }
+    
+    return 1.0;
   }
   
 }

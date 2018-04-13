@@ -40,7 +40,7 @@
 #define ZETA1_720 0.00138888888889
 
 // factorials up to 90!
-const double facts[]= {
+const double Facts[]= {
   1.000000000000000000e+00,
   1.000000000000000000e+00,
   2.000000000000000000e+00,

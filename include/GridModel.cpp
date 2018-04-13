@@ -182,8 +182,8 @@ int GridModel::read_einteraction() {
                          einter.method);
   BOOST_LOG_SEV(lg, info) << "--> Method: " << einter.method;
 
-  // terms make sense only for MPC, method 0
-  if(einter.method == 0) {
+  // terms make sense only for MPC and IPA, method 0 and 1
+  if((einter.method == 0) || (einter.method == 1)) {
     err = read_attrib_hdf5<unsigned int>(h5obj, "/Electrostatic_interaction", "Terms",
                           einter.terms);
     BOOST_LOG_SEV(lg, info) << "--> Terms for MPC: " << einter.terms;

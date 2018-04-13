@@ -59,6 +59,9 @@ class Window(QMainWindow, Ui_MainWindow):
     self.radiobutton_mpc = self.ui.radioButton_MPC
     self.radiobutton_mpc.toggled.connect(self.toggle_terms)
 
+    self.radiobutton_ipa = self.ui.radioButton_IPA
+    self.radiobutton_ipa.toggled.connect(self.toggle_terms)
+    
     self.checkbox_tunnel = self.ui.checkBox_tunnel
     self.checkbox_tunnel.toggled.connect(self.toggle_eaffinity)
 
@@ -293,7 +296,7 @@ class Window(QMainWindow, Ui_MainWindow):
   def toggle_terms(self):
     """ Toggle spin box terms if MPC method is selected
     """
-    if self.radiobutton_mpc.isChecked():
+    if self.radiobutton_mpc.isChecked() or self.radiobutton_ipa.isChecked():
       #print("MPC Checked")
       self.ui.label_terms.setEnabled(1)
       self.ui.spinBox_terms.setEnabled(1)

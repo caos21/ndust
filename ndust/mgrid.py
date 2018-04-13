@@ -242,7 +242,7 @@ class EInteraction(mh5u.H5Writable):
     #
     self.method = mh5u.Attrib("Method", method)
     #
-    if method != 0:# method == 0 is Multipolar Coefficients Potential
+    if method == 2:# method == 2 is Coulomb
       terms = 0
     self.terms = mh5u.Attrib("Terms", terms)
     #

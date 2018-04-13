@@ -193,7 +193,9 @@ private:
     return eint::efactor_ipa(r1, r2,
                              q1, q2,
                              gm.einter.dconstant,
-                             gm.gsys.temperature);
+                             gm.gsys.temperature,
+    			     gm.einter.terms,
+                             gm.einter.terms);
   }
 
   //! Compute efactor using Coulomb method
