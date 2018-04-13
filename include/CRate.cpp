@@ -160,7 +160,7 @@ int CRate::compute() {
 
 void CRate::compute_efactor_grid() {
   // iterate in radii particle 1
-#pragma omp parallel for collapse(4) schedule(auto)
+#pragma omp parallel for default(none) collapse(4) schedule(auto)
   for (unsigned int l=0; l<gm.vols.nsections; ++l) {
     // iterate in charges particle 1
     for (unsigned int q=0; q<gm.chrgs.nsections; ++q) {

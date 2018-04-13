@@ -323,12 +323,15 @@ namespace eint {
 
     double force_coul = Kcoul*q1*q2/(h*h);// Coulomb term
 
+    double epsm = eps-1.0;
+    double epsp = eps+1.0;
+    
     double force_2 = 0.0;
     for(unsigned int m=1; m<size; ++m) {// m:1 -> lns
       for(unsigned int l=0; l<size; ++l) {
-        double numer = (acoefficients[l]*(eps-1.0)*m*(m+1)
+        double numer = (acoefficients[l]*(epsm)*m*(m+1)
                       *facts[l+m]*pow(r2, 2*m+1));
-        double denom = ((eps+1.0)*m+1)*(facts[l]
+        double denom = ((epsp)*m+1)*(facts[l]
                       *facts[m])*pow(h, 2*m+l+3);
         force_2 += numer / denom;
       }
@@ -337,8 +340,8 @@ namespace eint {
 
     double force_3 = 0.0;
     for(unsigned int l=1; l<size-1; ++l) {
-      double numer = (acoefficients[l]*acoefficients[l+1])*((eps+1.0)*(l+1)+1);
-      double denom = (eps-1.0)*pow(r1, 2*l+3);
+      double numer = (acoefficients[l]*acoefficients[l+1])*((epsp)*(l+1)+1);
+      double denom = (epsm)*pow(r1, 2*l+3);
       force_3 += numer / denom;
     }
     force_3 *= -invK;
@@ -469,11 +472,11 @@ namespace eint {
   // multipolar coefficients potential functor
   struct potential_mpc_funct
   {
-    potential_mpc_funct(double r21_,
-                        double q21_,
-                        double eps_,
-                        unsigned int j1max_,
-                        unsigned int j2max_):
+    potential_mpc_funct(double const& r21_,
+                        double const& q21_,
+                        double const& eps_,
+                        unsigned int const& j1max_,
+                        unsigned int const& j2max_):
                         r21(r21_), q21(q21_), eps(eps_),
                         j1max(j1max_), j2max(j2max_){
 
@@ -516,13 +519,13 @@ namespace eint {
   // multipolar coefficients force functor
   struct force_mpc_funct
   {
-    force_mpc_funct(double r21_,
-                        double q21_,
-                        double eps_,
-                        unsigned int j1max_,
-                        unsigned int j2max_):
-                        r21(r21_), q21(q21_), eps(eps_),
-                        j1max(j1max_), j2max(j2max_){
+    force_mpc_funct(double const& r21_,
+                    double const& q21_,
+                    double const& eps_,
+                    unsigned int const& j1max_,
+                    unsigned int const& j2max_):
+                    r21(r21_), q21(q21_), eps(eps_),
+                    j1max(j1max_), j2max(j2max_){
 
       coefficients = ublas::zero_matrix<double>(j1max-1, j1max-1);
       independent = ublas::zero_vector<double>(j1max-1);
@@ -560,9 +563,9 @@ namespace eint {
     ubvector acoefficients;
   };
 
-  // compute eta factor for a pair of particles
+ // compute eta factor for a pair of particles
   inline
-  double efactor_mpc(double r1, double r2,
+  double efactor_mpc2(double r1, double r2,
                     double q1, double q2,
                     double eps, double temperature,
                     unsigned int j1max, unsigned int j2max) {
@@ -588,7 +591,99 @@ namespace eint {
 
     double rt = 1.0 + r21;
 
-    //double min = rt;
+    double min = rt;
+
+    potential_mpc_funct pmpcfunct(r21, q21, eps,
+                                  j1max, j2max);
+    double pmpc = pmpcfunct(rt);
+
+    force_mpc_funct forcempcfunct(r21, q21, eps,
+                                  j1max, j2max);
+
+    std::pair<double, double> pair_pmpc;
+    bool failed = false;
+    try {
+      pair_pmpc = tools::toms748_solve(forcempcfunct, min, max, tol, max_iter);
+    }
+    catch(const std::exception& e) {
+      failed = true;
+      //std::terminate();
+      //pair_pmpc.first = 0.0;
+    }
+    bool attcontact = (pmpc<0.0? true: false);
+    bool fullatt = attcontact && failed;
+    bool withphimax = !failed || attcontact;
+
+    double potprefactor = q1*q1*eCharge*eCharge/r1;
+    double eta = 0.0;
+    double phimin = potprefactor*pmpc;
+
+    if(withphimax){
+//       double phimax = potprefactor*pair_pmpc.first;
+      double rbarrier = 0.5*(pair_pmpc.first + pair_pmpc.second);
+      double phimax = 0.0;
+      if (rbarrier>0.0){
+        phimax = potprefactor*pmpcfunct(rbarrier);
+      }
+      eta = exp(-phimax/(Kboltz*temperature))
+          *(1.0+(phimax-phimin)/(Kboltz*temperature));
+    }
+    if(fullatt){
+      eta = 1.0 - phimin /(Kboltz*temperature);
+    }
+    if(!attcontact){
+      eta = exp(-phimin/(Kboltz*temperature));
+    }
+
+  //   std::cout << std::endl << r21 << "\t" << q21 << "\t" << potprefactor*pair_pmpc.first
+  //             << "\t" << phimin << "\t" << attcontact << "\t"
+  //             << fullatt << "\t" << eta;
+    return eta;
+  }
+  
+  // compute eta factor for a pair of particles
+  inline
+  double efactor_mpc(double r1, double r2,
+                     double q1, double q2,
+                     const double eps, const double temperature,
+                     const unsigned int j1max, const unsigned int j2max) {
+
+    double r21 = r2/r1;
+    double q21 = q2/q1;
+    // check q1==0
+    if(fabs(q1)<1.e-200){
+      // q1=0, permute particle 1 with 2
+      double raux = r2;
+      r2 = r1;
+      r1 = raux;
+      double qaux = q2;
+      q2 = q1;
+      q1 = qaux;
+      r21 = r2/r1;
+      q21 = 0.0;
+    }
+
+    /* double r21, q21, r1c, r2c, q1c, q2c; */
+    /* if(fabs(q1)>1.0e-200){ */
+    /*   r1c = r1; */
+    /*   r2c = r2; */
+    /*   q1c = q1; */
+    /*   q2c = q2; */
+    /* } */
+    /* else { */
+    /*   r1c = r2; */
+    /*   r2c = r1; */
+    /*   q1c = q2; */
+    /*   q2c = q1; */
+    /* } */
+    /* r21 = r2c/r1c; */
+    /* q21 = q2c/q1c; */
+    
+    double max = 500.0;
+
+    double rt = 1.0 + r21;
+
+    double min = rt;
 
     potential_mpc_funct pmpcfunct(r21, q21, eps,
                                   j1max, j2max);
@@ -596,66 +691,83 @@ namespace eint {
     // Potential at contact
     double pmpc_rt = pmpcfunct(rt);
 
-    force_mpc_funct forcempcfunct(r21, q21, eps,
-                                  j1max, j2max);
-
-    // Force at contact
-    double forcempc_rt = forcempcfunct(rt);
-
     double potprefactor = q1*q1*eCharge*eCharge/r1;
 
     // Potential at contact
     double phi_rt = potprefactor*pmpc_rt;
 
-    if(forcempc_rt>0){
+    if(pmpc_rt>0){
       double eta = exp(-phi_rt/(Kboltz*temperature));
       /* if(phi_rt < 0){ */
       /* 	std::terminate(); */
       /* } */
       return eta;
     }
-    else {// force is negative (attractive) or zero at contact
+    else {// potential is negative (attractive) or zero at contact
+
+      // force functor
+      force_mpc_funct forcempcfunct(r21, q21, eps,
+				    j1max, j2max);
+      // Force at contact
+      double forcempc_rt = forcempcfunct(rt);
       
       // Force at r max
       double forcempc_max = forcempcfunct(max);
-      // checks if force is monotonically decreasing
-      if((forcempc_rt*forcempc_max>=0.0)){
+      
+      // checks if force is monotonically decreasing [non bracketed]
+      if(forcempc_rt*forcempc_max >= 0.0){
 	double eta = 1.0 - phi_rt /(Kboltz*temperature);
 	/* if(phi_rt > 0){ */
 	/*   std::terminate(); */
 	/* } */
 	return eta;
       }
-      else {// find maximum	
+      else {// find maximum, zero of force is bracketed between rt and max
 	std::pair<double, double> pair_pmpc;
+	boost::uintmax_t max_iter = 1000;
+	tools::eps_tolerance<double> tol(30);
 	try {
-	  pair_pmpc = tools::toms748_solve(forcempcfunct, rt, max, forcempc_rt, forcempc_max, tol, max_iter);
+	  //#pragma omp critical
+	  //{	  
+	  pair_pmpc = tools::toms748_solve(forcempcfunct, min, max, forcempc_rt, forcempc_max, tol, max_iter);
+
 	  //pair_pmpc = tools::toms748_solve(forcempcfunct, rt, max, tol, max_iter);
+	
+	 // std::cerr << "\n" << rt << "\t" << max << "\t" << forcempcfunct(rt) << "\t" << forcempcfunct(max);
+	 //}
 	}
 	catch(const std::exception& exc) {
 	  
-	  pair_pmpc.first = 0.0;
-	  pair_pmpc.second = 0.0;
-	  std::cerr << '\n' << exc.what() << '\n';
+	  //pair_pmpc.first = 0.0;
+	  //pair_pmpc.second = 0.0;
 
-	  int nst = 50;
-	  double st = (max-rt)/(nst-1);
-	  for(int i=0; i<50; ++i){
-	    double rr = rt + st*i;
-	    std::cerr << "\n" << rr << "\t" << pmpcfunct(rr) << "\t" << forcempcfunct(rr);
-	  }
-	  std::cerr << '\n';	
-	  std::terminate();
+	    std::cerr << '\n' << exc.what() << '\n';
+
+	  //int nst = 50;
+	  //double st = (max-rt)/(nst-1);
+	  //for(int i=0; i<50; ++i){
+	  //  double rr = rt + st*i;
+	  //  std::cerr << "\n" << rr << "\t" << pmpcfunct(rr) << "\t" << forcempcfunct(rr);
+	  //}
+	  //std::cerr << '\n';	
+	    std::terminate();
+	  //return 1.0 - phi_rt /(Kboltz*temperature);
 	}
 	if(max_iter > 990){
 	  std::cerr << "\n ERROR max iter " << max_iter << "\n\n";
 	  std::terminate();
 	}
 	double rbarrier = 0.5*(pair_pmpc.first+pair_pmpc.second);
-	double phimax = pmpcfunct(rbarrier);
-	double eta = exp(-phimax/(Kboltz*temperature))
-	           *(1.0+(phimax-phi_rt)/(Kboltz*temperature));
-	return eta;
+	if(rbarrier>=0){
+	  double phimax = potprefactor * pmpcfunct(rbarrier);
+	  double eta = exp(-phimax/(Kboltz*temperature))
+	               *(1.0+(phimax-phi_rt)/(Kboltz*temperature));	  
+	  return eta;
+	}
+	else{
+	  std::cerr << "\n ERROR Negative rbarrier " << rbarrier << '\n';
+	  std::terminate();
+	}
       }
     }
     
