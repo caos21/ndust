@@ -648,10 +648,21 @@ namespace eint {
                      const double eps, const double temperature,
                      const unsigned int j1max, const unsigned int j2max) {
 
+    // compute always r2/r1 <= 1
+    if(r2>r1){
+      double raux = r2;
+      r2 = r1;
+      r1 = raux;
+      double qaux = q2;
+      q2 = q1;
+      q1 = qaux;
+    }
+
     double r21 = r2/r1;
     double q21 = q2/q1;
-    // check q1==0
-    if(fabs(q1)<1.e-200){
+
+    // WARNING float comparison
+    if(q1==0.0){
       // q1=0, permute particle 1 with 2
       double raux = r2;
       r2 = r1;
@@ -661,25 +672,9 @@ namespace eint {
       q1 = qaux;
       r21 = r2/r1;
       q21 = 0.0;
-    }
-
-    /* double r21, q21, r1c, r2c, q1c, q2c; */
-    /* if(fabs(q1)>1.0e-200){ */
-    /*   r1c = r1; */
-    /*   r2c = r2; */
-    /*   q1c = q1; */
-    /*   q2c = q2; */
-    /* } */
-    /* else { */
-    /*   r1c = r2; */
-    /*   r2c = r1; */
-    /*   q1c = q2; */
-    /*   q2c = q1; */
-    /* } */
-    /* r21 = r2c/r1c; */
-    /* q21 = q2c/q1c; */
-    
-    double max = 500.0;
+    }    
+      
+    double max = 1000.0;
 
     double rt = 1.0 + r21;
 
@@ -1009,10 +1004,21 @@ namespace eint {
                      const unsigned int j1max=25,
 		     const unsigned int j2max=25) {
 
+    // compute always r2/r1 <= 1
+    if(r2>r1){
+      double raux = r2;
+      r2 = r1;
+      r1 = raux;
+      double qaux = q2;
+      q2 = q1;
+      q1 = qaux;
+    }
+
     double r21 = r2/r1;
     double q21 = q2/q1;
-    // check q1==0
-    if(fabs(q1)<1.e-200){
+
+    // WARNING float comparison
+    if(q1==0.0){
       // q1=0, permute particle 1 with 2
       double raux = r2;
       r2 = r1;
@@ -1023,8 +1029,9 @@ namespace eint {
       r21 = r2/r1;
       q21 = 0.0;
     }
-
-    double max = 500.0;
+    
+      
+    double max = 1000.0;
 
     double rt = 1.0 + r21;
 
