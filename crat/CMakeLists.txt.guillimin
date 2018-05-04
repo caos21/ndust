@@ -4,7 +4,9 @@ cmake_minimum_required(VERSION 2.8)
 project(crat)
 
 add_definitions(-DBOOST_LOG_DYN_LINK)
+
 add_definitions(-DNDEBUG)
+
 
 set (CMAKE_CXX_FLAGS "-std=gnu++14 ${CMAKE_CXX_FLAGS}")
 
@@ -43,11 +45,13 @@ add_library(CRate STATIC ../include/CRate.cpp)
 
 # include_directories(${INC_DIR})
 
+
 set(CMAKE_CXX_COMPILE_FLAGS "${CMAKE_CXX_COMPILE_FLAGS} -Ofast -frecord-gcc-switches")
 
 set(CMAKE_CXX_LINK_FLAGS "${CMAKE_CXX_LINK_FLAGS} -Ofast -frecord-gcc-switches")
 
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -std=gnu++14 -mtune=athlon-fx -O2 -frecord-gcc-switches")
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -std=gnu++14 -mtune=native -O2 -frecord-gcc-switches")
+
 #
 # RELEASE ADD -DNDEBUG for boost performance
 #
@@ -65,6 +69,7 @@ if(OPENMP_FOUND)
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS} ")
   add_definitions(-DOPENMP)
 endif()
+
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Ofast -frecord-gcc-switches")
 
