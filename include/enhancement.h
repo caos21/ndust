@@ -29,6 +29,7 @@
 
 #include <omp.h>
 
+#include "log.h"
 #include "eint.h"
 #include "array.h"
 #include "constants.h"
@@ -37,6 +38,9 @@
 using namespace utils;
 
 namespace enhancement {
+
+  const boost::uintmax_t ROOT_MAXITER = 1000;
+  const tools::eps_tolerance<double> ROOT_TOL(30);
 
   class ParticlePair {
   public:
@@ -138,6 +142,7 @@ namespace enhancement {
     // friend
     // bool operator == (const ReducedParticlePair& lx,
     // 		    const ReducedParticlePair& rx);
+
     double r21_;                //!< Value for radius fraction r2/r1
     double q21_;                //!< Value for radius fraction r2/r1
 
@@ -216,7 +221,8 @@ namespace enhancement {
   }
 
   struct reducedPairsComparison {
-    bool operator()(const ReducedParticlePair& lx, const ReducedParticlePair& rx) const {
+    bool operator()(const ReducedParticlePair& lx,
+		    const ReducedParticlePair& rx) const {
       if (lx.r21_ != rx.r21_) {
 	return (lx.r21_ < rx.r21_);
       }
@@ -243,6 +249,7 @@ namespace enhancement {
 		     const short &n = 0) : id_(id),
 					   potential_(potential),
 					   n_(n) {
+
     }
   
 
@@ -288,8 +295,9 @@ namespace enhancement {
   class Enhancement {
   public:
 
-    Enhancement(const darray& rarray_, const darray& qarray_, double eps_) :
-      rarray(rarray_), qarray(qarray_), eps(eps_) {
+    Enhancement(const darray& rarray_, const darray& qarray_, double eps_,
+		src::severity_logger< severity_level > lg_) :
+      rarray(rarray_), qarray(qarray_), eps(eps_), lg(lg_) {
 
       rarray_size = rarray.size();
       qarray_size = qarray.size();
@@ -299,10 +307,16 @@ namespace enhancement {
       particle_pairs.reserve(ncombs);
 
       potential_threshold = 0.0;
+
+      nmin = 25;
+      nmax = 300;
+      nstep = 5;      
     }
     
     inline
     void compute_reducedpairs() {
+
+      BOOST_LOG_SEV(lg, info) << "Computing particle pairs...";
 
       ParticlePair *ppair = new ParticlePair();
 
@@ -363,11 +377,10 @@ namespace enhancement {
 	}
       }
 
-      // fill 
-      // ReducedParticlePair *rppair = new ReducedParticlePair();
-      // fill_rppair(*rppair, particle_pairs[0].r21_, particle_pairs[0].q21_, 0); 
-      // reduced_pairs.push_back(*rppair);
+      BOOST_LOG_SEV(lg, info) << "Pairs size : " << particle_pairs.size();
 
+      BOOST_LOG_SEV(lg, info) << "Computing reduced pairs...";
+      
       reduced_pairs.resize(particle_pairs.size());
 
       for (unsigned int i = 0; i<particle_pairs.size(); ++i) {
@@ -388,56 +401,159 @@ namespace enhancement {
       std::vector<ReducedParticlePair>().swap(tmp);
     
       //****************************************************************************
-      // Add indices of repeated to vector ofast repetitions
+      // Add indices of repeated to vector repetitions
       //****************************************************************************
 
-
+      BOOST_LOG_SEV(lg, info) << "Reduced pairs size : " << reduced_pairs.size();
+      
 #pragma omp parallel for schedule(nonmonotonic:dynamic)
       for (unsigned int irp=0; irp<reduced_pairs.capacity(); ++irp) {
 	for (unsigned int jpp=0; jpp<particle_pairs.capacity(); ++jpp) {
-	  // #pragma omp critical
-	  // {
 	  if(reduced_pairs[irp]==particle_pairs[jpp]) {
-	    //std::cout << "\n[ii] equals: " << irp << '\t' << jpp;
 #pragma omp critical
-	    {	    
+	    {
+	      // one thread a at time
 	      reduced_pairs[irp].fill_repeated(jpp);
 	    }
 	  }
-	  // }
 	}
       }
  
-      //delete(rppair);
       delete(ppair);
 
       // resize contact potentials
       contact_potentials.resize(reduced_pairs.size());
       attractive_potentials.reserve(reduced_pairs.size());
-      
+
+      BOOST_LOG_SEV(lg, info) << "Done computing pairs.";
     }
 
     inline
-    void compute_contact_potentials() {
+    void compute_ipapotential_contact() {
+      BOOST_LOG_SEV(lg, info)
+	<< "Computing ipa potential at contact for n pairs : "
+	<< reduced_pairs.size();
+#pragma omp parallel for schedule(nonmonotonic:dynamic)
+      for (unsigned int i=0; i<reduced_pairs.size(); ++i) {
+
+	double r21 = reduced_pairs[i].r21_;
+	double q21 = reduced_pairs[i].q21_;
+ 
+	double rt = 1.0 + r21;
+   
+	eint::potential_ipa_funct pipafunct(r21, q21, eps);
+
+	// // ipa at contact 
+	double pipa_rt = pipafunct(rt);
+
+#pragma omp critical
+	{
+	  fill_contact_potential(contact_potentials[i], i, pipa_rt, 0);
+	  //check attractive potential
+	  if (pipa_rt<potential_threshold){
+	    ContactPotential acpot(i, pipa_rt, 0);
+	    attractive_potentials.push_back(acpot);
+	  }
+	}
+      }
+
+      std::vector<ContactPotential> tmp = attractive_potentials;
+      attractive_potentials.swap(tmp);
+      std::vector<ContactPotential>().swap(tmp);
+
+      barrier_potentials.reserve(attractive_potentials.size());
+      rbarrier_array.reserve(attractive_potentials.size());
+
+      BOOST_LOG_SEV(lg, info) << "Attractive potentials size : " << attractive_potentials.size();
+      BOOST_LOG_SEV(lg, info) << "Done computing ipa potential at contact.";
+    }
+
+    inline
+    void compute_ipapotential_barrier() {
+      BOOST_LOG_SEV(lg, info) << "Computing ipa potential barrier for n pairs : " << reduced_pairs.size();
+#pragma omp parallel for shared(reduced_pairs) schedule(nonmonotonic:dynamic)
+      for (unsigned int i=0; i<attractive_potentials.size(); ++i) {
+    
+	unsigned int index = attractive_potentials[i].id_; 
+
+	double r21 = reduced_pairs[index].r21_;
+	double q21 = reduced_pairs[index].q21_;
+
+	double rmin = 1.0 + r21;
+	double rmax = 100.0;
+
+	double min = rmin;
+	double max = rmax;
+     
+	eint::force_ipa_funct fipafunct(r21, q21, eps);
+	// force ipa at contact 
+	double fipa_rmin = fipafunct(rmin);
+	// Force at r max
+	double fipa_rmax = fipafunct(rmax);
+
+	// checks if minimum exists
+	if (fipa_rmin*fipa_rmax < 0.0) {
+	  // std::cerr << "\n[ii] Mixed phi_rt = " << fipa_rmin << '\t' << fipa_rmax;
+	  boost::uintmax_t bmax_iter = ROOT_MAXITER;
+	  tools::eps_tolerance<double> tol = ROOT_TOL;
+
+	  std::pair<double, double> pair_fipa;
+	  try {
+	    pair_fipa = tools::toms748_solve(fipafunct, min, max, fipa_rmin, fipa_rmax, tol, bmax_iter);
+	  }
+	  catch(const std::exception& exc) {
+	    std::cerr << '\n' << exc.what() << '\n';
+	    std::terminate();
+	  }
+	  if(bmax_iter > 990){
+	    std::cerr << "\n ERROR max iter " << bmax_iter << "\n\n";
+	    std::terminate();
+	  }
+	  double rbarrier = 0.5*(pair_fipa.first+pair_fipa.second);
+	  if(rbarrier>=min){
+	    //*********************** USE SAME COEFFICIENTS OF FORCE
+	    // ipa functor
+	    eint::potential_ipa_funct pipafunct(r21, q21, eps);      
+	    // ipa at contact
+	    double pipa_rbarrier = pipafunct(rbarrier);	  
+	    ContactPotential barrierpot(index, pipa_rbarrier);
+	    barrier_potentials.push_back(barrierpot);
+	    rbarrier_array.push_back(rbarrier);
+	  }
+	  else{
+	    std::cerr << "\n ERROR Negative rbarrier " << rbarrier << '\n';
+	    std::terminate();
+	  }	
+	} 
+      }
+ 
+      std::vector<ContactPotential> tmp = barrier_potentials;
+      barrier_potentials.swap(tmp);
+      std::vector<ContactPotential>().swap(tmp);
+
+      std::vector<double> tmp2 = rbarrier_array;
+      rbarrier_array.swap(tmp2);
+      std::vector<double>().swap(tmp2);
+
+      BOOST_LOG_SEV(lg, info) << "Barrier potentials size : " <<barrier_potentials.size();
+      BOOST_LOG_SEV(lg, info) << "Done computing ipa potential barrier.";
+    }
+        
+    inline
+    void compute_mpcpotential_contact() {
+      BOOST_LOG_SEV(lg, info)
+	<< "Computing mpc potential at contact for n pairs : "
+	<< reduced_pairs.size();      
+      // WARNING FIXME
       std::ofstream outfile("pot1.dat");
       outfile << "#n\tr21\tq21\tmpc\tpipa\terror_pot\terror\tmsg\n";
- 
-      unsigned int nmin = 25;//25;//25;//10;//80;//20;
-      unsigned int nmax = 300;//100;//100;//90;//90;//32;
-      unsigned int nstep = 5;//20;
 
-      unsigned int i;
-#pragma omp parallel for private(i) schedule(nonmonotonic:dynamic)
-      for (i=0; i<reduced_pairs.size(); ++i) {
+#pragma omp parallel for schedule(nonmonotonic:dynamic)
+      for (unsigned int i=0; i<reduced_pairs.size(); ++i) {
 
 
 	double r21 = reduced_pairs[i].r21_;
 	double q21 = reduced_pairs[i].q21_;
-
-	// for(auto ups: reduced_pairs){
-
-	//   double r21 = ups.r21_;
-	//   double q21 = ups.q21_;
  
 	double rt = 1.0 + r21;
    
@@ -449,7 +565,7 @@ namespace enhancement {
 	double pcomp = pipa_rt;
 	unsigned int initer=0;
       
-	for(unsigned int n=nmin; n <= nmax; n+=nstep, ++initer){
+	for(short n=nmin; n <= nmax; n+=nstep, ++initer){
       
 	  // mpc functor
 	  eint::potential_mpc_funct pmpcfunct(r21, q21, eps, n);
@@ -507,36 +623,118 @@ namespace enhancement {
 
       outfile.close();
 
-  
-      std::cout << "\nPotentials attcontact contact : " << attractive_potentials.size() <<  '\n';
       std::vector<ContactPotential> tmp = attractive_potentials;
-      std::cout << "\nPotentials attcontact capacity : " << attractive_potentials.capacity() <<  '\n';
       attractive_potentials.swap(tmp);
-      std::cout << "\nPotentials attcontact capacity : " << attractive_potentials.capacity() <<  '\n';
       std::vector<ContactPotential>().swap(tmp);
+
+      barrier_potentials.reserve(attractive_potentials.size());
+      rbarrier_array.reserve(attractive_potentials.size());
+
+      BOOST_LOG_SEV(lg, info) << "Attractive potentials size : " << attractive_potentials.size();
+      BOOST_LOG_SEV(lg, info) << "Done computing ipa potential at contact.";
+    }
+
+    inline
+    void compute_mpcpotential_barrier() {
+      BOOST_LOG_SEV(lg, info) << "Computing mpc potential barrier for n pairs : " << reduced_pairs.size();
+#pragma omp parallel for shared(reduced_pairs) schedule(nonmonotonic:dynamic)
+      for (unsigned int i=0; i<attractive_potentials.size(); ++i) {
+    
+	unsigned int index = attractive_potentials[i].id_; 
+	unsigned int nterms = attractive_potentials[i].n_;
+
+	double r21 = reduced_pairs[index].r21_;
+	double q21 = reduced_pairs[index].q21_;
+
+	double rmin = 1.0 + r21;
+	double rmax = 100.0;
+
+	double min = rmin;
+	double max = rmax;
+     
+	eint::force_mpc_funct fmpcfunct(r21, q21, eps, nterms);
+	// force mpc at contact 
+	double fmpc_rmin = fmpcfunct(rmin);
+	// Force at r max
+	double fmpc_rmax = fmpcfunct(rmax);
+
+	// checks if minimum exists
+	if (fmpc_rmin*fmpc_rmax < 0.0) {
+	  // std::cerr << "\n[ii] Mixed phi_rt = " << fmpc_rmin << '\t' << fmpc_rmax;
+	  boost::uintmax_t bmax_iter = ROOT_MAXITER;
+	  tools::eps_tolerance<double> tol = ROOT_TOL;
+
+	  std::pair<double, double> pair_fmpc;
+	  try {
+	    pair_fmpc = tools::toms748_solve(fmpcfunct, min, max, fmpc_rmin, fmpc_rmax, tol, bmax_iter);
+	  }
+	  catch(const std::exception& exc) {
+	    std::cerr << '\n' << exc.what() << '\n';
+	    std::terminate();
+	  }
+	  if(bmax_iter > 990){
+	    std::cerr << "\n ERROR max iter " << bmax_iter << "\n\n";
+	    std::terminate();
+	  }
+	  double rbarrier = 0.5*(pair_fmpc.first+pair_fmpc.second);
+	  if(rbarrier>=min){
+	    //*********************** USE SAME COEFFICIENTS OF FORCE
+	    // mpc functor
+	    eint::potential_mpc_funct pmpcfunct(r21, q21, eps, nterms);      
+	    // mpc at contact
+	    double pmpc_rbarrier = pmpcfunct(rbarrier);	  
+	    ContactPotential barrierpot(index, pmpc_rbarrier, nterms);
+	    barrier_potentials.push_back(barrierpot);
+	    rbarrier_array.push_back(rbarrier);
+	  }
+	  else{
+	    std::cerr << "\n ERROR Negative rbarrier " << rbarrier << '\n';
+	    std::terminate();
+	  }	
+	} 
+      }
+ 
+      std::vector<ContactPotential> tmp = barrier_potentials;
+      barrier_potentials.swap(tmp);
+      std::vector<ContactPotential>().swap(tmp);
+
+      std::vector<double> tmp2 = rbarrier_array;
+      rbarrier_array.swap(tmp2);
+      std::vector<double>().swap(tmp2);
+
+      BOOST_LOG_SEV(lg, info) << "Barrier potentials size : " <<barrier_potentials.size();      
+      BOOST_LOG_SEV(lg, info) << "Done computing mpc potential barrier.";
+    }
+
+    inline
+    void compute_enhancement_factor() {
       
     }
-    darray rarray;
-    
+    //
+    darray rarray;    
     darray qarray;
 
     double eps;
 
-    unsigned short rarray_size;
+    src::severity_logger< severity_level > lg;
     
+    unsigned short rarray_size;    
     unsigned short qarray_size;
-
     unsigned long ncombs;
+
+    short nmin;
+    short nmax;
+    short nstep;
     
     std::vector<ParticlePair> particle_pairs;
-
     std::vector<ReducedParticlePair> reduced_pairs;
-
     std::vector<ContactPotential> contact_potentials;
-
     std::vector<ContactPotential> attractive_potentials;
-
+    std::vector<ContactPotential> barrier_potentials;
+    
     double potential_threshold;
+
+    std::vector<double> rbarrier_array;
   };
 }
 

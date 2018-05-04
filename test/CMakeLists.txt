@@ -4,7 +4,7 @@ set(Boost_USE_STATIC_LIBS OFF)
 set(Boost_USE_MULTITHREADED ON)  
 set(Boost_USE_STATIC_RUNTIME OFF) 
 
-add_definitions( -DBOOST_ALL_NO_LIB )
+add_definitions(-DBOOST_ALL_NO_LIB)
 
 include_directories(SYSTEM "/usr/include/eigen3")
 
@@ -24,7 +24,7 @@ if(Boost_FOUND)
   include_directories(${Boost_INCLUDE_DIRS})
 endif()
 
-message("${Boost_LIBRARIES}")
+#message("${Boost_LIBRARIES}")
 #link_directories("${BOOST}/lib/")
 
 find_package(OpenMP)
@@ -36,7 +36,7 @@ if(OPENMP_FOUND)
  add_definitions(-DOPENMP)
 endif()
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O1 -frecord-gcc-switches -Wall -pedantic -march=znver1")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O1 -frecord-gcc-switches -Wall -pedantic -march=znver1 -g")
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${LIBS}")
 
 add_executable(eint-test eint-test.cpp)
