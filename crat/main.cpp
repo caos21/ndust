@@ -113,6 +113,7 @@ int main(int argc, char **argv) {
   crate.open();
   crate.read();
   crate.compute();
+  //crate.compute_sym();
   crate.write();
   crate.close();
 

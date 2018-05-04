@@ -158,15 +158,89 @@ int CRate::compute() {
   return 0;
 }
 
-void CRate::compute_efactor_grid() {
-  // iterate in radii particle 1
-#pragma omp parallel for collapse(4) schedule(runtime)
+int CRate::compute_sym() {
+
+  // bind efactorfunc
+  bind_efactorfunc();
+
+  // grid definition
+  grid = {{gm.vols.nsections, gm.chrgs.nsections}};
+  grid4 = {{gm.vols.nsections, gm.chrgs.nsections,
+            gm.vols.nsections, gm.chrgs.nsections}};
+
+  // resizing
+  efactor.resize(grid4); 
+  rcoag.resize(grid4);
+
+  // Compute electrostatic to thermal ratio
+  electhermratio = 1.0*eCharge*eCharge
+                  / (4.0*M_PI*EpsilonZero*Kboltz*gm.gsys.temperature);
+
+  BOOST_LOG_SEV(lg, info) << "Electrostatic to thermal ratio: "
+                          << electhermratio;
+
+  // Compute beta0
+  beta0 = pow(3.0/(4.0*M_PI), 1.0/6.0)
+        * sqrt(6.0*Kboltz*gm.gsys.temperature/gm.gsys.nmdensity);
+
+  BOOST_LOG_SEV(lg, info) << "Computing enhancement factor grid";
+  compute_efactor_grid_sym();
+  BOOST_LOG_SEV(lg, info) << "Done... ehancement factor grid";
+
+  BOOST_LOG_SEV(lg, info) << "Computing coagulation rate";
+  compute_rcoagulation();
+  BOOST_LOG_SEV(lg, info) << "Done... coagulation rate";
+
+  BOOST_LOG_SEV(lg, info) << "Computing eta creation rate";
+  compute_etafactor();
+  BOOST_LOG_SEV(lg, info) << "Done... eta";
+
+  BOOST_LOG_SEV(lg, info) << "Computing death rate";
+  compute_deathfactor();
+  BOOST_LOG_SEV(lg, info) << "Done... death";
+  
+  return 0;
+}
+
+
+void CRate::compute_efactor_grid_sym() {
+  BOOST_LOG_SEV(lg, info) << "Computing symmetric version";
+  // iterate in non repeated combinations of particle pairs (r,q)
+#pragma omp parallel for collapse(4) schedule(auto)
   for (unsigned int l=0; l<gm.vols.nsections; ++l) {
     // iterate in charges particle 1
     for (unsigned int q=0; q<gm.chrgs.nsections; ++q) {
       // iterate in radii particle 2
       for (unsigned int m=0; m<gm.vols.nsections; ++m) {
-        // iterate in charges particle 2
+	// iterate in charges particle 2	
+	for (unsigned int p=0; p<gm.chrgs.nsections; ++p) {
+	  unsigned int p1 = q * gm.vols.nsections + l;
+	  unsigned int p2 = p * gm.vols.nsections + m;
+	  // avoid repetitions
+	  if((p>=q) && (p2 >= p1)){
+	    efactor[l][q][m][p] = compute_efactor(gm.vols.radii[l],
+						  gm.vols.radii[m],
+						  gm.chrgs.charges[q],
+						  gm.chrgs.charges[p]);
+	    // write symmetric enhancement factor
+	    efactor[m][p][l][q] =  efactor[l][q][m][p]; 
+	  }
+	}
+      }
+    }
+  }
+}
+
+void CRate::compute_efactor_grid() {
+  // iterate in radii particle 1
+  //#pragma omp parallel for default(none) collapse(4) schedule(auto)
+#pragma omp parallel for collapse(4) schedule(auto)
+  for (unsigned int l=0; l<gm.vols.nsections; ++l) {
+    // iterate in charges particle 1
+    for (unsigned int q=0; q<gm.chrgs.nsections; ++q) {
+      // iterate in radii particle 2
+      for (unsigned int m=0; m<gm.vols.nsections; ++m) {
+        // iterate in charges particle 2	
         for (unsigned int p=0; p<gm.chrgs.nsections; ++p) {
           efactor[l][q][m][p] = compute_efactor(gm.vols.radii[l],
                                                 gm.vols.radii[m],

@@ -111,6 +111,12 @@ public:
   */
   int compute();
 
+  //! Start calculations WARNING TESTING
+  /*! 
+   * Testing symmetrization
+  */
+  int compute_sym();
+  
   //! write h5 datafile
   /*! 
    * Write on file prefix_filename.h5 in dirname
@@ -193,7 +199,9 @@ private:
     return eint::efactor_ipa(r1, r2,
                              q1, q2,
                              gm.einter.dconstant,
-                             gm.gsys.temperature);
+                             gm.gsys.temperature,
+    			     gm.einter.terms,
+                             gm.einter.terms);
   }
 
   //! Compute efactor using Coulomb method
@@ -219,6 +227,12 @@ private:
     Compute enhancement in the grid vols x chrgs
   */
   void compute_efactor_grid();
+
+  //! Compute efactor in the grid vols x chrgs
+  /*! 
+    Compute enhancement in the grid vols x chrgs symmetric
+  */
+  void compute_efactor_grid_sym();
 
   double beta_free(const double vol1, const double vol2,
                    const double beta0);
