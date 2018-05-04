@@ -43,3 +43,6 @@ add_executable(eint-test eint-test.cpp)
 
 target_link_libraries(eint-test ${Boost_LIBRARIES} ${LIBS})
 
+add_executable(enhancement-test enhancement-test.cpp)
+
+target_link_libraries(enhancement-test ${Boost_LIBRARIES} ${LIBS})

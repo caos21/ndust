@@ -177,12 +177,13 @@ private:
   double compute_efactor_mpc(double r1, double r2,
                              double q1, double q2) {
 
-    return eint::efactor_mpc(r1, r2,
-                             q1, q2,
-                             gm.einter.dconstant,
-                             gm.gsys.temperature,
-                             gm.einter.terms,
-                             gm.einter.terms);
+    /* return eint::efactor_mpc(r1, r2, */
+    /*                          q1, q2, */
+    /*                          gm.einter.dconstant, */
+    /*                          gm.gsys.temperature, */
+    /*                          gm.einter.terms, */
+    /*                          gm.einter.terms); */
+    return 1.0;
   }
 
   //! Compute efactor using ipa method
@@ -196,12 +197,13 @@ private:
   double compute_efactor_ipa(double r1, double r2,
                              double q1, double q2) {
 
-    return eint::efactor_ipa(r1, r2,
-                             q1, q2,
-                             gm.einter.dconstant,
-                             gm.gsys.temperature,
-    			     gm.einter.terms,
-                             gm.einter.terms);
+    /* return eint::efactor_ipa(r1, r2, */
+    /*                          q1, q2, */
+    /*                          gm.einter.dconstant, */
+    /*                          gm.gsys.temperature, */
+    /* 			     gm.einter.terms, */
+    /*                          gm.einter.terms); */
+    return 1.0;
   }
 
   //! Compute efactor using Coulomb method

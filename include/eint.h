@@ -48,17 +48,6 @@
 #include <boost/numeric/bindings/lapack/sysv.hpp>
 #include <boost/numeric/bindings/traits/ublas_vector2.hpp>
 
-#ifdef USING_EIGEN
-
-#include <Eigen/Eigen>
-#include <Eigen/Core>
-#include <Eigen/IterativeLinearSolvers>
-
-typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> MatrixDD;
-typedef Eigen::Matrix<double, Eigen::Dynamic, 1> VectorDD;
-
-#endif
-
 // #include <boost/numeric/bindings/umfpack/umfpack.hpp>
 
 #include "constants.h"

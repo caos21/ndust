@@ -27,6 +27,17 @@
 #include <algorithm>
 #include <cmath>
 
+#ifdef USING_EIGEN
+
+#include <Eigen/Eigen>
+#include <Eigen/Core>
+#include <Eigen/IterativeLinearSolvers>
+
+typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> MatrixDD;
+typedef Eigen::Matrix<double, Eigen::Dynamic, 1> VectorDD;
+
+#endif
+
 // Boost array
 #include <boost/multi_array.hpp>
 #include <boost/math/special_functions/cbrt.hpp>
