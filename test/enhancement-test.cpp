@@ -38,8 +38,6 @@
 
 #include "../include/log.h"
 #include "../include/enhancement.h"
-// #include "../include/eint.h"
-// #include "../include/constants.h"
 
 using namespace std;
 using namespace boost::unit_test;
@@ -156,6 +154,7 @@ BOOST_AUTO_TEST_CASE( mpc_enhancement_test ) {
       cpot.print();
     }
 
+    enh.compute_enhancement_factor();
     BOOST_REQUIRE_CLOSE(1.0, 1.0, PTOL);
   }
 

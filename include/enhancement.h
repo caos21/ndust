@@ -242,6 +242,7 @@ namespace enhancement {
     }
   }
 
+  
   class ContactPotential {
   public:
     ContactPotential(const long &id = 0,
@@ -292,6 +293,22 @@ namespace enhancement {
   }
 
 
+  struct find_id {
+    long id;
+    find_id(const long & id_) : id(id_) {
+    }
+
+    bool operator()(const ContactPotential& cpot) const {
+      //return rpp.id_ = id
+      //std::vector<long> rptd = rpp.repetitions_;
+      //std::vector<long>::iterator it = std::find(rptd.begin(), rptd.end(), id);
+      //return std::find(rptd.begin(), rptd.end(), id) != rptd.end();
+      return (cpot.id_ == id);
+    }
+  };
+
+  typedef std::vector<ContactPotential>::iterator ContactPotentialIterator;
+  
   class Enhancement {
   public:
 
@@ -708,7 +725,100 @@ namespace enhancement {
 
     inline
     void compute_enhancement_factor() {
+
+      bgrid4d grid4;
+      boost_array4d efactor;
       
+      grid4 = {{static_cast<unsigned>(rarray.size()),
+		static_cast<unsigned>(qarray.size()),
+		static_cast<unsigned>(rarray.size()),
+		static_cast<unsigned>(qarray.size())}};
+      
+      efactor.resize(grid4);
+      
+      BOOST_LOG_SEV(lg, info) << "Computing Enhancement Factor";
+
+      BOOST_LOG_SEV(lg, info) << "Computing Enhancement Factor";
+      //#pragma omp parallel for shared(reduced_pairs) schedule(nonmonotonic:dynamic)
+      // Loop in all contact potentials
+      for (unsigned int icp=0; icp<contact_potentials.size(); ++icp) {
+
+	// this is the index of reduced pairs
+	unsigned int index  = contact_potentials[icp].id_;
+	double contact_potential = contact_potentials[icp].potential_;
+	
+	// get repeated combinations (of particle_pairs)
+	std::vector<long> reps = reduced_pairs[index].repetitions_;
+	double r21 = reduced_pairs[index].r21_;
+	double q21 = reduced_pairs[index].q21_;
+	
+	
+	// //** find repetitions using index
+	// std::vector<ReducedParticlePair>::iterator it = std::find_if(reduced_pairs.begin(),
+	// 							     reduced_pairs.end(),
+	// 							     findId(index));
+	
+	
+	//** find if index is in barrier_potentials
+	ContactPotentialIterator barrier_it = std::find_if(barrier_potentials.begin(),
+							   barrier_potentials.end(),
+							   find_id(index));
+
+
+	
+	// //** this check has to be passed to the following loop
+	// if(it != barrier_potentials.end()) {
+	//     // std::cerr << "\n*********************";
+	//     // std::cerr << "\n* " << (*it).id_;
+	//     // 			   std::cerr << "\n* " << (*it).potential_;
+	//     // 						  std::cerr << "\n*********************";
+								       
+	// }
+	
+	//** loop in repetitions private or shared it?
+	for(unsigned int jrep=0; jrep<reps.size(); ++jrep){
+	  short rep_index = reps[jrep];
+	  unsigned int l = particle_pairs[rep_index].l_;
+	  unsigned int q = particle_pairs[rep_index].q_;
+	  unsigned int m = particle_pairs[rep_index].m_;
+	  unsigned int p = particle_pairs[rep_index].p_;
+
+	  // we have potential barrier
+	  // ** if barrier compute eta	  
+	  if(barrier_it != barrier_potentials.end()) {
+	    // std::cerr << "\n*********************";
+	    // std::cerr << "\n* " << (*it).id_;
+	    // 			   std::cerr << "\n* " << (*it).potential_;
+	    //
+	    std::cerr << "\n*********************" << rep_index;
+	    std::cerr << "\n(" << l << ", " << q << ") + (" << m << ", " << p << ")";
+	    std::cerr << "\n*******contact**********" << contact_potential;
+	    std::cerr << "\n*******barrier**********" << (*barrier_it).potential_;
+	    efactor[l][q][m][p] = 1;
+	    efactor[m][p][l][q] = 1;
+	    //break;
+	  }
+	  else {
+	    // ** if not barrier
+	    // ** attraction and repulsion
+	    if(contact_potential <= 0 ){
+	      std::cerr << "\n--------------------" << rep_index;
+	      std::cerr << "\n(" << l << ", " << q << ") + (" << m << ", " << p << ")";
+	      std::cerr << "\n----------contact------" << contact_potential;
+	      efactor[l][q][m][p] = 1;
+	      efactor[m][p][l][q] = 1;
+	    }
+	    else {
+	      std::cerr << "\n++++++++++++++++++++" << rep_index;
+	      std::cerr << "\n(" << l << ", " << q << ") + (" << m << ", " << p << ")";
+	      std::cerr << "\n++++++++++contact++++++++++" << contact_potential;
+	      efactor[l][q][m][p] = 1;
+	      efactor[m][p][l][q] = 1;	      	      
+	    }
+	  }
+	}
+
+      } 
     }
     //
     darray rarray;    
@@ -735,6 +845,8 @@ namespace enhancement {
     double potential_threshold;
 
     std::vector<double> rbarrier_array;
+
+
   };
 }
 
