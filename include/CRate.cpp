@@ -77,17 +77,17 @@ int CRate::read_results() {
 int CRate::write() {
   hid_t id = h5obj.getId();
 
-  BOOST_LOG_SEV(lg, info) << "Writing eta creation factor";
-  write_etafactor();
+  // BOOST_LOG_SEV(lg, info) << "Writing eta creation factor";
+  // write_etafactor();
 
-  BOOST_LOG_SEV(lg, info) << "Writing death factor";
-  write_deathfactor();
+  // BOOST_LOG_SEV(lg, info) << "Writing death factor";
+  // write_deathfactor();
 
   BOOST_LOG_SEV(lg, info) << "Writing enhancement factor";
   write_efactor();
 
-  BOOST_LOG_SEV(lg, info) << "Writing coagulation rate";
-  write_rcoagulation();
+  // BOOST_LOG_SEV(lg, info) << "Writing coagulation rate";
+  // write_rcoagulation();
 
   return 0;
 }
@@ -114,46 +114,221 @@ void CRate::bind_efactorfunc(){
   }
 }
 
+
+int CRate::write_pairs() {
+
+  BOOST_LOG_SEV(lg, info) << "Computing and writing particle pairs...";
+  
+  // grid definition
+  grid = {{gm.vols.nsections, gm.chrgs.nsections}};
+  grid4 = {{gm.vols.nsections, gm.chrgs.nsections,
+            gm.vols.nsections, gm.chrgs.nsections}};
+  
+  // resizing
+  efactor.resize(grid4); 
+  rcoag.resize(grid4);
+
+  BOOST_LOG_SEV(lg, info) << "Size for array efactor : " << efactor.size();
+  // BOOST_LOG_SEV(lg, info) <<"\n r size " << gm.vols.radii.size();
+  // std::cerr << "\n q size " << gm.chrgs.charges.size();
+  BOOST_LOG_SEV(lg, info) << "Radii size : " << gm.vols.nsections;
+  BOOST_LOG_SEV(lg, info) << "Charge size : " << gm.chrgs.nsections;
+  
+      
+  boost_array4d_ref efactor_ref(efactor);     //!< Reference to efactor
+
+  enhancement::Enhancement enh(gm.vols.radii, gm.chrgs.charges*eCharge, efactor_ref, gm.einter.dconstant, lg);
+
+  BOOST_LOG_SEV(lg, info) << "Computing reduced particle pairs...";
+  auto start = std::chrono::system_clock::now();
+  //
+  enh.compute_reducedpairs();
+  //
+  auto end = std::chrono::system_clock::now();
+  std::chrono::duration<double> elapsed_seconds = end-start;
+  BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
+
+
+  std::string fullname = dirname + prefix_filename;
+  
+  BOOST_LOG_SEV(lg, info) << "Writing particle pairs...";
+  start = std::chrono::system_clock::now();
+  //
+  enh.write_particlepairs(fullname);
+  //
+  end = std::chrono::system_clock::now();
+  elapsed_seconds = end-start;
+  BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
+
+  return 0;
+}
+
+
+int CRate::read_pairs() {
+
+  BOOST_LOG_SEV(lg, info) << "Reading particle pairs...";
+  
+  // grid definition
+  grid = {{gm.vols.nsections, gm.chrgs.nsections}};
+  grid4 = {{gm.vols.nsections, gm.chrgs.nsections,
+            gm.vols.nsections, gm.chrgs.nsections}};
+  
+  // resizing
+  efactor.resize(grid4); 
+  rcoag.resize(grid4);
+
+  BOOST_LOG_SEV(lg, info) << "Size for array efactor : " << efactor.size();
+  // BOOST_LOG_SEV(lg, info) <<"\n r size " << gm.vols.radii.size();
+  // std::cerr << "\n q size " << gm.chrgs.charges.size();
+  BOOST_LOG_SEV(lg, info) << "Radii size : " << gm.vols.nsections;
+  BOOST_LOG_SEV(lg, info) << "Charge size : " << gm.chrgs.nsections;
+  
+      
+  boost_array4d_ref efactor_ref(efactor);     //!< Reference to efactor
+
+  enhancement::Enhancement enh(gm.vols.radii, gm.chrgs.charges*eCharge, efactor_ref, gm.einter.dconstant, lg);
+
+
+  std::string fullname = dirname + prefix_filename;
+  
+  BOOST_LOG_SEV(lg, info) << "Reading particle pairs...";
+  auto start = std::chrono::system_clock::now();
+  //
+  enh.read_particlepairs(fullname);
+  //
+  auto end = std::chrono::system_clock::now();
+  std::chrono::duration<double>  elapsed_seconds = end-start;
+  BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
+
+  return 0;
+}
+
+
 int CRate::compute() {
 
-  // bind efactorfunc
-  bind_efactorfunc();
+  // // bind efactorfunc
+  // bind_efactorfunc();
 
   // grid definition
   grid = {{gm.vols.nsections, gm.chrgs.nsections}};
   grid4 = {{gm.vols.nsections, gm.chrgs.nsections,
             gm.vols.nsections, gm.chrgs.nsections}};
-
+  
   // resizing
   efactor.resize(grid4); 
   rcoag.resize(grid4);
 
-  // Compute electrostatic to thermal ratio
-  electhermratio = 1.0*eCharge*eCharge
-                  / (4.0*M_PI*EpsilonZero*Kboltz*gm.gsys.temperature);
+  BOOST_LOG_SEV(lg, info) << "Size for array efactor : " << efactor.size();
+  // BOOST_LOG_SEV(lg, info) <<"\n r size " << gm.vols.radii.size();
+  // std::cerr << "\n q size " << gm.chrgs.charges.size();
+  BOOST_LOG_SEV(lg, info) << "Radii size : " << gm.vols.nsections;
+  BOOST_LOG_SEV(lg, info) << "Charge size : " << gm.chrgs.nsections;
+  
+      
+  boost_array4d_ref efactor_ref(efactor);     //!< Reference to efactor
 
-  BOOST_LOG_SEV(lg, info) << "Electrostatic to thermal ratio: "
-                          << electhermratio;
+  enhancement::Enhancement enh(gm.vols.radii, gm.chrgs.charges*eCharge, efactor_ref, gm.einter.dconstant, lg);  
 
-  // Compute beta0
-  beta0 = pow(3.0/(4.0*M_PI), 1.0/6.0)
-        * sqrt(6.0*Kboltz*gm.gsys.temperature/gm.gsys.nmdensity);
-
+  BOOST_LOG_SEV(lg, info) << "Computing reduced particle pairs...";
+  auto start = std::chrono::system_clock::now();
+  //
+  enh.compute_reducedpairs();
+  //
+  auto end = std::chrono::system_clock::now();
+  std::chrono::duration<double> elapsed_seconds = end-start;
+  BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();  
+  
+  switch(gm.einter.method) {
+    case 0:
+      BOOST_LOG_SEV(lg, info) << "Bounded method MPC : " << gm.einter.method;
+      BOOST_LOG_SEV(lg, info) << "Computing MPC potentials at contact...";
+      start = std::chrono::system_clock::now();
+      //
+      enh.compute_mpcpotential_contact();
+      //
+      end = std::chrono::system_clock::now();
+      elapsed_seconds = end-start;
+      BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
+      BOOST_LOG_SEV(lg, info) << "Computing MPC potentials barriers...";
+      start = std::chrono::system_clock::now();
+      //
+      enh.compute_mpcpotential_barrier();
+      //
+      end = std::chrono::system_clock::now();
+      elapsed_seconds = end-start;
+      BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
+      break;
+    case 1:
+      BOOST_LOG_SEV(lg, info) << "Bounded method IPA : " << gm.einter.method;
+      BOOST_LOG_SEV(lg, info) << "Computing IPA potentials at contact...";
+      start = std::chrono::system_clock::now();
+      //
+      enh.compute_ipapotential_contact();
+      //
+      end = std::chrono::system_clock::now();
+      elapsed_seconds = end-start;
+      BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
+      BOOST_LOG_SEV(lg, info) << "Computing IPA potentials barriers...";
+      start = std::chrono::system_clock::now();
+      //      
+      enh.compute_ipapotential_barrier();
+      //
+      end = std::chrono::system_clock::now();
+      elapsed_seconds = end-start;
+      BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
+      break; 
+    case 2:
+      BOOST_LOG_SEV(lg, info) << "Bounded method Coulomb : " << gm.einter.method;
+      BOOST_LOG_SEV(lg, info) << "Computing coulomb potentials at contact...";
+      start = std::chrono::system_clock::now();
+      //      
+      enh.compute_coulombpotential_contact();
+      //
+      end = std::chrono::system_clock::now();
+      elapsed_seconds = end-start;
+      BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
+      break;
+  default:
+    BOOST_LOG_SEV(lg, error) << "Method " << gm.einter.method
+  			     << " not known";
+      std::terminate();
+  }
+ 
   BOOST_LOG_SEV(lg, info) << "Computing enhancement factor grid";
-  compute_efactor_grid();
-  BOOST_LOG_SEV(lg, info) << "Done... ehancement factor grid";
+  start = std::chrono::system_clock::now();
+  //
+  enh.compute_enhancement_factor();
+  //
+  end = std::chrono::system_clock::now();
+  elapsed_seconds = end-start;
+  BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
+  
+  // // Compute electrostatic to thermal ratio
+  // electhermratio = 1.0*eCharge*eCharge
+  //                 / (4.0*M_PI*EpsilonZero*Kboltz*gm.gsys.temperature);
 
-  BOOST_LOG_SEV(lg, info) << "Computing coagulation rate";
-  compute_rcoagulation();
-  BOOST_LOG_SEV(lg, info) << "Done... coagulation rate";
+  // BOOST_LOG_SEV(lg, info) << "Electrostatic to thermal ratio: "
+  //                         << electhermratio;
 
-  BOOST_LOG_SEV(lg, info) << "Computing eta creation rate";
-  compute_etafactor();
-  BOOST_LOG_SEV(lg, info) << "Done... eta";
+  // // Compute beta0
+  // beta0 = pow(3.0/(4.0*M_PI), 1.0/6.0)
+  //       * sqrt(6.0*Kboltz*gm.gsys.temperature/gm.gsys.nmdensity);
 
-  BOOST_LOG_SEV(lg, info) << "Computing death rate";
-  compute_deathfactor();
-  BOOST_LOG_SEV(lg, info) << "Done... death";
+  // BOOST_LOG_SEV(lg, info) << "Computing enhancement factor grid";
+  // compute_efactor_grid();
+  // BOOST_LOG_SEV(lg, info) << "Done... ehancement factor grid";
+
+  // BOOST_LOG_SEV(lg, info) << "Computing coagulation rate";
+  // compute_rcoagulation();
+  // BOOST_LOG_SEV(lg, info) << "Done... coagulation rate";
+
+  // BOOST_LOG_SEV(lg, info) << "Computing eta creation rate";
+  // compute_etafactor();
+  // BOOST_LOG_SEV(lg, info) << "Done... eta";
+
+  // BOOST_LOG_SEV(lg, info) << "Computing death rate";
+  // compute_deathfactor();
+  // BOOST_LOG_SEV(lg, info) << "Done... death";
 
   return 0;
 }

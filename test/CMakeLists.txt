@@ -9,9 +9,9 @@ add_definitions(-DBOOST_ALL_NO_LIB)
 include_directories(SYSTEM "/usr/include/eigen3")
 
 add_definitions(-DBOOST_LOG_DYN_LINK)
-#add_definitions(-DNDEBUG)
-#add_definitions(-DBOOST_UBLAS_DNDEBUG)
-#add_definitions(-DUSING_EIGEN)
+add_definitions(-DNDEBUG)
+add_definitions(-DBOOST_UBLAS_DNDEBUG)
+add_definitions(-DUSING_EIGEN)
 #add_definitions(-DEIGEN_DONT_PARALLELIZE)
 
 

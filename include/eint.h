@@ -80,6 +80,20 @@ namespace eint {
   typedef ublas::matrix<double> ubmatrix;
   typedef ublas::vector<double> ubvector;
 
+  //! Factorized (dimensionless) Coulomb potential
+  /*!
+    \param rt the separation.
+    \param r21 the ratio r2/r1.
+    \param q21 the ratio q2/q1.
+    \param eps the dielectric constant.
+  */
+  inline
+  double potential_coulomb_fact(const double rt, const double r21,
+				const double q21) {
+
+    return Kcoul*q21/rt;
+  }
+  
   //! Factorized (dimensionless) potential approximation IPA.
   /*!
     \param rt the separation.
@@ -623,6 +637,19 @@ namespace eint {
   double max_relative_error(const double a, const double b){
     return abs((a-b)/std::min(a,b));
   }
+
+  struct potential_coulomb_funct
+  {
+    potential_coulomb_funct(double r21_, double q21_): r21(r21_), q21(q21_){
+    }
+
+    double operator()(double const& rt) {
+      return potential_coulomb_fact(rt, r21, q21);
+    }
+
+    double r21;
+    double q21;
+  };
   
   struct potential_ipa_funct
   {

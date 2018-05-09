@@ -37,6 +37,7 @@
 #include <cstdlib>
 
 #include "../include/log.h"
+#include "../include/constants.h"
 #include "../include/enhancement.h"
 
 using namespace std;
@@ -67,6 +68,22 @@ struct Logger {
   src::severity_logger< severity_level > lg;
 };
 
+void print_efactor(boost_array4d array4d, unsigned rsize, unsigned qsize) {
+  for (unsigned int l=0; l<rsize; ++l) {
+    // iterate in charges particle 1
+    for (unsigned int q=0; q<qsize; ++q) {
+      // iterate in radii particle 2
+      std::cout << "\n\n---slab---";
+      for (unsigned int m=0; m<rsize; ++m) {
+	// iterate in charges particle 2
+	std::cout << '\n';
+	for (unsigned int p=0; p<qsize; ++p) {
+	  std::cout << '\t' << array4d[l][q][m][p];
+	}
+      }
+    }
+  }
+}
 //Logger TLOG;
 
 //src::severity_logger< severity_level > lg = TLOG.get_lg();
@@ -77,20 +94,81 @@ struct Logger {
 
 //BOOST_GLOBAL_FIXTURE(Logger);
 
+
+BOOST_AUTO_TEST_CASE( coulomb_enhancement_test ) {
+  {
+
+    Logger tlog("coulomb-enhancement");
+
+    src::severity_logger< severity_level > lg = tlog.get_lg();
+ 
+    darray rarray = {1e-9, 50e-9};
+    darray qarray = {-eCharge, 0.0, eCharge};
+    // darray rarray = {1e-9, 2e-9, 3e-9, 50e-9};
+    // darray qarray = {-eCharge, eCharge};    
+    double eps = 11.68;
+
+    bgrid4d grid4;
+    boost_array4d efactor;
+
+    unsigned rsize = static_cast<unsigned>(rarray.size());
+    unsigned qsize = static_cast<unsigned>(qarray.size());
+    grid4 = {{rsize, qsize, rsize, qsize}};
+
+    efactor.resize(grid4);
+    boost_array4d_ref efactor_ref(efactor);
+     
+    Enhancement enh(rarray, qarray, efactor_ref, eps, lg);
+
+    BOOST_TEST_MESSAGE( "\n\n[ii] Testing particle pairs..." );
+    enh.compute_reducedpairs();
+    for (auto pp: enh.particle_pairs) {
+      pp.print();
+    }
+
+    BOOST_TEST_MESSAGE( "\n\n[ii] Testing reduced particle pairs..." );
+    for (auto rpp: enh.reduced_pairs) {
+      rpp.print();
+    }
+
+    BOOST_TEST_MESSAGE( "\n\n[ii] Testing coulomb potentials at contact..." );
+    enh.compute_coulombpotential_contact();
+    for (auto cpot: enh.contact_potentials) {
+      cpot.print();
+    }
+    
+    BOOST_TEST_MESSAGE( "\n\n[ii] Testing enhancement factor..." );
+    enh.compute_enhancement_factor();
+
+    print_efactor(efactor, rsize, qsize);
+    
+    BOOST_REQUIRE_CLOSE(1.0, 1.0, PTOL);
+  }
+}
+
 BOOST_AUTO_TEST_CASE( ipa_enhancement_test ) {
   {
 
     Logger tlog("ipa-enhancement");
 
     src::severity_logger< severity_level > lg = tlog.get_lg();
- 
-    darray rarray = {1, 10};
-    darray qarray = {1, 20};
-    double eps = 10.0;
-    
-    
-    Enhancement enh(rarray, qarray, eps, lg);
 
+    darray rarray = {1e-9, 50e-9};
+    darray qarray = {-eCharge, 0.0, eCharge};
+    double eps = 11.68;
+
+    bgrid4d grid4;
+    boost_array4d efactor;
+
+    unsigned rsize = static_cast<unsigned>(rarray.size());
+    unsigned qsize = static_cast<unsigned>(qarray.size());
+    grid4 = {{rsize, qsize, rsize, qsize}};
+
+    efactor.resize(grid4);
+    boost_array4d_ref efactor_ref(efactor);
+
+    Enhancement enh(rarray, qarray, efactor_ref, eps, lg);
+    
     BOOST_TEST_MESSAGE( "\n\n[ii] Testing particle pairs..." );
     enh.compute_reducedpairs();
     for (auto pp: enh.particle_pairs) {
@@ -113,6 +191,11 @@ BOOST_AUTO_TEST_CASE( ipa_enhancement_test ) {
     for (auto cpot: enh.barrier_potentials) {
       cpot.print();
     }
+
+    BOOST_TEST_MESSAGE( "\n\n[ii] Testing enhancement factor..." );
+    enh.compute_enhancement_factor();
+
+    print_efactor(efactor, rsize, qsize);
     
     BOOST_REQUIRE_CLOSE(1.0, 1.0, PTOL);
   }
@@ -125,11 +208,21 @@ BOOST_AUTO_TEST_CASE( mpc_enhancement_test ) {
 
     src::severity_logger< severity_level > lg = tlog.get_lg();
     
-    darray rarray = {1, 10};
-    darray qarray = {1, 20};
-    double eps = 10.0;
-    
-    Enhancement enh(rarray, qarray, eps, lg);
+    darray rarray = {1e-9, 50e-9};
+    darray qarray = {-eCharge, 0.0, eCharge};
+    double eps = 11.68;
+
+    bgrid4d grid4;
+    boost_array4d efactor;
+
+    unsigned rsize = static_cast<unsigned>(rarray.size());
+    unsigned qsize = static_cast<unsigned>(qarray.size());
+    grid4 = {{rsize, qsize, rsize, qsize}};
+
+    efactor.resize(grid4);
+    boost_array4d_ref efactor_ref(efactor);
+     
+    Enhancement enh(rarray, qarray, efactor, eps, lg);
 
     BOOST_TEST_MESSAGE( "\n\n[ii] Testing particle pairs..." );
     enh.compute_reducedpairs();
@@ -154,7 +247,11 @@ BOOST_AUTO_TEST_CASE( mpc_enhancement_test ) {
       cpot.print();
     }
 
+    BOOST_TEST_MESSAGE( "\n\n[ii] Testing enhancement factor..." );
     enh.compute_enhancement_factor();
+
+    print_efactor(efactor, rsize, qsize);
+    
     BOOST_REQUIRE_CLOSE(1.0, 1.0, PTOL);
   }
 
@@ -164,7 +261,7 @@ BOOST_AUTO_TEST_CASE( mpc_enhancement_test ) {
 //   return true;
 // }
 
-//BOOST_AUTO_TEST_SUITE_END()
+// BOOST_AUTO_TEST_SUITE_END()
 // int main(int argc, char* argv[], char* envp[]) {
 
 //   unit_test_main(init_unit_test, argc, argv);

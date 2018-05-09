@@ -8,9 +8,13 @@ file(GLOB SRCS *.cpp)
 file(GLOB INCSRCS RELATIVE "../include/" "*.cpp")
 
 include_directories("../include/")
+include_directories(SYSTEM "/usr/include/eigen3")
 
 add_definitions(-DBOOST_LOG_DYN_LINK)
 add_definitions(-DNDEBUG)
+add_definitions(-DBOOST_UBLAS_DNDEBUG)
+add_definitions(-DUSING_EIGEN)
+add_definitions(-DEIGEN_DONT_PARALLELIZE)
 
 add_library(GridModel STATIC ../include/GridModel.cpp)
 add_library(CRate STATIC ../include/CRate.cpp)
@@ -52,7 +56,11 @@ endif()
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Ofast -frecord-gcc-switches -march=znver1")
 
-add_executable(crat ${SRCS} ${INCSRCS})
+add_executable(crat "main.cpp" ${INCSRCS})
+
+add_executable(crat-writer "crat-writer.cpp" ${INCSRCS})
+
+add_executable(crat-reader "crat-reader.cpp" ${INCSRCS})
 
 target_link_libraries(CRate
                       GridModel
@@ -61,6 +69,14 @@ target_link_libraries(CRate
 target_link_libraries(crat
                       CRate
                       ${LIBS})
+
+target_link_libraries(crat-writer
+                      CRate
+                      ${LIBS})
+
+target_link_libraries(crat-reader
+                      CRate
+                      ${LIBS})		    
 
 enable_testing()
 

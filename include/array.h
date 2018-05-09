@@ -47,6 +47,9 @@ typedef boost::multi_array<double, 1> boost_array1d;
 typedef boost::multi_array<double, 2> boost_array2d;
 typedef boost::multi_array<double, 3> boost_array3d;
 typedef boost::multi_array<double, 4> boost_array4d;
+
+typedef boost::multi_array_ref<double, 4> boost_array4d_ref;
+
 typedef boost::array<boost_array2d::index, 2> bgrid2d;
 typedef boost::array<boost_array3d::index, 3> bgrid3d;
 typedef boost::array<boost_array4d::index, 4> bgrid4d;

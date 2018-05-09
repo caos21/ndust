@@ -21,6 +21,8 @@
 #include <iostream>
 #include <string>
 #include <functional>
+#include <chrono>
+#include <ctime>
 
 // hdf5 c++ bindings
 #include <H5Cpp.h>
@@ -29,6 +31,7 @@
 #include "h5plasma.h"
 #include "GridModel.h"
 #include "eint.h"
+#include "enhancement.h"
 #include "eta.h"
 
 /**
@@ -77,6 +80,7 @@ public:
     @param  lg_ Logger instance.
   */
   CRate() {
+    
   }
   
 // Public methods
@@ -122,6 +126,19 @@ public:
    * Write on file prefix_filename.h5 in dirname
   */
   int write();
+
+  //! write particle pairs to datafile
+  /*! 
+   * Write 
+  */
+  int write_pairs();
+
+  //! read particle pairs from datafile
+  /*! 
+   * Read
+  */
+  int read_pairs();
+  
 //
 // Public attributes
 //
@@ -304,6 +321,7 @@ private:
 // 
 
   boost_array4d efactor;              //!< Array for enhancement factor.
+  /* boost_array4d_ref efactor_ref;     //!< Reference to efactor */
   boost_array4d rcoag;                //!< Coagulation rate.
 
   double electhermratio;          //!< Electrostatic energy to thermal ratio.

@@ -3,9 +3,13 @@ cmake_minimum_required(VERSION 2.8)
 
 project(crat)
 
-add_definitions(-DBOOST_LOG_DYN_LINK)
+include_directories(SYSTEM "/usr/include/eigen3")
 
+add_definitions(-DBOOST_LOG_DYN_LINK)
 add_definitions(-DNDEBUG)
+add_definitions(-DBOOST_UBLAS_DNDEBUG)
+add_definitions(-DUSING_EIGEN)
+add_definitions(-DEIGEN_DONT_PARALLELIZE)
 
 
 set (CMAKE_CXX_FLAGS "-std=gnu++14 ${CMAKE_CXX_FLAGS}")
@@ -73,7 +77,11 @@ endif()
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Ofast -frecord-gcc-switches")
 
-add_executable(crat ${SRCS} ${INCSRCS})
+add_executable(crat "main.cpp" ${INCSRCS})
+
+add_executable(crat-writer "crat-writer.cpp" ${INCSRCS})
+
+add_executable(crat-reader "crat-reader.cpp" ${INCSRCS})
 
 target_link_libraries(CRate
                       GridModel
@@ -104,6 +112,33 @@ target_link_libraries(crat
 		      mkl)
 
 
+target_link_libraries(crat-writer
+                      CRate
+                      boost_log
+		      hdf5
+		      hdf5_cpp
+		      boost_system
+		      boost_thread
+		      boost_atomic
+		      boost_chrono
+		      boost_regex
+		      boost_date_time
+		      boost_filesystem
+		      mkl)
+		    
+target_link_libraries(crat-reader                      
+                      CRate
+                      boost_log
+		      hdf5
+		      hdf5_cpp
+		      boost_system
+		      boost_thread
+		      boost_atomic
+		      boost_chrono
+		      boost_regex
+		      boost_date_time
+		      boost_filesystem
+		      mkl)		    
 enable_testing()
 
 install(TARGETS crat RUNTIME DESTINATION bin)
