@@ -115,6 +115,12 @@ public:
   */
   int compute();
 
+  //! Start calculations, need to read pairs first
+  /*! 
+   * Start to compute the with pairs from a file
+  */
+  int compute_frompairs();
+  
   //! Start calculations WARNING TESTING
   /*! 
    * Testing symmetrization

@@ -573,6 +573,11 @@ namespace enhancement {
       	rpstream.close();
 	BOOST_LOG_SEV(lg, info) <<  "Reduced pair size = " << reduced_pairs.size();
       }
+
+      if (reduced_pairs.size()>0) {
+	contact_potentials.resize(reduced_pairs.size());
+	attractive_potentials.reserve(reduced_pairs.size());
+      }
       
       return 0;
     }
