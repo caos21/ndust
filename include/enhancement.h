@@ -55,6 +55,7 @@ namespace enhancement {
     ParticlePair() {
       // call fill to set 0 all the fields
       //fill_ppair(*this, 0, 0, 0, 0, 0.0, 0.0, true);
+      id_ = 0;
       l_ = 0;
       q_ = 0;
       m_ = 0;
@@ -64,14 +65,15 @@ namespace enhancement {
       notswapd_ = true;
     }
 
-    ParticlePair(const short &l,
+    ParticlePair(const unsigned long &id,
+		 const short &l,
 		 const short &q,
 		 const short &m,
 		 const short &p,
 		 const double &r21,
 		 const double &q21,
 		 const bool& notswapd) :
-      l_(l), q_(q), m_(m), p_(p), r21_(r21), q21_(q21), notswapd_(notswapd){
+      id_(id),l_(l), q_(q), m_(m), p_(p), r21_(r21), q21_(q21), notswapd_(notswapd){
       // call fill to set 0 all the fields
       //fill_ppair(*this, 0, 0, 0, 0, 0.0, 0.0, true);
     }
@@ -79,7 +81,8 @@ namespace enhancement {
     ParticlePair(const ParticlePair &pp) {
       assign(pp);
     }
-  
+
+    unsigned long id_;   //!< Index
     short l_;            //!< Index l of coalescing particle 1
     short q_;            //!< Index q of coalescing particle 1
     short m_;            //!< Index m of coalescing particle 2
@@ -89,6 +92,7 @@ namespace enhancement {
     bool notswapd_;            //!< false if indices were swapped
 
     void assign(const ParticlePair &pp) {
+      id_=pp.id_;
       l_=pp.l_;
       q_=pp.q_;
       m_=pp.m_;
@@ -99,6 +103,7 @@ namespace enhancement {
     }
   
     friend void fill_ppair(ParticlePair &pp,
+			   const unsigned long &id,
 			   const short &l,
 			   const short &q,
 			   const short &m,
@@ -121,6 +126,7 @@ namespace enhancement {
 
   inline
   void fill_ppair(ParticlePair &pp,
+		  const unsigned long &id,
 		  const short &l,
 		  const short &q,
 		  const short &m,
@@ -128,6 +134,7 @@ namespace enhancement {
 		  const double &r21,
 		  const double &q21,
 		  const bool& notswapd) {
+    pp.id_=id;
     pp.l_=l;
     pp.q_=q;
     pp.m_=m;
@@ -139,7 +146,8 @@ namespace enhancement {
 
   inline
   void particlepair_tostream(const ParticlePair &pp, std::ostream& stream) {
-    stream << pp.l_ << '\t'
+    stream << pp.id_ << '\t'
+	   << pp.l_ << '\t'
 	   << pp.q_ << '\t'
 	   << pp.m_ << '\t'
 	   << pp.p_ << '\t'
@@ -151,6 +159,7 @@ namespace enhancement {
   inline
   void particlepair_fromstream(ParticlePair &pp,
 			       std::istringstream &stream) {
+    std::string sid_;            //!< Index l of current volume section
     std::string sl_;            //!< Index l of current volume section
     std::string sq_;            //!< Index q of current charge section
     std::string sm_;            //!< Index m of coalescing volume
@@ -159,6 +168,7 @@ namespace enhancement {
     std::string sq21_;
     std::string snotswapd_;
 
+    unsigned long id_;
     short l_;            //!< Index l of coalescing particle 1
     short q_;            //!< Index q of coalescing particle 1
     short m_;            //!< Index m of coalescing particle 2
@@ -167,7 +177,8 @@ namespace enhancement {
     double q21_;                //!< Value for radius fraction r2/r1
     bool notswapd_;            //!< false if indices were swapped
 
-    stream >> sl_
+    stream >> sid_
+	   >> sl_
 	   >> sq_
 	   >> sm_
 	   >> sp_
@@ -175,6 +186,7 @@ namespace enhancement {
 	   >> sq21_
 	   >> snotswapd_;
 
+    id_  = boost::lexical_cast<unsigned long>(sid_);
     l_   = boost::lexical_cast<short>(sl_);
     q_   = boost::lexical_cast<short>(sq_);
     m_   = boost::lexical_cast<short>(sm_);
@@ -183,7 +195,7 @@ namespace enhancement {
     q21_ = std::stod(sq21_);
     notswapd_  = boost::lexical_cast<bool>(snotswapd_);
 
-    fill_ppair(pp, l_, q_, m_, p_, r21_, q21_, notswapd_);
+    fill_ppair(pp, id_, l_, q_, m_, p_, r21_, q21_, notswapd_);
   }
 
   class ReducedParticlePair {
@@ -191,7 +203,7 @@ namespace enhancement {
     //
     ReducedParticlePair() {
       // call fill to set 0 all the fields
-      fill_rppair(*this, 0.0, 0.0);
+      fill_rppair(*this, 0, 0.0, 0.0);
     }
 
     bool operator<(const ReducedParticlePair &rpp) const { 
@@ -217,6 +229,7 @@ namespace enhancement {
     // bool operator == (const ReducedParticlePair& lx,
     // 		    const ReducedParticlePair& rx);
 
+    unsigned long id_;
     double r21_;                //!< Value for radius fraction r2/r1
     double q21_;                //!< Value for radius fraction r2/r1
 
@@ -227,6 +240,7 @@ namespace enhancement {
     }
 
     void assign(const ReducedParticlePair &rpp) {
+      id_ =rpp.id_;
       r21_=rpp.r21_;
       q21_=rpp.q21_;
       repetitions_  = rpp.repetitions_;
@@ -243,15 +257,18 @@ namespace enhancement {
     }  
 
     friend void fill_rppair(ReducedParticlePair &rpp,
+			    unsigned long id_,
 			    double r21,
 			    double q21);
 
     friend void fill_rppair(ReducedParticlePair &rpp,
+			    unsigned long id_,
 			    double r21,
 			    double q21,
 			    std::vector<long> repetitions);
     
     friend void fill_rppair(ReducedParticlePair &rpp,
+			    unsigned long id_,
 			    double r21,
 			    double q21,
 			    long irepeated);
@@ -286,17 +303,21 @@ namespace enhancement {
 
   inline
   void fill_rppair(ReducedParticlePair &rpp,
+		   unsigned long id,
 		   double r21,
 		   double q21) {
+    rpp.id_ =id;
     rpp.r21_=r21;
     rpp.q21_=q21;
   }
 
   inline
   void fill_rppair(ReducedParticlePair &rpp,
+		   unsigned long id,
 		   double r21,
 		   double q21,
 		   std::vector<long> repetitions) {
+    rpp.id_ =id;
     rpp.r21_=r21;
     rpp.q21_=q21;
     rpp.repetitions_ = repetitions;    
@@ -304,9 +325,11 @@ namespace enhancement {
   
   inline
   void fill_rppair(ReducedParticlePair &rpp,
+		   unsigned long id,
 		   double r21,
 		   double q21,
 		   long irepeated) {
+    rpp.id_=id;
     rpp.r21_=r21;
     rpp.q21_=q21;
     rpp.repetitions_.push_back(irepeated);
@@ -325,7 +348,8 @@ namespace enhancement {
   inline
   void reducedparticlepair_tostream(const ReducedParticlePair &rpp,
 				    std::ostream& stream) {
-    stream << rpp.r21_ << '\t'
+    stream << rpp.id_ << '\t' 
+	   << rpp.r21_ << '\t'
 	   << rpp.q21_ << '\t';
 	   // << "repeated = \t";
     for (auto ir: rpp.repetitions_) {
@@ -337,20 +361,24 @@ namespace enhancement {
   inline
   void reducedparticlepair_fromstream(ReducedParticlePair &rpp,
 				      std::istream& stream) {
+    std::string sid_;
     std::string sr21_;
     std::string sq21_;
 
     std::string srep_;
 
+    unsigned long id_;
     double r21_;                //!< Value for radius fraction r2/r1
     double q21_;                //!< Value for radius fraction r2/r1
 
     std::vector<long> repetitions_;
     
-    stream >> sr21_
+    stream >> sid_
+           >> sr21_
 	   >> sq21_
 	   >> srep_;
 
+    id_  = boost::lexical_cast<unsigned long>(sid_);
     r21_ = std::stod(sr21_);
     q21_ = std::stod(sq21_);
 
@@ -370,12 +398,12 @@ namespace enhancement {
       //std::cout << "\t" << *it;
     }
 
-    fill_rppair(rpp, r21_, q21_, repetitions_);
+    fill_rppair(rpp, id_, r21_, q21_, repetitions_);
   }
   
   class ContactPotential {
   public:
-    ContactPotential(const long &id = 0,
+    ContactPotential(const unsigned long &id = 0,
 		     const double &potential = 0,
 		     const short &n = 0) : id_(id),
 					   potential_(potential),
@@ -386,7 +414,7 @@ namespace enhancement {
 
     friend
     void fill_contact_potential(ContactPotential &cpot,
-				const long &id,
+				const unsigned long &id,
 				const double &potential,
 				const short &n);
 
@@ -398,14 +426,14 @@ namespace enhancement {
     void contactpotential_tostream(const ContactPotential &cpot,
 				   std::ostream& stream);
   
-    long id_;
+    unsigned long id_;
     double potential_;
-    long n_;
+    short n_;
   };
 
   inline
   void fill_contact_potential(ContactPotential &cpot,
-			      const long &id,
+			      const unsigned long &id,
 			      const double &potential,
 			      const short &n) {
     cpot.id_ = id;
@@ -424,8 +452,8 @@ namespace enhancement {
 
 
   struct find_id {
-    long id;
-    find_id(const long & id_) : id(id_) {
+    unsigned long id;
+    find_id(const unsigned long & id_) : id(id_) {
     }
 
     bool operator()(const ContactPotential& cpot) const {
@@ -466,42 +494,42 @@ namespace enhancement {
     int write_particlepairs(std::string ppfilename) {
       std::ofstream ppstream(std::string(ppfilename+"_pp.dat"));
 
-      ppstream << "#l\tq\tm\tp\tr21\tq21\tnotswapd";
-// #pragma omp parallel for ordered//schedule(nonmonotonic:dynamic)
+      ppstream << "#id\tl\tq\tm\tp\tr21\tq21\tnotswapd";
+#pragma omp parallel for schedule(nonmonotonic:dynamic)
       for (unsigned int i=0; i<particle_pairs.size(); ++i) {
-// #pragma omp critical
-// 	{
+#pragma omp critical
+	{
 	  ppstream << '\n';
 	  particlepair_tostream(particle_pairs[i], ppstream);
-	// }
+	}
       }
       ppstream.close();
 
       // Neutral particles
       std::ofstream npstream(std::string(ppfilename+"_np.dat"));
 
-      npstream << "#l\tq\tm\tp\tr21\tq21\tnotswapd";
-// #pragma omp parallel for ordered//schedule(nonmonotonic:dynamic)
+      npstream << "#id\tl\tq\tm\tp\tr21\tq21\tnotswapd";
+#pragma omp parallel for schedule(nonmonotonic:dynamic)
       for (unsigned int i=0; i<neutral_pairs.size(); ++i) {
-// #pragma omp critical
-// 	{
+#pragma omp critical
+	{
 	  npstream << '\n';
 	  particlepair_tostream(neutral_pairs[i], npstream);
-	// }
+	}
       }
       npstream.close();
 
       // Reduced pairs
       std::ofstream rpstream(std::string(ppfilename+"_rp.dat"));
 
-      rpstream << "#r21\tq21\trepetitions";
-// #pragma omp parallel for ordered//schedule(nonmonotonic:dynamic)
+      rpstream << "#id\tr21\tq21\trepetitions";
+#pragma omp parallel for schedule(nonmonotonic:dynamic)
       for (unsigned int i=0; i<reduced_pairs.size(); ++i) {
-// #pragma omp critical
-// 	{
+#pragma omp critical
+	{
 	  rpstream << '\n';
 	  reducedparticlepair_tostream(reduced_pairs[i], rpstream);
-	// }
+	}
       }
       rpstream.close();
 
@@ -592,7 +620,8 @@ namespace enhancement {
       BOOST_LOG_SEV(lg, info) << "Computing particle pairs...";
       auto start = std::chrono::system_clock::now();
       //
-      unsigned int i = 0;
+      unsigned long idpp = 0;
+      unsigned long idnp = 0;
       // #pragma omp parallel for collapse(4) schedule(auto)
       for (unsigned int l=0; l<rarray_size; ++l) {
 	// iterate in charges particle 1
@@ -641,15 +670,16 @@ namespace enhancement {
 		  // mp2 = m;  pp2 = p;
 		  // q21 = 0.0;
 		  // r21 = rarray[m]/rarray[l];
-		  ParticlePair neutralpair(lp1, qp1, mp2, pp2, r21, q21, notswapd);
+		  ParticlePair neutralpair(idpp, lp1, qp1, mp2, pp2, r21, q21, notswapd);
 		  neutral_pairs.push_back(neutralpair);
-		  break;
+		  ++idpp;
+		  continue;//break;
 		}
 
-		ParticlePair ppair(lp1, qp1, mp2, pp2, r21, q21, notswapd);
+		ParticlePair ppair(idpp, lp1, qp1, mp2, pp2, r21, q21, notswapd);
 		particle_pairs.push_back(ppair);
 
-		++i;
+		++idpp;
 		// write symmetric combination
 	      }
 	    }
@@ -670,6 +700,7 @@ namespace enhancement {
 
       start = std::chrono::system_clock::now();
       for (unsigned int i = 0; i<particle_pairs.size(); ++i) {
+	reduced_pairs[i].id_  = particle_pairs[i].id_;
 	reduced_pairs[i].r21_ = particle_pairs[i].r21_;
 	reduced_pairs[i].q21_ = particle_pairs[i].q21_;
       }
