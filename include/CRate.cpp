@@ -337,8 +337,6 @@ int CRate::compute_frompairs() {
 }
 
 
-
-
 int CRate::compute() {
 
   // // bind efactorfunc

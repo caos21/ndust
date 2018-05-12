@@ -467,13 +467,13 @@ namespace enhancement {
       std::ofstream ppstream(std::string(ppfilename+"_pp.dat"));
 
       ppstream << "#l\tq\tm\tp\tr21\tq21\tnotswapd";
-#pragma omp parallel for schedule(nonmonotonic:dynamic)
+// #pragma omp parallel for ordered//schedule(nonmonotonic:dynamic)
       for (unsigned int i=0; i<particle_pairs.size(); ++i) {
-#pragma omp critical
-	{
+// #pragma omp critical
+// 	{
 	  ppstream << '\n';
 	  particlepair_tostream(particle_pairs[i], ppstream);
-	}
+	// }
       }
       ppstream.close();
 
@@ -481,13 +481,13 @@ namespace enhancement {
       std::ofstream npstream(std::string(ppfilename+"_np.dat"));
 
       npstream << "#l\tq\tm\tp\tr21\tq21\tnotswapd";
-#pragma omp parallel for schedule(nonmonotonic:dynamic)
+// #pragma omp parallel for ordered//schedule(nonmonotonic:dynamic)
       for (unsigned int i=0; i<neutral_pairs.size(); ++i) {
-#pragma omp critical
-	{
+// #pragma omp critical
+// 	{
 	  npstream << '\n';
 	  particlepair_tostream(neutral_pairs[i], npstream);
-	}
+	// }
       }
       npstream.close();
 
@@ -495,13 +495,13 @@ namespace enhancement {
       std::ofstream rpstream(std::string(ppfilename+"_rp.dat"));
 
       rpstream << "#r21\tq21\trepetitions";
-#pragma omp parallel for schedule(nonmonotonic:dynamic)
+// #pragma omp parallel for ordered//schedule(nonmonotonic:dynamic)
       for (unsigned int i=0; i<reduced_pairs.size(); ++i) {
-#pragma omp critical
-	{
+// #pragma omp critical
+// 	{
 	  rpstream << '\n';
 	  reducedparticlepair_tostream(reduced_pairs[i], rpstream);
-	}
+	// }
       }
       rpstream.close();
 
@@ -574,6 +574,10 @@ namespace enhancement {
 	BOOST_LOG_SEV(lg, info) <<  "Reduced pair size = " << reduced_pairs.size();
       }
 
+	// for (auto rp: reduced_pairs){
+	//   std::cout << std::endl;
+	//   rp.print();	  
+	// }      
       if (reduced_pairs.size()>0) {
 	contact_potentials.resize(reduced_pairs.size());
 	attractive_potentials.reserve(reduced_pairs.size());
@@ -730,6 +734,10 @@ namespace enhancement {
       BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();      
       
       BOOST_LOG_SEV(lg, info) << "Done computing pairs.";
+      // for (auto rp: reduced_pairs){
+      //   std::cout << std::endl;
+      //   rp.print();
+      // }
     }
 
     inline
@@ -737,7 +745,7 @@ namespace enhancement {
       BOOST_LOG_SEV(lg, info)
 	<< "Computing Coulomb potential at contact for n pairs : "
 	<< reduced_pairs.size();
-#pragma omp parallel for schedule(nonmonotonic:dynamic)
+#pragma omp parallel for ordered//schedule(nonmonotonic:dynamic)
       for (unsigned int i=0; i<reduced_pairs.size(); ++i) {
 
 	double r21 = reduced_pairs[i].r21_;
@@ -752,12 +760,17 @@ namespace enhancement {
 
 #pragma omp critical
 	{
-	  fill_contact_potential(contact_potentials[i], i, pcoul_rt, 0);
+	  fill_contact_potential(contact_potentials[i], static_cast<long>(i), pcoul_rt, 0);
+	  //ContactPotential cpot(i, pcoul_rt, 0);
+	  //contact_potentials.push_back(cpot);
+	  //long ti = reduced_pairs[i].repetitions_[0];
+	  //fill_contact_potential(contact_potentials[i], ti, pcoul_rt, 0);
 	  // //check attractive potential
 	  // if (pcoul_rt<potential_threshold){
 	  //   ContactPotential acpot(i, pcoul_rt, 0);
 	  //   attractive_potentials.push_back(acpot);
 	  // }
+	  //std::cout << std::endl << pcoul_rt;
 	}
       }
 
@@ -780,7 +793,7 @@ namespace enhancement {
       BOOST_LOG_SEV(lg, info)
 	<< "Computing ipa potential at contact for n pairs : "
 	<< reduced_pairs.size();
-#pragma omp parallel for schedule(nonmonotonic:dynamic)
+#pragma omp parallel for ordered// schedule(nonmonotonic:dynamic)
       for (unsigned int i=0; i<reduced_pairs.size(); ++i) {
 
 	double r21 = reduced_pairs[i].r21_;
@@ -793,7 +806,7 @@ namespace enhancement {
 	// // ipa at contact 
 	double pipa_rt = pipafunct(rt);
 
-#pragma omp critical
+#pragma omp ordered// critical
 	{
 	  fill_contact_potential(contact_potentials[i], i, pipa_rt, 0);
 	  //check attractive potential
@@ -818,7 +831,7 @@ namespace enhancement {
     inline
     void compute_ipapotential_barrier() {
       BOOST_LOG_SEV(lg, info) << "Computing ipa potential barrier for n pairs : " << reduced_pairs.size();
-#pragma omp parallel for shared(reduced_pairs) schedule(nonmonotonic:dynamic)
+#pragma omp parallel for shared(reduced_pairs) ordered// schedule(nonmonotonic:dynamic)
       for (unsigned int i=0; i<attractive_potentials.size(); ++i) {
     
 	unsigned int index = attractive_potentials[i].id_; 
@@ -839,6 +852,7 @@ namespace enhancement {
 	double fipa_rmax = fipafunct(rmax);
 
 	// checks if minimum exists
+	#pragma omp ordered
 	if (fipa_rmin*fipa_rmax < 0.0) {
 	  // std::cerr << "\n[ii] Mixed phi_rt = " << fipa_rmin << '\t' << fipa_rmax;
 	  boost::uintmax_t bmax_iter = ROOT_MAXITER;
@@ -1104,10 +1118,19 @@ namespace enhancement {
       //#pragma omp parallel for shared(reduced_pairs) schedule(nonmonotonic:dynamic)
       // Loop in all contact potentials
       //#pragma omp parallel for //shared(reduced_pairs) schedule(nonmonotonic:dynamic)// num_threads(1)
+      //for (unsigned int icp=0; icp<contact_potentials.size(); ++icp) {
+
       for (unsigned int icp=0; icp<contact_potentials.size(); ++icp) {
 
+	// min element of reduced_pair size repetitions must be the
+	// index of non repeated, then take the contact potential
+	// look for barrier etc.
+
+	
 	// this is the index of reduced pairs
-	unsigned int index  = contact_potentials[icp].id_;
+	unsigned int index = contact_potentials[icp].id_;
+	//if(icp!=index) std::terminate;
+	// ************
 	double contact_potential = contact_potentials[icp].potential_;
 	
 	// get repeated combinations (of particle_pairs)
@@ -1209,6 +1232,8 @@ namespace enhancement {
 	      efactor[m][p][l][q] = eta;	      	      
 	    }
 	  }
+	  //std::cout << std::endl << l << '\t' << q << '\t' << m << '\t' << p << '\t' << efactor[l][q][m][p];
+	 
 	}
       }
 
@@ -1216,10 +1241,10 @@ namespace enhancement {
       
       auto start = std::chrono::system_clock::now();
       for (unsigned int i = 0; i<neutral_pairs.size(); ++i) {
-	short l = particle_pairs[i].l_;
-	short q = particle_pairs[i].q_;
-	short m = particle_pairs[i].m_;
-	short p = particle_pairs[i].p_;
+	short l = neutral_pairs[i].l_;
+	short q = neutral_pairs[i].q_;
+	short m = neutral_pairs[i].m_;
+	short p = neutral_pairs[i].p_;
 	efactor[l][q][m][p] = 1.0;
 	efactor[m][p][l][q] = 1.0;
       }
