@@ -112,8 +112,8 @@ int main(int argc, char **argv) {
   CRate crate(dirname, prefix_filename, lg);
   crate.open();
   crate.read();
-  //crate.compute();
-  crate.compute_frompairs();
+  crate.compute();
+  //crate.compute_frompairs();
   //crate.write_pairs();
   //crate.compute_sym();
   crate.write();

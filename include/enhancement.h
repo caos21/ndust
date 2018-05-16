@@ -42,6 +42,8 @@
 #include "constants.h"
 #include "utils.h"
 
+#define MPC_ERROR 1.0//0.4
+
 using namespace utils;
 
 namespace enhancement {
@@ -486,8 +488,8 @@ namespace enhancement {
       potential_threshold = 0.0;
 
       nmin = 25;
-      nmax = 300;
-      nstep = 5;      
+      nmax = 2000;
+      nstep = 5;
     }
 
     inline
@@ -495,13 +497,13 @@ namespace enhancement {
       std::ofstream ppstream(std::string(ppfilename+"_pp.dat"));
 
       ppstream << "#id\tl\tq\tm\tp\tr21\tq21\tnotswapd";
-#pragma omp parallel for schedule(nonmonotonic:dynamic)
+// #pragma omp parallel for ordered//schedule(nonmonotonic:dynamic)
       for (unsigned int i=0; i<particle_pairs.size(); ++i) {
-#pragma omp critical
-	{
+// #pragma omp ordered
+	// {
 	  ppstream << '\n';
 	  particlepair_tostream(particle_pairs[i], ppstream);
-	}
+	// }
       }
       ppstream.close();
 
@@ -509,13 +511,13 @@ namespace enhancement {
       std::ofstream npstream(std::string(ppfilename+"_np.dat"));
 
       npstream << "#id\tl\tq\tm\tp\tr21\tq21\tnotswapd";
-#pragma omp parallel for schedule(nonmonotonic:dynamic)
+// #pragma omp parallel for ordered//schedule(nonmonotonic:dynamic)
       for (unsigned int i=0; i<neutral_pairs.size(); ++i) {
-#pragma omp critical
-	{
+// #pragma omp ordered
+	// {
 	  npstream << '\n';
 	  particlepair_tostream(neutral_pairs[i], npstream);
-	}
+	// }
       }
       npstream.close();
 
@@ -523,13 +525,13 @@ namespace enhancement {
       std::ofstream rpstream(std::string(ppfilename+"_rp.dat"));
 
       rpstream << "#id\tr21\tq21\trepetitions";
-#pragma omp parallel for schedule(nonmonotonic:dynamic)
+// #pragma omp parallel for ordered//schedule(nonmonotonic:dynamic)
       for (unsigned int i=0; i<reduced_pairs.size(); ++i) {
-#pragma omp critical
-	{
+// #pragma omp ordered
+	// {
 	  rpstream << '\n';
 	  reducedparticlepair_tostream(reduced_pairs[i], rpstream);
-	}
+	// }
       }
       rpstream.close();
 
@@ -620,8 +622,8 @@ namespace enhancement {
       BOOST_LOG_SEV(lg, info) << "Computing particle pairs...";
       auto start = std::chrono::system_clock::now();
       //
-      unsigned long idpp = 0;
-      unsigned long idnp = 0;
+      unsigned long idpp = 0;// index for particle pairs
+      unsigned long idnp = 0;// index for neutral pairs
       // #pragma omp parallel for collapse(4) schedule(auto)
       for (unsigned int l=0; l<rarray_size; ++l) {
 	// iterate in charges particle 1
@@ -670,9 +672,9 @@ namespace enhancement {
 		  // mp2 = m;  pp2 = p;
 		  // q21 = 0.0;
 		  // r21 = rarray[m]/rarray[l];
-		  ParticlePair neutralpair(idpp, lp1, qp1, mp2, pp2, r21, q21, notswapd);
+		  ParticlePair neutralpair(idnp, lp1, qp1, mp2, pp2, r21, q21, notswapd);
 		  neutral_pairs.push_back(neutralpair);
-		  ++idpp;
+		  ++idnp;
 		  continue;//break;
 		}
 
@@ -693,6 +695,10 @@ namespace enhancement {
       BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
   
       BOOST_LOG_SEV(lg, info) << "Pairs size : " << particle_pairs.size();
+      BOOST_LOG_SEV(lg, info) << "Neutral pairs size : " << neutral_pairs.size();
+
+      BOOST_LOG_SEV(lg, info) << "Total pairs size : " << particle_pairs.size()+neutral_pairs.size();
+      BOOST_LOG_SEV(lg, info) << "Total combinations : " << ncombs;
 
       BOOST_LOG_SEV(lg, info) << "Computing reduced pairs...";
       
@@ -712,12 +718,18 @@ namespace enhancement {
 
       start = std::chrono::system_clock::now();      
       BOOST_LOG_SEV(lg, info) << "Sorting...";
-      __gnu_parallel::sort(reduced_pairs.begin(), reduced_pairs.end(), reducedPairsComparison());
-      // std::sort(reduced_pairs.begin(), reduced_pairs.end(), reducedPairsComparison());
+      //__gnu_parallel::sort(reduced_pairs.begin(), reduced_pairs.end(), reducedPairsComparison());
+      std::sort(reduced_pairs.begin(), reduced_pairs.end(), reducedPairsComparison());
       end = std::chrono::system_clock::now();
       elapsed_seconds = end-start;
       BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
 
+
+      // ******** new stuff
+      // vector sorted with repeated 
+      std::vector<ReducedParticlePair> sorted_reducedpairs = reduced_pairs;
+      // ******** end new stuff
+      
       BOOST_LOG_SEV(lg, info) << "Erasing...";
       reduced_pairs.erase(std::unique(reduced_pairs.begin(), reduced_pairs.end() ), reduced_pairs.end());
       //__gnu_parallel::unique_copy(reduced_pairs.begin(), reduced_pairs.end(), reduced_pairs);
@@ -734,19 +746,43 @@ namespace enhancement {
 
       BOOST_LOG_SEV(lg, info) << "Reduced pairs size : " << reduced_pairs.size();
 
-      start = std::chrono::system_clock::now();      
-#pragma omp parallel for schedule(nonmonotonic:dynamic)// collapse(2)
+      start = std::chrono::system_clock::now();
+      
+      /// new stuff
+
+// #pragma omp parallel for schedule(nonmonotonic:dynamic)// collapse(2)
+      long jstart = 0;
       for (unsigned int irp=0; irp<reduced_pairs.size(); ++irp) {
-	for (long jpp=0; jpp<particle_pairs.size(); ++jpp) {
-	  if(reduced_pairs[irp]==particle_pairs[jpp]) {
-#pragma omp critical
-	    {
+	for (long jpp=jstart; jpp<sorted_reducedpairs.size(); ++jpp) {
+	  if(reduced_pairs[irp]==sorted_reducedpairs[jpp]) {
+// #pragma omp critical
+// 	    {
 	      // one thread a at time
-	      reduced_pairs[irp].fill_repeated(jpp);
-	    }
+	    reduced_pairs[irp].fill_repeated(sorted_reducedpairs[jpp].id_);
+	    // }
+	  }
+	  else {
+	    jstart = jpp;
+	    break;
 	  }
 	}
       }
+
+      /// end new stuff
+
+      // this stuff works, slowly
+// #pragma omp parallel for schedule(nonmonotonic:dynamic)// collapse(2)
+//       for (unsigned int irp=0; irp<reduced_pairs.size(); ++irp) {
+// 	for (long jpp=0; jpp<particle_pairs.size(); ++jpp) {
+// 	  if(reduced_pairs[irp]==particle_pairs[jpp]) {
+// #pragma omp critical
+// 	    {
+// 	      // one thread a at time
+// 	      reduced_pairs[irp].fill_repeated(jpp);
+// 	    }
+// 	  }
+// 	}
+//       }
       end = std::chrono::system_clock::now();
       elapsed_seconds = end-start;
       BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();      
@@ -779,6 +815,7 @@ namespace enhancement {
 #pragma omp parallel for ordered//schedule(nonmonotonic:dynamic)
       for (unsigned int i=0; i<reduced_pairs.size(); ++i) {
 
+	unsigned long id = reduced_pairs[i].id_;
 	double r21 = reduced_pairs[i].r21_;
 	double q21 = reduced_pairs[i].q21_;
  
@@ -791,7 +828,7 @@ namespace enhancement {
 
 #pragma omp critical
 	{
-	  fill_contact_potential(contact_potentials[i], static_cast<long>(i), pcoul_rt, 0);
+	  fill_contact_potential(contact_potentials[i], id, pcoul_rt, 0);
 	  //ContactPotential cpot(i, pcoul_rt, 0);
 	  //contact_potentials.push_back(cpot);
 	  //long ti = reduced_pairs[i].repetitions_[0];
@@ -824,9 +861,11 @@ namespace enhancement {
       BOOST_LOG_SEV(lg, info)
 	<< "Computing ipa potential at contact for n pairs : "
 	<< reduced_pairs.size();
-#pragma omp parallel for ordered// schedule(nonmonotonic:dynamic)
+// #pragma omp parallel for ordered// schedule(nonmonotonic:dynamic)
       for (unsigned int i=0; i<reduced_pairs.size(); ++i) {
 
+	// id of particle pair (not repeated)
+	unsigned long id = reduced_pairs[i].id_;
 	double r21 = reduced_pairs[i].r21_;
 	double q21 = reduced_pairs[i].q21_;
  
@@ -837,15 +876,18 @@ namespace enhancement {
 	// // ipa at contact 
 	double pipa_rt = pipafunct(rt);
 
-#pragma omp ordered// critical
-	{
-	  fill_contact_potential(contact_potentials[i], i, pipa_rt, 0);
+// #pragma omp ordered// critical
+// 	{
+	  // contact_potentials has the same index of reduced pairs
+	  // and same id of particle pairs
+	  fill_contact_potential(contact_potentials[i], id, pipa_rt, 0);
 	  //check attractive potential
-	  if (pipa_rt<potential_threshold){
+	  if (pipa_rt<potential_threshold) {
+	    // the attractive potential has the id of index of reduced pairs (i)
 	    ContactPotential acpot(i, pipa_rt, 0);
 	    attractive_potentials.push_back(acpot);
 	  }
-	}
+	// }
       }
 
       std::vector<ContactPotential> tmp = attractive_potentials;
@@ -862,11 +904,12 @@ namespace enhancement {
     inline
     void compute_ipapotential_barrier() {
       BOOST_LOG_SEV(lg, info) << "Computing ipa potential barrier for n pairs : " << reduced_pairs.size();
-#pragma omp parallel for shared(reduced_pairs) ordered// schedule(nonmonotonic:dynamic)
+// #pragma omp parallel for shared(reduced_pairs) schedule(nonmonotonic:dynamic)
       for (unsigned int i=0; i<attractive_potentials.size(); ++i) {
     
-	unsigned int index = attractive_potentials[i].id_; 
-
+	unsigned int index = attractive_potentials[i].id_;
+	//unsigned int index = i;//attractive_potentials[i].id_;
+	
 	double r21 = reduced_pairs[index].r21_;
 	double q21 = reduced_pairs[index].q21_;
 
@@ -883,7 +926,7 @@ namespace enhancement {
 	double fipa_rmax = fipafunct(rmax);
 
 	// checks if minimum exists
-	#pragma omp ordered
+	//	#pragma omp ordered
 	if (fipa_rmin*fipa_rmax < 0.0) {
 	  // std::cerr << "\n[ii] Mixed phi_rt = " << fipa_rmin << '\t' << fipa_rmax;
 	  boost::uintmax_t bmax_iter = ROOT_MAXITER;
@@ -907,10 +950,14 @@ namespace enhancement {
 	    // ipa functor
 	    eint::potential_ipa_funct pipafunct(r21, q21, eps);      
 	    // ipa at contact
-	    double pipa_rbarrier = pipafunct(rbarrier);	  
-	    ContactPotential barrierpot(index, pipa_rbarrier);
-	    barrier_potentials.push_back(barrierpot);
-	    rbarrier_array.push_back(rbarrier);
+	    double pipa_rbarrier = pipafunct(rbarrier);
+	    // the barrier has the index of the id of reduced pairs
+// #pragma omp critical
+	    // {
+	      ContactPotential barrierpot(index, pipa_rbarrier);
+	      barrier_potentials.push_back(barrierpot);
+	      rbarrier_array.push_back(rbarrier);
+	    // }
 	  }
 	  else{
 	    std::cerr << "\n ERROR Negative rbarrier " << rbarrier << '\n';
@@ -943,7 +990,7 @@ namespace enhancement {
 #pragma omp parallel for schedule(nonmonotonic:dynamic)
       for (unsigned int i=0; i<reduced_pairs.size(); ++i) {
 
-
+	unsigned long id = reduced_pairs[i].id_;
 	double r21 = reduced_pairs[i].r21_;
 	double q21 = reduced_pairs[i].q21_;
  
@@ -969,44 +1016,52 @@ namespace enhancement {
 	  //double error_pipa = max_pct_error(pipa_rt, pmpc_rt);
 	
 	  //cerr << "\n[ii] n = " << n << "\t err = " << error_comp;
-	  if ((error_comp < 2.0) && (initer>0)){
-#pragma omp critical
-	    {
-	      fill_contact_potential(contact_potentials[i], i, pmpc_rt, n);
-	      // outfile << n
-	      // 	      << '\t' << r21 << '\t' << q21
-	      // 	      << '\t' << pmpc_rt 
-	      // 	      << '\t' << pipa_rt
-	      // 	      << '\t' << error_pipa
-	      // 	      << '\t' << error_comp << '\n';
+	  if ((error_comp < MPC_ERROR) && (initer>0)){
+// #pragma omp critical
+// 	    {
+	    fill_contact_potential(contact_potentials[i], id, pmpc_rt, n);
+	    // outfile << n
+	    // 	      << '\t' << r21 << '\t' << q21
+	    // 	      << '\t' << pmpc_rt 
+	    // 	      << '\t' << pipa_rt
+	    // 	      << '\t' << error_pipa
+	    // 	      << '\t' << error_comp << '\n';
 	      //check attractive potential
-	      if (pmpc_rt<potential_threshold){
-		ContactPotential acpot(i, pmpc_rt, n);
-		attractive_potentials.emplace_back(acpot);
-	      }
+#pragma omp critical
+	    {	      
+		if (pmpc_rt<potential_threshold){
+		  ContactPotential acpot(i, pmpc_rt, n);
+		  
+		  attractive_potentials.push_back(acpot);
+		}
+	    
+		//break;
+		n=nmax;
 	    }
-	    break;
 	  }
 	  else {
 	    if (n>nmax-nstep){
+	      std::cerr << "\n[ww] Max iterations exceeded\n";
+	      fill_contact_potential(contact_potentials[i], i, pmpc_rt, n);
+	      // outfile << n
+	      // 	<< '\t' << r21 << '\t' << q21
+	      // 	<< '\t' << pmpc_rt 
+	      // 	<< '\t' << pipa_rt
+	      // 	<< '\t' << error_pipa
+	      // 	<< '\t' << error_comp
+	      // 	<< '\t' << "max_iter\n";
+	      //check attractive potential
 #pragma omp critical
 	      {
-		std::cerr << "\n[ww] Max iterations exceeded\n";
-		fill_contact_potential(contact_potentials[i], i, pmpc_rt, n);
-		// outfile << n
-		// 	<< '\t' << r21 << '\t' << q21
-		// 	<< '\t' << pmpc_rt 
-		// 	<< '\t' << pipa_rt
-		// 	<< '\t' << error_pipa
-		// 	<< '\t' << error_comp
-		// 	<< '\t' << "max_iter\n";
-		//check attractive potential
+		ContactPotential epot(i, pmpc_rt, n);
+		error_potentials.push_back(epot);
 		if (pmpc_rt<potential_threshold){
-		  ContactPotential acpot(i, pmpc_rt, n);
-		  attractive_potentials.push_back(acpot);
+		    ContactPotential acpot(i, pmpc_rt, n);
+		    attractive_potentials.push_back(acpot);
 		}
+	      
+		//break;
 	      }
-	      break;
 	    }
 	  }
 	  pcomp = pmpc_rt;
@@ -1023,6 +1078,7 @@ namespace enhancement {
       rbarrier_array.reserve(attractive_potentials.size());
 
       BOOST_LOG_SEV(lg, info) << "Attractive potentials size : " << attractive_potentials.size();
+      BOOST_LOG_SEV(lg, info) << "Error potentials size : " << error_potentials.size();
       BOOST_LOG_SEV(lg, info) << "Done computing MPC potential at contact.";
     }
 
@@ -1044,11 +1100,11 @@ namespace enhancement {
 
     inline
     void compute_mpcpotential_barrier() {
-      BOOST_LOG_SEV(lg, info) << "Computing mpc potential barrier for n pairs : " << reduced_pairs.size();
+      BOOST_LOG_SEV(lg, info) << "Computing mpc potential barrier for n pairs : " << attractive_potentials.size();
 #pragma omp parallel for shared(reduced_pairs) schedule(nonmonotonic:dynamic)
       for (unsigned int i=0; i<attractive_potentials.size(); ++i) {
     
-	unsigned int index = attractive_potentials[i].id_; 
+	unsigned int index = attractive_potentials[i].id_;
 	unsigned int nterms = attractive_potentials[i].n_;
 
 	double r21 = reduced_pairs[index].r21_;
@@ -1088,13 +1144,16 @@ namespace enhancement {
 	  double rbarrier = 0.5*(pair_fmpc.first+pair_fmpc.second);
 	  if(rbarrier>=min){
 	    //*********************** USE SAME COEFFICIENTS OF FORCE
-	    // mpc functor
-	    eint::potential_mpc_funct pmpcfunct(r21, q21, eps, nterms);      
-	    // mpc at contact
-	    double pmpc_rbarrier = pmpcfunct(rbarrier);	  
-	    ContactPotential barrierpot(index, pmpc_rbarrier, nterms);
-	    barrier_potentials.push_back(barrierpot);
-	    rbarrier_array.push_back(rbarrier);
+#pragma omp critical
+	    {
+	      // mpc functor
+	      eint::potential_mpc_funct pmpcfunct(r21, q21, eps, nterms);      
+	      // mpc at contact
+	      double pmpc_rbarrier = pmpcfunct(rbarrier);	  
+	      ContactPotential barrierpot(index, pmpc_rbarrier, nterms);
+	      barrier_potentials.push_back(barrierpot);
+	      rbarrier_array.push_back(rbarrier);
+	    }
 	  }
 	  else{
 	    std::cerr << "\n ERROR Negative rbarrier " << rbarrier << '\n';
@@ -1117,127 +1176,74 @@ namespace enhancement {
 
     inline
     void compute_enhancement_factor() {
-
-  //     unsigned rsize = static_cast<unsigned>(rarray.size());
-  //     unsigned qsize = static_cast<unsigned>(qarray.size());
-  //     bgrid4d  grid4 = {{rsize, qsize,
-  // 			 rsize, qsize}};
-  
-  // // resizing
-  //     efactor.resize(grid4); 
-
       BOOST_LOG_SEV(lg, info) << "Size for array efactor : " << efactor.size();
-      // efactor[1][1][1][1] = 1.0;
-      // return;
-      
-      // if (efactor.size()<4){
-      // 	std::cerr << "\nnull size for array efactor\n";
-      // 	std::terminate();
-      // }
-      
-      // bgrid4d grid4;
-      // boost_array4d efactor;
-      
-      // grid4 = {{static_cast<unsigned>(rarray.size()),
-      // 		static_cast<unsigned>(qarray.size()),
-      // 		static_cast<unsigned>(rarray.size()),
-      // 		static_cast<unsigned>(qarray.size())}};
-      
-      // efactor.resize(grid4);
-      
+            
       BOOST_LOG_SEV(lg, info) << "Computing Enhancement Factor";
-      //#pragma omp parallel for shared(reduced_pairs) schedule(nonmonotonic:dynamic)
-      // Loop in all contact potentials
-      //#pragma omp parallel for //shared(reduced_pairs) schedule(nonmonotonic:dynamic)// num_threads(1)
-      //for (unsigned int icp=0; icp<contact_potentials.size(); ++icp) {
 
-      for (unsigned int icp=0; icp<contact_potentials.size(); ++icp) {
-
-	// min element of reduced_pair size repetitions must be the
-	// index of non repeated, then take the contact potential
-	// look for barrier etc.
-
+      // iterate in reduced_pairs
+      for (unsigned int irp=0; irp<reduced_pairs.size(); ++irp) {
 	
-	// this is the index of reduced pairs
-	unsigned int index = contact_potentials[icp].id_;
-	//if(icp!=index) std::terminate;
-	// ************
-	double contact_potential = contact_potentials[icp].potential_;
+	// this is the index of reduced pairs, i.e., non repeated pair
+	unsigned int index = reduced_pairs[irp].id_;
+
+	// contact potential for this reduced pairhas the same ordering
+	// of reduced pairs
+	double contact_potential = contact_potentials[irp].potential_;
 	
 	// get repeated combinations (of particle_pairs)
-	//#pragma omp atomic write
-	std::vector<long> reps = reduced_pairs[index].repetitions_;
-	//double r21 = reduced_pairs[index].r21_;
-	//double q21 = reduced_pairs[index].q21_;
-	
-	
-	// //** find repetitions using index
-	// std::vector<ReducedParticlePair>::iterator it = std::find_if(reduced_pairs.begin(),
-	// 							     reduced_pairs.end(),
-	// 							     findId(index));
-	
-	
-	//** find if index is in barrier_potentials
+	std::vector<long> reps = reduced_pairs[irp].repetitions_;
+
+	// find if index is in barrier_potentials, i.e., if a potential
+	// barrier exists
 	ContactPotentialIterator barrier_it = std::find_if(barrier_potentials.begin(),
 							   barrier_potentials.end(),
-							   find_id(index));
-
-
-	//__gnu_parallel::find_if
-	// //** this check has to be passed to the following loop
-	// if(it != barrier_potentials.end()) {
-	//     // std::cerr << "\n*********************";
-	//     // std::cerr << "\n* " << (*it).id_;
-	//     // 			   std::cerr << "\n* " << (*it).potential_;
-	//     // 						  std::cerr << "\n*********************";
-								       
-	// }
+							   find_id(irp));
 	
-	//** loop in repetitions private or shared it?
-	//#pragma omp parallel for private(particle_pairs,rarray,qarray, barrier_it,barrier_potentials) shared(efactor) schedule(nonmonotonic:dynamic)
-	for(unsigned int jrep=0; jrep<reps.size(); ++jrep){
+        // iterate in vector of repeated combinations
+	for(unsigned int jrep=0; jrep<reps.size(); ++jrep) {
 	  long rep_index = reps[jrep];
 	  short l = particle_pairs[rep_index].l_;
 	  short q = particle_pairs[rep_index].q_;
 	  short m = particle_pairs[rep_index].m_;
 	  short p = particle_pairs[rep_index].p_;
-  	  // bool notswapd  = particle_pairs[rep_index].notswapd_;
-	  //std::cerr << "\nn l is " << l;
+
 	  double tr1 = rarray[l];//(!notswapd ? rarray[l] : rarray[m]);
 	  //std::cerr << "\nn q is " << q;
 	  double tq1 = qarray[q];//(!notswapd ? qarray[q] : qarray[p]);
 	  double potprefactor = tq1*tq1/tr1;
 	  double phimin = potprefactor*contact_potential;
 	  //std::cerr << "\n\n";
-	  //std::cerr << "\n(" << rarray[l] << ", " << qarray[q] << ") + ("
-		    // << rarray[m] << ", " << qarray[p] << ")";
-	  //std::cerr << "\n NOTSWAPPED " << notswapd << "\tr1 " << tr1  << "\tq1 " << tq1;
+
 	  // we have potential barrier
-	  // ** if barrier compute eta	  
+	  // ** if barrier compute eta       
 	  if(barrier_it != barrier_potentials.end()) {
 	    // std::cerr << "\n*********************";
 	    // std::cerr << "\n* " << (*it).id_;
 	    // 			   std::cerr << "\n* " << (*it).potential_;
 	    //
 	    double phimax = potprefactor*(*barrier_it).potential_;
-	    //std::cerr << "\n*********************" << rep_index;
-	    //std::cerr << "\n(" << l << ", " << q << ") + (" << m << ", " << p << ")";
-	    //std::cerr << "\n*******contact**********\t" << contact_potential;
-	    //std::cerr << "\n*******barrier**********\t" << (*barrier_it).potential_;  
-	    //std::cerr << "\n*******phimin**********\t" << phimin;
-	    //std::cerr << "\n*******phimax**********\t" << phimax;
+	    // std::cerr << "\n*********************" << rep_index;
+	    // std::cerr << "\n(" << l << ", " << q << ") + (" << m << ", " << p << ")";
+	    // std::cerr << "\n*******contact**********\t" << contact_potential;
+	    // std::cerr << "\n*******barrier**********\t" << (*barrier_it).potential_;  
+	    // std::cerr << "\n*******phimin**********\t" << phimin;
+	    // std::cerr << "\n*******phimax**********\t" << phimax;
 	    double eta = eta_barrier(phimin, phimax);
-	    //std::cerr << "\n*******eta**********\t" << eta;
+	    // std::cerr << "\n*******eta**********\t" << eta
+	    // 	      << '\t' << tr1
+	    // 	      << '\t' << tq1
+	    // 	      << '\t' << rarray[m]
+	    // 	      << '\t' << qarray[p]
+	    // 	      << '\t' << particle_pairs[rep_index].notswapd_;
 	    // #pragma omp atomic write
 	    efactor[l][q][m][p] = eta;
 	    // #pragma omp atomic write
 	    efactor[m][p][l][q] = eta;
-	    //break;
 	  }
 	  else {
 	    // ** if not barrier
 	    // ** attraction and repulsion
-	    if(contact_potential <= 0 ){
+	    if(contact_potential < potential_threshold){
 	      //std::cerr << "\n--------------------" << rep_index;
 	      //std::cerr << "\n(" << l << ", " << q << ") + (" << m << ", " << p << ")";
 	      //double phimin = qarray[]
@@ -1251,33 +1257,37 @@ namespace enhancement {
 	      efactor[m][p][l][q] = eta;
 	    }
 	    else {
-	      //std::cerr << "\n++++++++++++++++++++" << rep_index;
-	      //std::cerr << "\n(" << l << ", " << q << ") + (" << m << ", " << p << ")";
-	      //std::cerr << "\n++++++++++contact++++++++++\t" << contact_potential;
-	      //std::cerr << "\n++++++++++phimin++++++++++\t" << phimin;
-	      double eta = eta_repulsive(phimin);
-	      //std::cerr << "\n++++++++++eta++++++++++\t" << eta;
-	      // #pragma omp atomic write
-	      efactor[l][q][m][p] = eta;
-	      // #pragma omp atomic write
-	      efactor[m][p][l][q] = eta;	      	      
+	      // if(contact_potential > potential_threshold ){
+	      	//std::cerr << "\n++++++++++++++++++++" << rep_index;
+	      	//std::cerr << "\n(" << l << ", " << q << ") + (" << m << ", " << p << ")";
+	      	//std::cerr << "\n++++++++++contact++++++++++\t" << contact_potential;
+	      	//std::cerr << "\n++++++++++phimin++++++++++\t" << phimin;
+	      	double eta = eta_repulsive(phimin);
+	      	//std::cerr << "\n++++++++++eta++++++++++\t" << eta;
+	      	// #pragma omp atomic write
+	      	efactor[l][q][m][p] = eta;
+	      	// #pragma omp atomic write
+	      	efactor[m][p][l][q] = eta;
+	      // }
 	    }
 	  }
+
 	  //std::cout << std::endl << l << '\t' << q << '\t' << m << '\t' << p << '\t' << efactor[l][q][m][p];
 	 
 	}
       }
+    
 
       BOOST_LOG_SEV(lg, info) << "Computing neutral pairs : " << neutral_pairs.size();
       
       auto start = std::chrono::system_clock::now();
       for (unsigned int i = 0; i<neutral_pairs.size(); ++i) {
-	short l = neutral_pairs[i].l_;
-	short q = neutral_pairs[i].q_;
-	short m = neutral_pairs[i].m_;
-	short p = neutral_pairs[i].p_;
-	efactor[l][q][m][p] = 1.0;
-	efactor[m][p][l][q] = 1.0;
+      	short l = neutral_pairs[i].l_;
+      	short q = neutral_pairs[i].q_;
+      	short m = neutral_pairs[i].m_;
+      	short p = neutral_pairs[i].p_;
+      	efactor[l][q][m][p] = 1.0;
+      	efactor[m][p][l][q] = 1.0;
       }
 
       auto end = std::chrono::system_clock::now();
@@ -1309,6 +1319,7 @@ namespace enhancement {
     std::vector<ReducedParticlePair> reduced_pairs;
     std::vector<ContactPotential> contact_potentials;
     std::vector<ContactPotential> attractive_potentials;
+    std::vector<ContactPotential> error_potentials;  
     std::vector<ContactPotential> barrier_potentials;
     
     double potential_threshold;
