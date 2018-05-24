@@ -57,11 +57,11 @@ class GridSystem(mh5u.H5Writable):
     self.writable_list = [self.temperature, self.nmdensity]
 #
 #
-def compute_sections(nsections, rmin, base, power, linear, special):
+def compute_sections(nsections, rmin, base, power, grid_type):
   """ Compute sections
       [rmin] = metre
   """
-  if linear and not special:
+  if grid_type['linear'] and not grid_type['special']:
     rads = np.linspace(rmin, base*nsections*1e-9, nsections)
     rifaces = rads-base*1e-9*0.5
     rifaces = np.append(rifaces, rads[-1]+base*1e-9*0.5)
@@ -71,9 +71,33 @@ def compute_sections(nsections, rmin, base, power, linear, special):
     minvoliface = ifaces[0]
     return minvoliface, ifaces, vols, rads, diams
 
-  if special:
+  if grid_type['special']:
     rlow = np.arange(1, 10.5, 0.5)*1e-9*0.5
     rhigh = np.arange(90, 100.5, 0.5)*1e-9*0.5
+    rads = np.concatenate((rlow, rhigh))
+    rifaces = rads-base*1e-9*0.5
+    rifaces = np.append(rifaces, rads[-1]+base*1e-9*0.5)
+    diams = 2.0*rads
+    vols = cvol(rads)
+    ifaces = cvol(rifaces)
+    minvoliface = ifaces[0]
+    return minvoliface, ifaces, vols, rads, diams
+
+  if grid_type['small']:
+    rlow = np.arange(1, 10.5, 0.25)*1e-9*0.5
+    rhigh = np.array([90, 95, 100])*1e-9*0.5
+    rads = np.concatenate((rlow, rhigh))
+    rifaces = rads-base*1e-9*0.5
+    rifaces = np.append(rifaces, rads[-1]+base*1e-9*0.5)
+    diams = 2.0*rads
+    vols = cvol(rads)
+    ifaces = cvol(rifaces)
+    minvoliface = ifaces[0]
+    return minvoliface, ifaces, vols, rads, diams
+
+  if grid_type['big']:
+    rlow = np.array([1, 2, 5, 10])*1e-9*0.5
+    rhigh = np.arange(90, 100.5, 0.25)*1e-9*0.5
     rads = np.concatenate((rlow, rhigh))
     rifaces = rads-base*1e-9*0.5
     rifaces = np.append(rifaces, rads[-1]+base*1e-9*0.5)
@@ -99,7 +123,7 @@ def compute_sections(nsections, rmin, base, power, linear, special):
 class VSections(mh5u.H5Writable):
   """ Represents the volumes of nanoparticles
   """
-  def __init__(self, h5obj, nsections, rmin, base, power, linear=False, special=False):
+  def __init__(self, h5obj, nsections, rmin, base, power, grid_type):
     """ Initial values
     """
     self.h5obj = h5obj
@@ -108,7 +132,7 @@ class VSections(mh5u.H5Writable):
     #
     minvoliface, self.ifaces, self.vols, self.rads, self.diams = compute_sections(nsections,
                                                                                   rmin,base, power,
-                                                                                  linear, special)
+                                                                                  grid_type)
 
     self.miniface = mh5u.Attrib("Min_interface", minvoliface)
     #
@@ -154,7 +178,7 @@ class VSections(mh5u.H5Writable):
 class QSections(mh5u.H5Writable):
   """ Represents the charges of nanoparticles
   """
-  def __init__(self, h5obj, nsections, maxpositive, maxnegative, special):
+  def __init__(self, h5obj, nsections, maxpositive, maxnegative, grid_type):
     """ Initial values
     """
     self.h5obj = h5obj
@@ -166,7 +190,7 @@ class QSections(mh5u.H5Writable):
     self.maxpositive = mh5u.Attrib("Max_positive", maxpositive)
     #
     self.maxnegative = mh5u.Attrib("Max_negative", maxnegative)
-    if not special:
+    if not grid_type['special']:
       # charges
       charges = np.arange(-maxnegative, maxpositive+1)
     else:
@@ -178,6 +202,21 @@ class QSections(mh5u.H5Writable):
                 np.arange(-maxnegative+32, -14, 5),
                 np.arange(-14, 6)))
 
+    if grid_type['small']:
+      charges = np.concatenate((np.array([-235, -225, -215]), np.arange(-20, 6)))
+      #self.maxpositive = 5
+      #self.maxnegative = -235
+      print('len charges', len(charges))
+      #nsecs = len(charges)
+      #self.nsections = mh5u.Attrib("NSections", nsecs)
+
+    if grid_type['big']:
+      charges = np.concatenate((np.arange(-235, -214), np.array([-20, -10, -2, -1, 0, 1])))
+      #self.maxpositive = 1
+      #self.maxnegative = -235
+      #nsecs = len(charges)
+      #self.nsections = mh5u.Attrib("NSections", nsecs)
+      print('len charges', len(charges))
 
     self.charges = mh5u.DataSet("Charges",
                                 (nsections, ),

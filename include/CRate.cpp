@@ -83,6 +83,9 @@ int CRate::write() {
   // BOOST_LOG_SEV(lg, info) << "Writing death factor";
   // write_deathfactor();
 
+  BOOST_LOG_SEV(lg, info) << "Writing potentials";
+  write_potentials();
+  
   BOOST_LOG_SEV(lg, info) << "Writing enhancement factor";
   write_efactor();
 
@@ -125,7 +128,10 @@ int CRate::write_pairs() {
             gm.vols.nsections, gm.chrgs.nsections}};
   
   // resizing
-  efactor.resize(grid4); 
+  efactor.resize(grid4);
+  cpotentials.resize(grid4);
+  bpotentials.resize(grid4);
+  rbarriers.resize(grid4);
   rcoag.resize(grid4);
 
   BOOST_LOG_SEV(lg, info) << "Size for array efactor : " << efactor.size();
@@ -136,8 +142,14 @@ int CRate::write_pairs() {
   
       
   boost_array4d_ref efactor_ref(efactor);     //!< Reference to efactor
+  boost_array4d_ref cpotentials_ref(cpotentials);     //!< Reference to cpotentials
+  boost_array4d_ref bpotentials_ref(bpotentials);     //!< Reference to bpotentials
+  boost_array4d_ref rbarriers_ref(rbarriers);
 
-  enhancement::Enhancement enh(gm.vols.radii, gm.chrgs.charges*eCharge, efactor_ref, gm.einter.dconstant, lg);
+  enhancement::Enhancement enh(gm.vols.radii, gm.chrgs.charges*eCharge,
+			       efactor_ref, cpotentials_ref, bpotentials_ref,
+			       rbarriers_ref,
+			       gm.einter.dconstant, lg);
 
   BOOST_LOG_SEV(lg, info) << "Computing reduced particle pairs...";
   auto start = std::chrono::system_clock::now();
@@ -174,7 +186,10 @@ int CRate::read_pairs() {
             gm.vols.nsections, gm.chrgs.nsections}};
   
   // resizing
-  efactor.resize(grid4); 
+  efactor.resize(grid4);
+  cpotentials.resize(grid4);
+  bpotentials.resize(grid4);
+  rbarriers.resize(grid4);
   rcoag.resize(grid4);
 
   BOOST_LOG_SEV(lg, info) << "Size for array efactor : " << efactor.size();
@@ -185,9 +200,14 @@ int CRate::read_pairs() {
   
       
   boost_array4d_ref efactor_ref(efactor);     //!< Reference to efactor
+  boost_array4d_ref cpotentials_ref(cpotentials);     //!< Reference to cpotentials
+  boost_array4d_ref bpotentials_ref(bpotentials);     //!< Reference to bpotentials
+  boost_array4d_ref rbarriers_ref(rbarriers);
 
-  enhancement::Enhancement enh(gm.vols.radii, gm.chrgs.charges*eCharge, efactor_ref, gm.einter.dconstant, lg);
-
+  enhancement::Enhancement enh(gm.vols.radii, gm.chrgs.charges*eCharge,
+			       efactor_ref, cpotentials_ref, bpotentials_ref,
+			       rbarriers_ref,
+			       gm.einter.dconstant, lg);
 
   std::string fullname = dirname + prefix_filename;
   
@@ -214,7 +234,10 @@ int CRate::compute_frompairs() {
             gm.vols.nsections, gm.chrgs.nsections}};
   
   // resizing
-  efactor.resize(grid4); 
+  efactor.resize(grid4);
+  cpotentials.resize(grid4);
+  bpotentials.resize(grid4);
+  rbarriers.resize(grid4);
   rcoag.resize(grid4);
 
   BOOST_LOG_SEV(lg, info) << "Size for array efactor : " << efactor.size();
@@ -225,9 +248,14 @@ int CRate::compute_frompairs() {
   
       
   boost_array4d_ref efactor_ref(efactor);     //!< Reference to efactor
+  boost_array4d_ref cpotentials_ref(cpotentials);     //!< Reference to cpotentials
+  boost_array4d_ref bpotentials_ref(bpotentials);     //!< Reference to bpotentials
+  boost_array4d_ref rbarriers_ref(rbarriers);
 
-  enhancement::Enhancement enh(gm.vols.radii, gm.chrgs.charges*eCharge, efactor_ref, gm.einter.dconstant, lg);
-
+  enhancement::Enhancement enh(gm.vols.radii, gm.chrgs.charges*eCharge,
+			       efactor_ref, cpotentials_ref, bpotentials_ref,
+			       rbarriers_ref,
+			       gm.einter.dconstant, lg);
 
   std::string fullname = dirname + prefix_filename;
   
@@ -348,7 +376,10 @@ int CRate::compute() {
             gm.vols.nsections, gm.chrgs.nsections}};
   
   // resizing
-  efactor.resize(grid4); 
+  efactor.resize(grid4);
+  cpotentials.resize(grid4);
+  bpotentials.resize(grid4);
+  rbarriers.resize(grid4);
   rcoag.resize(grid4);
 
   BOOST_LOG_SEV(lg, info) << "Size for array efactor : " << efactor.size();
@@ -359,8 +390,14 @@ int CRate::compute() {
   
       
   boost_array4d_ref efactor_ref(efactor);     //!< Reference to efactor
+  boost_array4d_ref cpotentials_ref(cpotentials);     //!< Reference to cpotentials
+  boost_array4d_ref bpotentials_ref(bpotentials);     //!< Reference to bpotentials
+  boost_array4d_ref rbarriers_ref(rbarriers);
 
-  enhancement::Enhancement enh(gm.vols.radii, gm.chrgs.charges*eCharge, efactor_ref, gm.einter.dconstant, lg);  
+  enhancement::Enhancement enh(gm.vols.radii, gm.chrgs.charges*eCharge,
+			       efactor_ref, cpotentials_ref, bpotentials_ref,
+			       rbarriers_ref,
+			       gm.einter.dconstant, lg);
 
   BOOST_LOG_SEV(lg, info) << "Computing reduced particle pairs...";
   auto start = std::chrono::system_clock::now();
@@ -421,6 +458,25 @@ int CRate::compute() {
       elapsed_seconds = end-start;
       BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
       break;
+    case 3:
+      BOOST_LOG_SEV(lg, info) << "Bounded Hybrid method : " << gm.einter.method;
+      BOOST_LOG_SEV(lg, info) << "Computing MPC potentials at contact...";
+      start = std::chrono::system_clock::now();
+      //
+      enh.compute_mpcpotential_contact();
+      //
+      end = std::chrono::system_clock::now();
+      elapsed_seconds = end-start;
+      BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
+      BOOST_LOG_SEV(lg, info) << "Computing IPA potentials barriers...";
+      start = std::chrono::system_clock::now();
+      //
+      enh.compute_ipapotential_barrier();
+      //
+      end = std::chrono::system_clock::now();
+      elapsed_seconds = end-start;
+      BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
+      break;      
   default:
     BOOST_LOG_SEV(lg, error) << "Method " << gm.einter.method
   			     << " not known";
@@ -1039,6 +1095,17 @@ void CRate::write_efactor() {
   int err = create_attrib_hdf5(h5obj, gname,
                                "electhermratio",
                                electhermratio);
+}
+
+void CRate::write_potentials() {
+  std::string cname = "Contact_potential";
+  write_4d(cname, cpotentials);
+
+  std::string bname = "Barrier_potential";
+  write_4d(bname, bpotentials);
+
+  std::string rname = "Barrier_location";
+  write_4d(rname, rbarriers);  
 }
 
 void CRate::write_rcoagulation() {

@@ -309,7 +309,7 @@ BOOST_AUTO_TEST_CASE( microparticles ) {
 	      << '\t' << force_frompotmpc[i] << '\t' << force_frompotipa[i];
     }
     outfile << '\n';
-    outfile.close();    
+    outfile.close();
   }
 }
 

@@ -473,9 +473,15 @@ namespace enhancement {
   public:
 
     Enhancement(const darray& rarray_, const darray& qarray_,
-		boost_array4d_ref efactor_, double eps_,
+		boost_array4d_ref efactor_,
+		boost_array4d_ref cpotentials_,
+		boost_array4d_ref bpotentials_,
+		boost_array4d_ref rbarriers_,
+		double eps_,
 		src::severity_logger< severity_level > lg_) :
       rarray(rarray_), qarray(qarray_), efactor(efactor_),
+      cpotentials(cpotentials_), bpotentials(bpotentials_),
+      rbarriers(rbarriers_),
       eps(eps_), lg(lg_) {
 
       rarray_size = static_cast<unsigned short>(rarray.size());
@@ -490,6 +496,18 @@ namespace enhancement {
       nmin = 25;
       nmax = 2000;
       nstep = 5;
+
+      // double kt = Kboltz*temperature;
+      // std::cerr << "\n KT "<< kt;
+      // std::cerr << '\n';
+      // std::cerr << "\n pot barrier "<< exp(-0.0 / kt);
+      // double pp = 0.0;
+      // std::cerr << "\n pot barrier "<< eta_barrier(-1e-19, pp);
+      // std::cerr << '\n';
+      // std::cerr << "\n q[1] "<< qarray[1];
+      // std::cerr << '\n';
+      // std::terminate();
+      
     }
 
     inline
@@ -914,7 +932,7 @@ namespace enhancement {
 	double q21 = reduced_pairs[index].q21_;
 
 	double rmin = 1.0 + r21;
-	double rmax = 100.0;
+	double rmax = 2.5+r21;
 
 	double min = rmin;
 	double max = rmax;
@@ -938,7 +956,8 @@ namespace enhancement {
 	  }
 	  catch(const std::exception& exc) {
 	    std::cerr << '\n' << exc.what() << '\n';
-	    std::terminate();
+	    //std::terminate();
+	    std::cerr << "\n[ee] No barrier\n";
 	  }
 	  if(bmax_iter > 990){
 	    std::cerr << "\n ERROR max iter " << bmax_iter << "\n\n";
@@ -1084,18 +1103,20 @@ namespace enhancement {
 
     inline
     double eta_attractive(double phimin){
-      return 1.0 - phimin /(Kboltz*temperature);
+      double kt = Kboltz*temperature;
+      return 1.0 - phimin / kt;
     }
 
     inline
     double eta_repulsive(double phimin){
-      return exp(-phimin/(Kboltz*temperature));
+      double kt = Kboltz*temperature;
+      return exp(-phimin / kt);
     }
 
     inline
     double eta_barrier(double phimin, double phimax){
-      return exp(-phimax/(Kboltz*temperature))
-	*(1.0+(phimax-phimin)/(Kboltz*temperature));
+      double kt = Kboltz*temperature;
+      return exp(-phimax / kt) * (1.0 + (phimax-phimin) / kt);
     }
 
     inline
@@ -1111,7 +1132,7 @@ namespace enhancement {
 	double q21 = reduced_pairs[index].q21_;
 
 	double rmin = 1.0 + r21;
-	double rmax = 100.0;
+	double rmax = 2.5+r21;//100.0 + r21;
 
 	double min = rmin;
 	double max = rmax;
@@ -1176,6 +1197,22 @@ namespace enhancement {
 
     inline
     void compute_enhancement_factor() {
+
+      for (unsigned int l=0; l<rarray_size; ++l) {
+	// iterate in charges particle 1
+	for (unsigned int q=0; q<qarray_size; ++q) {
+	  // iterate in radii particle 2
+	  for (unsigned int m=0; m<rarray_size; ++m) {
+	    // iterate in charges particle 2	
+	    for (unsigned int p=0; p<qarray_size; ++p) {
+	      efactor[l][q][m][p] = 0.0;
+	      cpotentials[l][q][m][p] = 0.0;
+	      bpotentials[l][q][m][p] = 0.0;	      
+	    }
+	  }
+	}
+      }
+    
       BOOST_LOG_SEV(lg, info) << "Size for array efactor : " << efactor.size();
             
       BOOST_LOG_SEV(lg, info) << "Computing Enhancement Factor";
@@ -1228,7 +1265,7 @@ namespace enhancement {
 	    // std::cerr << "\n*******barrier**********\t" << (*barrier_it).potential_;  
 	    // std::cerr << "\n*******phimin**********\t" << phimin;
 	    // std::cerr << "\n*******phimax**********\t" << phimax;
-	    double eta = eta_barrier(phimin, phimax);
+	    // double eta = eta_barrier(phimin, phimax);
 	    // std::cerr << "\n*******eta**********\t" << eta
 	    // 	      << '\t' << tr1
 	    // 	      << '\t' << tq1
@@ -1236,25 +1273,38 @@ namespace enhancement {
 	    // 	      << '\t' << qarray[p]
 	    // 	      << '\t' << particle_pairs[rep_index].notswapd_;
 	    // #pragma omp atomic write
-	    efactor[l][q][m][p] = eta;
+	    // efactor[l][q][m][p] = eta;
 	    // #pragma omp atomic write
-	    efactor[m][p][l][q] = eta;
+	    // efactor[m][p][l][q] = eta;
+	    // update potentials
+	    cpotentials[m][p][l][q] = phimin;
+	    cpotentials[l][q][m][p] = phimin;
+	    bpotentials[m][p][l][q] = phimax;
+	    bpotentials[l][q][m][p] = phimax;
+	    unsigned int idr = barrier_it - barrier_potentials.begin();
+	    rbarriers[l][q][m][p] = rbarrier_array[idr]*tr1;
+	    rbarriers[m][p][l][q] = rbarrier_array[idr]*tr1;
 	  }
 	  else {
 	    // ** if not barrier
 	    // ** attraction and repulsion
-	    if(contact_potential < potential_threshold){
+	    if(contact_potential <= potential_threshold){
 	      //std::cerr << "\n--------------------" << rep_index;
 	      //std::cerr << "\n(" << l << ", " << q << ") + (" << m << ", " << p << ")";
 	      //double phimin = qarray[]
 	      //std::cerr << "\n----------contact------\t" << contact_potential;
 	      //std::cerr << "\n----------phimin----------\t" << phimin;
-	      double eta = eta_attractive(phimin);
+	      // double eta = eta_attractive(phimin);
 	      //std::cerr << "\n----------eta------\t" << eta;
 	      // #pragma omp atomic write
-	      efactor[l][q][m][p] = eta;
+	      // efactor[l][q][m][p] = eta;
 	      // #pragma omp atomic write
-	      efactor[m][p][l][q] = eta;
+	      // efactor[m][p][l][q] = eta;
+	      // update potentials
+	      cpotentials[m][p][l][q] = phimin;
+	      cpotentials[l][q][m][p] = phimin;
+	      //bpotentials[m][p][l][q] = 0.0;
+	      //bpotentials[l][q][m][p] = 0.0;
 	    }
 	    else {
 	      // if(contact_potential > potential_threshold ){
@@ -1262,12 +1312,17 @@ namespace enhancement {
 	      	//std::cerr << "\n(" << l << ", " << q << ") + (" << m << ", " << p << ")";
 	      	//std::cerr << "\n++++++++++contact++++++++++\t" << contact_potential;
 	      	//std::cerr << "\n++++++++++phimin++++++++++\t" << phimin;
-	      	double eta = eta_repulsive(phimin);
+	      	// double eta = eta_repulsive(phimin);
 	      	//std::cerr << "\n++++++++++eta++++++++++\t" << eta;
 	      	// #pragma omp atomic write
-	      	efactor[l][q][m][p] = eta;
+	      	// efactor[l][q][m][p] = eta;
 	      	// #pragma omp atomic write
-	      	efactor[m][p][l][q] = eta;
+	      	//efactor[m][p][l][q] = eta;
+		// update potentials
+		cpotentials[m][p][l][q] = phimin;
+		cpotentials[l][q][m][p] = phimin;
+		//bpotentials[m][p][l][q] = 0.0;
+		//bpotentials[l][q][m][p] = 0.0;		
 	      // }
 	    }
 	  }
@@ -1276,7 +1331,31 @@ namespace enhancement {
 	 
 	}
       }
-    
+
+      //#pragma omp parallel for 
+      for (unsigned int l=0; l<rarray_size; ++l) {
+	// iterate in charges particle 1
+	for (unsigned int q=0; q<qarray_size; ++q) {
+	  // iterate in radii particle 2
+	  for (unsigned int m=0; m<rarray_size; ++m) {
+	    // iterate in charges particle 2	
+	    for (unsigned int p=0; p<qarray_size; ++p) {
+	      double phimin = cpotentials[l][q][m][p];
+	      if (phimin <= potential_threshold) {
+		double phimax = bpotentials[l][q][m][p];
+		double eta = eta_barrier(phimin, phimax);
+                //#pragma omp atomic write
+		efactor[l][q][m][p] = eta;		
+	      }
+	      else {
+		double eta = eta_repulsive(phimin);
+		//#pragma omp atomic write
+		efactor[l][q][m][p] = eta;
+	      }
+	    }
+	  }
+	}
+      }
 
       BOOST_LOG_SEV(lg, info) << "Computing neutral pairs : " << neutral_pairs.size();
       
@@ -1301,6 +1380,9 @@ namespace enhancement {
     darray qarray;
 
     boost_array4d_ref efactor;
+    boost_array4d_ref cpotentials;
+    boost_array4d_ref bpotentials;
+    boost_array4d_ref rbarriers;
     
     double eps;
 

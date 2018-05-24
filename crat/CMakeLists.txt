@@ -62,6 +62,8 @@ add_executable(crat-writer "crat-writer.cpp" ${INCSRCS})
 
 add_executable(crat-reader "crat-reader.cpp" ${INCSRCS})
 
+add_executable(potentials "potentials.cpp" ${INCSRCS})
+
 target_link_libraries(CRate
                       GridModel
                       ${LIBS})
@@ -76,7 +78,11 @@ target_link_libraries(crat-writer
 
 target_link_libraries(crat-reader
                       CRate
-                      ${LIBS})		    
+                      ${LIBS})
+
+
+target_link_libraries(potentials ${LIBS})
+
 
 enable_testing()
 

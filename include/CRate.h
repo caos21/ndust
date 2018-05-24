@@ -316,6 +316,12 @@ private:
   */
   void write_efactor();
 
+  //! Write potentials
+  /*! 
+    Writes contact and barrier potentials
+  */
+  void write_potentials();
+  
   //! Write coagulation rate
   /*! 
     Write coagulation rate
@@ -327,6 +333,10 @@ private:
 // 
 
   boost_array4d efactor;              //!< Array for enhancement factor.
+  boost_array4d cpotentials;          //!< Array for contact potentials.
+  boost_array4d bpotentials;          //!< Array for potential barriers.
+  boost_array4d rbarriers;            //!< Array for potential barriers.
+  
   /* boost_array4d_ref efactor_ref;     //!< Reference to efactor */
   boost_array4d rcoag;                //!< Coagulation rate.
 
