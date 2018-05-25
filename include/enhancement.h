@@ -628,7 +628,6 @@ namespace enhancement {
 	// }      
       if (reduced_pairs.size()>0) {
 	contact_potentials.resize(reduced_pairs.size());
-	attractive_potentials.reserve(reduced_pairs.size());
       }
       
       return 0;
@@ -788,30 +787,15 @@ namespace enhancement {
 
       /// end new stuff
 
-      // this stuff works, slowly
-// #pragma omp parallel for schedule(nonmonotonic:dynamic)// collapse(2)
-//       for (unsigned int irp=0; irp<reduced_pairs.size(); ++irp) {
-// 	for (long jpp=0; jpp<particle_pairs.size(); ++jpp) {
-// 	  if(reduced_pairs[irp]==particle_pairs[jpp]) {
-// #pragma omp critical
-// 	    {
-// 	      // one thread a at time
-// 	      reduced_pairs[irp].fill_repeated(jpp);
-// 	    }
-// 	  }
-// 	}
-//       }
       end = std::chrono::system_clock::now();
       elapsed_seconds = end-start;
       BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();      
  
-      //delete(ppair);
 
       start = std::chrono::system_clock::now();
       // resize contact potentials
       if (reduced_pairs.size()>0) {
 	contact_potentials.resize(reduced_pairs.size());
-	attractive_potentials.reserve(reduced_pairs.size());
       }
 
       end = std::chrono::system_clock::now();
@@ -819,10 +803,7 @@ namespace enhancement {
       BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();      
       
       BOOST_LOG_SEV(lg, info) << "Done computing pairs.";
-      // for (auto rp: reduced_pairs){
-      //   std::cout << std::endl;
-      //   rp.print();
-      // }
+
     }
 
     inline
@@ -847,30 +828,14 @@ namespace enhancement {
 #pragma omp critical
 	{
 	  fill_contact_potential(contact_potentials[i], id, pcoul_rt, 0);
-	  //ContactPotential cpot(i, pcoul_rt, 0);
-	  //contact_potentials.push_back(cpot);
-	  //long ti = reduced_pairs[i].repetitions_[0];
-	  //fill_contact_potential(contact_potentials[i], ti, pcoul_rt, 0);
-	  // //check attractive potential
-	  // if (pcoul_rt<potential_threshold){
-	  //   ContactPotential acpot(i, pcoul_rt, 0);
-	  //   attractive_potentials.push_back(acpot);
-	  // }
-	  //std::cout << std::endl << pcoul_rt;
 	}
       }
 
-      //attractive_potentials.reserve(1);
-      attractive_potentials.resize(0);
-      std::vector<ContactPotential> tmp = attractive_potentials;
-      attractive_potentials.swap(tmp);
-      std::vector<ContactPotential>().swap(tmp);
-
-       
+      
       barrier_potentials.resize(0);
       rbarrier_array.resize(0);
 
-      // BOOST_LOG_SEV(lg, info) << "Attractive potentials size : " << attractive_potentials.size();
+
       BOOST_LOG_SEV(lg, info) << "Done computing Coulomb potential at contact.";
     }
     
@@ -898,24 +863,12 @@ namespace enhancement {
 // 	{
 	  // contact_potentials has the same index of reduced pairs
 	  // and same id of particle pairs
-	  fill_contact_potential(contact_potentials[i], id, pipa_rt, 0);
-	  //check attractive potential
-	  if (pipa_rt<potential_threshold) {
-	    // the attractive potential has the id of index of reduced pairs (i)
-	    ContactPotential acpot(i, pipa_rt, 0);
-	    attractive_potentials.push_back(acpot);
-	  }
-	// }
+	fill_contact_potential(contact_potentials[i], id, pipa_rt, 0);
       }
 
-      std::vector<ContactPotential> tmp = attractive_potentials;
-      attractive_potentials.swap(tmp);
-      std::vector<ContactPotential>().swap(tmp);
+      barrier_potentials.reserve(contact_potentials.size());
+      rbarrier_array.reserve(contact_potentials.size());
 
-      barrier_potentials.reserve(attractive_potentials.size());
-      rbarrier_array.reserve(attractive_potentials.size());
-
-      BOOST_LOG_SEV(lg, info) << "Attractive potentials size : " << attractive_potentials.size();
       BOOST_LOG_SEV(lg, info) << "Done computing ipa potential at contact.";
     }
 
@@ -923,16 +876,15 @@ namespace enhancement {
     void compute_ipapotential_barrier() {
       BOOST_LOG_SEV(lg, info) << "Computing ipa potential barrier for n pairs : " << reduced_pairs.size();
 // #pragma omp parallel for shared(reduced_pairs) schedule(nonmonotonic:dynamic)
-      for (unsigned int i=0; i<attractive_potentials.size(); ++i) {
+      for (unsigned int i=0; i<contact_potentials.size(); ++i) {
     
-	unsigned int index = attractive_potentials[i].id_;
-	//unsigned int index = i;//attractive_potentials[i].id_;
+	unsigned int index = i;//contact_potentials[i].id_;
 	
 	double r21 = reduced_pairs[index].r21_;
 	double q21 = reduced_pairs[index].q21_;
 
 	double rmin = 1.0 + r21;
-	double rmax = 2.5+r21;
+	double rmax = 100.0*rmin;
 
 	double min = rmin;
 	double max = rmax;
@@ -1045,42 +997,14 @@ namespace enhancement {
 	    // 	      << '\t' << pipa_rt
 	    // 	      << '\t' << error_pipa
 	    // 	      << '\t' << error_comp << '\n';
-	      //check attractive potential
-#pragma omp critical
-	    {	      
-		if (pmpc_rt<potential_threshold){
-		  ContactPotential acpot(i, pmpc_rt, n);
-		  
-		  attractive_potentials.push_back(acpot);
-		}
 	    
-		//break;
-		n=nmax;
-	    }
+	    n=nmax;
+
 	  }
 	  else {
 	    if (n>nmax-nstep){
 	      std::cerr << "\n[ww] Max iterations exceeded\n";
 	      fill_contact_potential(contact_potentials[i], i, pmpc_rt, n);
-	      // outfile << n
-	      // 	<< '\t' << r21 << '\t' << q21
-	      // 	<< '\t' << pmpc_rt 
-	      // 	<< '\t' << pipa_rt
-	      // 	<< '\t' << error_pipa
-	      // 	<< '\t' << error_comp
-	      // 	<< '\t' << "max_iter\n";
-	      //check attractive potential
-#pragma omp critical
-	      {
-		ContactPotential epot(i, pmpc_rt, n);
-		error_potentials.push_back(epot);
-		if (pmpc_rt<potential_threshold){
-		    ContactPotential acpot(i, pmpc_rt, n);
-		    attractive_potentials.push_back(acpot);
-		}
-	      
-		//break;
-	      }
 	    }
 	  }
 	  pcomp = pmpc_rt;
@@ -1089,14 +1013,9 @@ namespace enhancement {
 
       //      outfile.close();
 
-      std::vector<ContactPotential> tmp = attractive_potentials;
-      attractive_potentials.swap(tmp);
-      std::vector<ContactPotential>().swap(tmp);
+      barrier_potentials.reserve(contact_potentials.size());
+      rbarrier_array.reserve(contact_potentials.size());
 
-      barrier_potentials.reserve(attractive_potentials.size());
-      rbarrier_array.reserve(attractive_potentials.size());
-
-      BOOST_LOG_SEV(lg, info) << "Attractive potentials size : " << attractive_potentials.size();
       BOOST_LOG_SEV(lg, info) << "Error potentials size : " << error_potentials.size();
       BOOST_LOG_SEV(lg, info) << "Done computing MPC potential at contact.";
     }
@@ -1121,18 +1040,18 @@ namespace enhancement {
 
     inline
     void compute_mpcpotential_barrier() {
-      BOOST_LOG_SEV(lg, info) << "Computing mpc potential barrier for n pairs : " << attractive_potentials.size();
+      BOOST_LOG_SEV(lg, info) << "Computing mpc potential barrier for n pairs : " << contact_potentials.size();
 #pragma omp parallel for shared(reduced_pairs) schedule(nonmonotonic:dynamic)
-      for (unsigned int i=0; i<attractive_potentials.size(); ++i) {
+      for (unsigned int i=0; i<contact_potentials.size(); ++i) {
     
-	unsigned int index = attractive_potentials[i].id_;
-	unsigned int nterms = attractive_potentials[i].n_;
+	unsigned int index = i;//contact_potentials[i].id_;
+	unsigned int nterms = contact_potentials[i].n_;
 
 	double r21 = reduced_pairs[index].r21_;
 	double q21 = reduced_pairs[index].q21_;
 
 	double rmin = 1.0 + r21;
-	double rmax = 2.5+r21;//100.0 + r21;
+	double rmax = 100.0*rmin;
 
 	double min = rmin;
 	double max = rmax;
@@ -1198,24 +1117,26 @@ namespace enhancement {
     inline
     void compute_enhancement_factor() {
 
-      for (unsigned int l=0; l<rarray_size; ++l) {
-	// iterate in charges particle 1
-	for (unsigned int q=0; q<qarray_size; ++q) {
-	  // iterate in radii particle 2
-	  for (unsigned int m=0; m<rarray_size; ++m) {
-	    // iterate in charges particle 2	
-	    for (unsigned int p=0; p<qarray_size; ++p) {
-	      efactor[l][q][m][p] = 0.0;
-	      cpotentials[l][q][m][p] = 0.0;
-	      bpotentials[l][q][m][p] = 0.0;	      
-	    }
-	  }
-	}
-      }
-    
+      // for (unsigned int l=0; l<rarray_size; ++l) {
+      // 	// iterate in charges particle 1
+      // 	for (unsigned int q=0; q<qarray_size; ++q) {
+      // 	  // iterate in radii particle 2
+      // 	  for (unsigned int m=0; m<rarray_size; ++m) {
+      // 	    // iterate in charges particle 2	
+      // 	    for (unsigned int p=0; p<qarray_size; ++p) {
+      // 	      efactor[l][q][m][p] = 0.0;
+      // 	      cpotentials[l][q][m][p] = 0.0;
+      // 	      bpotentials[l][q][m][p] = 0.0;	      
+      // 	    }
+      // 	  }
+      // 	}
+      // }
+
+      auto start = std::chrono::system_clock::now();
+	    
       BOOST_LOG_SEV(lg, info) << "Size for array efactor : " << efactor.size();
             
-      BOOST_LOG_SEV(lg, info) << "Computing Enhancement Factor";
+      BOOST_LOG_SEV(lg, info) << "Enhancement: expanding pair potentials";
 
       // iterate in reduced_pairs
       for (unsigned int irp=0; irp<reduced_pairs.size(); ++irp) {
@@ -1251,6 +1172,8 @@ namespace enhancement {
 	  double phimin = potprefactor*contact_potential;
 	  //std::cerr << "\n\n";
 
+	  cpotentials[m][p][l][q] = phimin;
+	  cpotentials[l][q][m][p] = phimin;
 	  // we have potential barrier
 	  // ** if barrier compute eta       
 	  if(barrier_it != barrier_potentials.end()) {
@@ -1277,61 +1200,25 @@ namespace enhancement {
 	    // #pragma omp atomic write
 	    // efactor[m][p][l][q] = eta;
 	    // update potentials
-	    cpotentials[m][p][l][q] = phimin;
-	    cpotentials[l][q][m][p] = phimin;
 	    bpotentials[m][p][l][q] = phimax;
 	    bpotentials[l][q][m][p] = phimax;
 	    unsigned int idr = barrier_it - barrier_potentials.begin();
 	    rbarriers[l][q][m][p] = rbarrier_array[idr]*tr1;
 	    rbarriers[m][p][l][q] = rbarrier_array[idr]*tr1;
 	  }
-	  else {
-	    // ** if not barrier
-	    // ** attraction and repulsion
-	    if(contact_potential <= potential_threshold){
-	      //std::cerr << "\n--------------------" << rep_index;
-	      //std::cerr << "\n(" << l << ", " << q << ") + (" << m << ", " << p << ")";
-	      //double phimin = qarray[]
-	      //std::cerr << "\n----------contact------\t" << contact_potential;
-	      //std::cerr << "\n----------phimin----------\t" << phimin;
-	      // double eta = eta_attractive(phimin);
-	      //std::cerr << "\n----------eta------\t" << eta;
-	      // #pragma omp atomic write
-	      // efactor[l][q][m][p] = eta;
-	      // #pragma omp atomic write
-	      // efactor[m][p][l][q] = eta;
-	      // update potentials
-	      cpotentials[m][p][l][q] = phimin;
-	      cpotentials[l][q][m][p] = phimin;
-	      //bpotentials[m][p][l][q] = 0.0;
-	      //bpotentials[l][q][m][p] = 0.0;
-	    }
-	    else {
-	      // if(contact_potential > potential_threshold ){
-	      	//std::cerr << "\n++++++++++++++++++++" << rep_index;
-	      	//std::cerr << "\n(" << l << ", " << q << ") + (" << m << ", " << p << ")";
-	      	//std::cerr << "\n++++++++++contact++++++++++\t" << contact_potential;
-	      	//std::cerr << "\n++++++++++phimin++++++++++\t" << phimin;
-	      	// double eta = eta_repulsive(phimin);
-	      	//std::cerr << "\n++++++++++eta++++++++++\t" << eta;
-	      	// #pragma omp atomic write
-	      	// efactor[l][q][m][p] = eta;
-	      	// #pragma omp atomic write
-	      	//efactor[m][p][l][q] = eta;
-		// update potentials
-		cpotentials[m][p][l][q] = phimin;
-		cpotentials[l][q][m][p] = phimin;
-		//bpotentials[m][p][l][q] = 0.0;
-		//bpotentials[l][q][m][p] = 0.0;		
-	      // }
-	    }
-	  }
-
+	  
 	  //std::cout << std::endl << l << '\t' << q << '\t' << m << '\t' << p << '\t' << efactor[l][q][m][p];
-	 
 	}
       }
 
+      auto end = std::chrono::system_clock::now();
+      std::chrono::duration<double> elapsed_seconds = end-start;
+      BOOST_LOG_SEV(lg, info) << "Done expanding pair potentials";
+      BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
+      
+      BOOST_LOG_SEV(lg, info) << "Computing Enhancement Factor";
+      start = std::chrono::system_clock::now();
+      
       //#pragma omp parallel for 
       for (unsigned int l=0; l<rarray_size; ++l) {
 	// iterate in charges particle 1
@@ -1341,25 +1228,39 @@ namespace enhancement {
 	    // iterate in charges particle 2	
 	    for (unsigned int p=0; p<qarray_size; ++p) {
 	      double phimin = cpotentials[l][q][m][p];
-	      if (phimin <= potential_threshold) {
-		double phimax = bpotentials[l][q][m][p];
+    	      double phimax = bpotentials[l][q][m][p];
+
+	      if (fabs(phimax) > potential_threshold) {
+		//double phimax = bpotentials[l][q][m][p];
 		double eta = eta_barrier(phimin, phimax);
                 //#pragma omp atomic write
 		efactor[l][q][m][p] = eta;		
 	      }
 	      else {
-		double eta = eta_repulsive(phimin);
-		//#pragma omp atomic write
-		efactor[l][q][m][p] = eta;
+		if(phimin > 0.0) {
+		  double eta = eta_repulsive(phimin);
+		  //#pragma omp atomic write
+		  efactor[l][q][m][p] = eta;
+		}
+		else {
+		  double eta = eta_attractive(phimin);
+		  //#pragma omp atomic write
+		  efactor[l][q][m][p] = eta;		  
+		}
 	      }
 	    }
 	  }
 	}
       }
 
-      BOOST_LOG_SEV(lg, info) << "Computing neutral pairs : " << neutral_pairs.size();
+      end = std::chrono::system_clock::now();
+      elapsed_seconds = end-start;
+      BOOST_LOG_SEV(lg, info) << "Done computing enhancement factor...";
+      BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
       
-      auto start = std::chrono::system_clock::now();
+      BOOST_LOG_SEV(lg, info) << "Computing neutral pairs : " << neutral_pairs.size();      
+      start = std::chrono::system_clock::now();
+      
       for (unsigned int i = 0; i<neutral_pairs.size(); ++i) {
       	short l = neutral_pairs[i].l_;
       	short q = neutral_pairs[i].q_;
@@ -1369,10 +1270,10 @@ namespace enhancement {
       	efactor[m][p][l][q] = 1.0;
       }
 
-      auto end = std::chrono::system_clock::now();
-      std::chrono::duration<double> elapsed_seconds = end-start;
+      end = std::chrono::system_clock::now();
+      elapsed_seconds = end-start;
       BOOST_LOG_SEV(lg, info) << "Done computing neutral pairs...";
-      BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();   
+      BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
       
     }
     //
@@ -1400,7 +1301,6 @@ namespace enhancement {
     std::vector<ParticlePair> neutral_pairs;    
     std::vector<ReducedParticlePair> reduced_pairs;
     std::vector<ContactPotential> contact_potentials;
-    std::vector<ContactPotential> attractive_potentials;
     std::vector<ContactPotential> error_potentials;  
     std::vector<ContactPotential> barrier_potentials;
     
