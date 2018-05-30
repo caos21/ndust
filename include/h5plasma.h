@@ -75,6 +75,7 @@ int create_group_hdf5(H5::H5File file,
     error.printError();
     return -1;
   }
+  return 0;
 }
 
 inline

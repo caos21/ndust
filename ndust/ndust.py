@@ -166,6 +166,7 @@ class Window(QMainWindow, Ui_MainWindow):
     linear = False
     special = False
     small = False
+    medium = False
     big =  False
     if self.ui.checkBox_linear.isChecked():
       linear = True
@@ -175,13 +176,17 @@ class Window(QMainWindow, Ui_MainWindow):
       self.ui.spinBox_vsecs.setValue(nvsections)
     if self.ui.checkBox_small.isChecked():
       small = True
-      nvsections = 41
+      nvsections = 48
+      self.ui.spinBox_vsecs.setValue(nvsections)
+    if self.ui.checkBox_medium.isChecked():
+      medium = True
+      nvsections = 48
       self.ui.spinBox_vsecs.setValue(nvsections)
     if self.ui.checkBox_big.isChecked():
       big = True
-      nvsections = 46
+      nvsections = 48
       self.ui.spinBox_vsecs.setValue(nvsections)      
-    grid_type = {'linear':linear, 'special':special, 'small':small, 'big':big}
+    grid_type = {'linear':linear, 'special':special, 'small':small, 'medium':medium, 'big':big}
 
 
     minvoliface, mg.ifaces, mg.vols, mg.rads, mg.diams = mg.compute_sections(nvsections, rmin,
@@ -247,6 +252,7 @@ class Window(QMainWindow, Ui_MainWindow):
     linear = False
     special = False
     small = False
+    medium = False
     big =  False
     if self.ui.checkBox_linear.isChecked():
       linear = True
@@ -254,9 +260,11 @@ class Window(QMainWindow, Ui_MainWindow):
       special = True
     if self.ui.checkBox_small.isChecked():
       small = True
+    if self.ui.checkBox_medium.isChecked():
+      medium = True
     if self.ui.checkBox_big.isChecked():
       big = True
-    grid_type = {'linear':linear, 'special':special, 'small':small, 'big':big}
+    grid_type = {'linear':linear, 'special':special, 'small':small, 'medium':medium, 'big':big}
 
     self.vsections = mg.VSections(h5f, nvsections, rmin, base, power, grid_type)
 
@@ -290,16 +298,22 @@ class Window(QMainWindow, Ui_MainWindow):
     print('type', type(nqsections))
     if big:
       print('BIG')
-      nqsections = 27
+      nqsections = 30
       value2le(self.ui.lineEdit_qsecs, nqsections)
       print('type', type(nqsections), nqsections)
       self.qsections = mg.QSections(h5f, nqsections, max_positive, max_negative, grid_type)
     elif small:
       print('SMALL')
-      nqsections = 29
+      nqsections = 32
       value2le(self.ui.lineEdit_qsecs, nqsections)
       print('type', type(nqsections), nqsections)
       self.qsections = mg.QSections(h5f, nqsections, max_positive, max_negative, grid_type)
+    elif medium:
+      print('MEDIUM')
+      nqsections = 33
+      value2le(self.ui.lineEdit_qsecs, nqsections)
+      print('type', type(nqsections), nqsections)
+      self.qsections = mg.QSections(h5f, nqsections, max_positive, max_negative, grid_type)      
     else:
       self.qsections = mg.QSections(h5f, nqsections, max_positive, max_negative, grid_type)
         

@@ -89,8 +89,8 @@ int CRate::write() {
   BOOST_LOG_SEV(lg, info) << "Writing enhancement factor";
   write_efactor();
 
-  // BOOST_LOG_SEV(lg, info) << "Writing coagulation rate";
-  // write_rcoagulation();
+  BOOST_LOG_SEV(lg, info) << "Writing coagulation rate";
+  write_rcoagulation();
 
   return 0;
 }
@@ -367,9 +367,6 @@ int CRate::compute_frompairs() {
 
 int CRate::compute() {
 
-  // // bind efactorfunc
-  // bind_efactorfunc();
-
   // grid definition
   grid = {{gm.vols.nsections, gm.chrgs.nsections}};
   grid4 = {{gm.vols.nsections, gm.chrgs.nsections,
@@ -383,8 +380,6 @@ int CRate::compute() {
   rcoag.resize(grid4);
 
   BOOST_LOG_SEV(lg, info) << "Size for array efactor : " << efactor.size();
-  // BOOST_LOG_SEV(lg, info) <<"\n r size " << gm.vols.radii.size();
-  // std::cerr << "\n q size " << gm.chrgs.charges.size();
   BOOST_LOG_SEV(lg, info) << "Radii size : " << gm.vols.nsections;
   BOOST_LOG_SEV(lg, info) << "Charge size : " << gm.chrgs.nsections;
   
@@ -499,18 +494,22 @@ int CRate::compute() {
   // BOOST_LOG_SEV(lg, info) << "Electrostatic to thermal ratio: "
   //                         << electhermratio;
 
-  // // Compute beta0
-  // beta0 = pow(3.0/(4.0*M_PI), 1.0/6.0)
-  //       * sqrt(6.0*Kboltz*gm.gsys.temperature/gm.gsys.nmdensity);
+  // Compute beta0
+  beta0 = pow(3.0/(4.0*M_PI), 1.0/6.0)
+        * sqrt(6.0*Kboltz*gm.gsys.temperature/gm.gsys.nmdensity);
 
   // BOOST_LOG_SEV(lg, info) << "Computing enhancement factor grid";
   // compute_efactor_grid();
   // BOOST_LOG_SEV(lg, info) << "Done... ehancement factor grid";
 
-  // BOOST_LOG_SEV(lg, info) << "Computing coagulation rate";
-  // compute_rcoagulation();
-  // BOOST_LOG_SEV(lg, info) << "Done... coagulation rate";
-
+  start = std::chrono::system_clock::now();
+  BOOST_LOG_SEV(lg, info) << "Computing coagulation rate";
+  compute_rcoagulation();
+  BOOST_LOG_SEV(lg, info) << "Done... coagulation rate";
+  end = std::chrono::system_clock::now();
+  elapsed_seconds = end-start;
+  BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
+  
   // BOOST_LOG_SEV(lg, info) << "Computing eta creation rate";
   // compute_etafactor();
   // BOOST_LOG_SEV(lg, info) << "Done... eta";
