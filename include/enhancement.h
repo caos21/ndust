@@ -844,7 +844,7 @@ namespace enhancement {
       BOOST_LOG_SEV(lg, info)
 	<< "Computing ipa potential at contact for n pairs : "
 	<< reduced_pairs.size();
-// #pragma omp parallel for ordered// schedule(nonmonotonic:dynamic)
+#pragma omp parallel for ordered// schedule(nonmonotonic:dynamic)
       for (unsigned int i=0; i<reduced_pairs.size(); ++i) {
 
 	// id of particle pair (not repeated)
@@ -875,7 +875,7 @@ namespace enhancement {
     inline
     void compute_ipapotential_barrier() {
       BOOST_LOG_SEV(lg, info) << "Computing ipa potential barrier for n pairs : " << reduced_pairs.size();
-// #pragma omp parallel for shared(reduced_pairs) schedule(nonmonotonic:dynamic)
+#pragma omp parallel for// shared(reduced_pairs) schedule(nonmonotonic:dynamic)
       for (unsigned int i=0; i<contact_potentials.size(); ++i) {
     
 	unsigned int index = i;//contact_potentials[i].id_;
@@ -923,12 +923,12 @@ namespace enhancement {
 	    // ipa at contact
 	    double pipa_rbarrier = pipafunct(rbarrier);
 	    // the barrier has the index of the id of reduced pairs
-// #pragma omp critical
-	    // {
+#pragma omp critical
+	    {
 	      ContactPotential barrierpot(index, pipa_rbarrier);
 	      barrier_potentials.push_back(barrierpot);
 	      rbarrier_array.push_back(rbarrier);
-	    // }
+	    }
 	  }
 	  else{
 	    std::cerr << "\n ERROR Negative rbarrier " << rbarrier << '\n';
@@ -958,7 +958,7 @@ namespace enhancement {
       // std::ofstream outfile("pot1.dat");
       // outfile << "#n\tr21\tq21\tmpc\tpipa\terror_pot\terror\tmsg\n";
 
-#pragma omp parallel for schedule(nonmonotonic:dynamic)
+#pragma omp parallel for// schedule(nonmonotonic:dynamic)
       for (unsigned int i=0; i<reduced_pairs.size(); ++i) {
 
 	unsigned long id = reduced_pairs[i].id_;
@@ -1041,7 +1041,7 @@ namespace enhancement {
     inline
     void compute_mpcpotential_barrier() {
       BOOST_LOG_SEV(lg, info) << "Computing mpc potential barrier for n pairs : " << contact_potentials.size();
-#pragma omp parallel for shared(reduced_pairs) schedule(nonmonotonic:dynamic)
+#pragma omp parallel for// shared(reduced_pairs) schedule(nonmonotonic:dynamic)
       for (unsigned int i=0; i<contact_potentials.size(); ++i) {
     
 	unsigned int index = i;//contact_potentials[i].id_;
@@ -1139,6 +1139,7 @@ namespace enhancement {
       BOOST_LOG_SEV(lg, info) << "Enhancement: expanding pair potentials";
 
       // iterate in reduced_pairs
+      #pragma omp parallel for
       for (unsigned int irp=0; irp<reduced_pairs.size(); ++irp) {
 	
 	// this is the index of reduced pairs, i.e., non repeated pair
@@ -1219,7 +1220,7 @@ namespace enhancement {
       BOOST_LOG_SEV(lg, info) << "Computing Enhancement Factor";
       start = std::chrono::system_clock::now();
       
-      //#pragma omp parallel for 
+      #pragma omp parallel for 
       for (unsigned int l=0; l<rarray_size; ++l) {
 	// iterate in charges particle 1
 	for (unsigned int q=0; q<qarray_size; ++q) {
@@ -1230,10 +1231,26 @@ namespace enhancement {
 	      double phimin = cpotentials[l][q][m][p];
     	      double phimax = bpotentials[l][q][m][p];
 
+	      // checks if a barrier exists over potential_threshold
+	      // FIXME change to 0
 	      if (fabs(phimax) > potential_threshold) {
 		//double phimax = bpotentials[l][q][m][p];
 		double eta = eta_barrier(phimin, phimax);
-                //#pragma omp atomic write
+
+		// In the hybrid approach eta can be negative
+		// in the case of phimin > phimax
+		if (eta<0.0){
+		  BOOST_LOG_SEV(lg, warning) << "Negative enhancement factor";
+		  BOOST_LOG_SEV(lg, warning) << "phimin : " << phimin;
+		  BOOST_LOG_SEV(lg, warning) << "phimax : " << phimax;
+		  if(phimin > 0.0) {
+		    eta = eta_repulsive(phimin);
+		  }
+		  else {
+		    eta = eta_attractive(phimin);
+		  }		  
+		}
+		//#pragma omp atomic write
 		efactor[l][q][m][p] = eta;		
 	      }
 	      else {

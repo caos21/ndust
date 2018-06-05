@@ -50,6 +50,7 @@
 
 // #include <boost/numeric/bindings/umfpack/umfpack.hpp>
 
+#include "array.h"
 #include "constants.h"
 
 namespace tools = boost::math::tools;
