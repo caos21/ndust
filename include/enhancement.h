@@ -51,6 +51,139 @@ namespace enhancement {
   const boost::uintmax_t ROOT_MAXITER = 1000;
   const tools::eps_tolerance<double> ROOT_TOL(30);
 
+  /*!
+   * class PairElement 
+   *
+   * Represents a value for a particle pair combination (l,q)+(m,p)
+   *
+   */  
+  class PairElement {
+  public:
+    //
+    PairElement() {
+      l_ = 0;
+      q_ = 0;
+      m_ = 0;
+      p_ = 0;
+      value_ = 0.0;
+    }
+
+    PairElement(const short &l,
+		 const short &q,
+		 const short &m,
+		 const short &p,
+		 const double &value) :
+      l_(l), q_(q), m_(m), p_(p), value_(value) {
+    }
+    
+    PairElement(const PairElement &pe) {
+      assign(pe);
+    }
+
+    short l_;            //!< Index l of coalescing particle 1
+    short q_;            //!< Index q of coalescing particle 1
+    short m_;            //!< Index m of coalescing particle 2
+    short p_;            //!< Index p of coalescing particle 2
+    double value_;       //!< Value 
+
+    void assign(const PairElement &pe) {
+      l_=pe.l_;
+      q_=pe.q_;
+      m_=pe.m_;
+      p_=pe.p_;
+      value_=pe.value_;
+    }
+
+
+    friend void fill_pe(PairElement &pe,
+			const short &l,
+			const short &q,
+			const short &m,
+			const short &p,
+			const double &value);
+
+
+    friend void pairelement_tostream(const PairElement &pe,
+				     std::ostream& stream);
+
+    friend void pairelement_tostream(PairElement &pe,
+				     std::istringstream &stream);
+    
+    void print(std::ostream& stream = std::cout) {
+      pairelement_tostream(*this, stream);
+    }
+  
+  };
+
+  inline
+  void get_pe(const PairElement &pe,
+	      short &l,
+	      short &q,
+	      short &m,
+	      short &p,
+	      double &value) {
+    l=pe.l_;
+    q=pe.q_;
+    m=pe.m_;
+    p=pe.p_;
+    value=pe.value_;
+  };
+  
+  inline
+  void fill_pe(PairElement &pe,
+	       const short &l,
+	       const short &q,
+	       const short &m,
+	       const short &p,
+	       const double &value) {
+    pe.l_=l;
+    pe.q_=q;
+    pe.m_=m;
+    pe.p_=p;
+    pe.value_=value;
+  }
+
+  inline
+  void pairelement_tostream(const PairElement &pe, std::ostream& stream) {
+    stream << pe.l_ << '\t'
+	   << pe.q_ << '\t'
+	   << pe.m_ << '\t'
+	   << pe.p_ << '\t'
+	   << pe.value_ ;
+  }
+
+  inline
+  void pairelement_fromstream(PairElement &pe,
+			      std::istringstream &stream) {
+    std::string sl_;            //!< Index l of current volume section
+    std::string sq_;            //!< Index q of current charge section
+    std::string sm_;            //!< Index m of coalescing volume
+    std::string sp_;            //!< Index p of coalescing charge
+    std::string svalue_;
+
+    short l_;            //!< Index l of coalescing particle 1
+    short q_;            //!< Index q of coalescing particle 1
+    short m_;            //!< Index m of coalescing particle 2
+    short p_;            //!< Index p of coalescing particle 2
+    double value_;       //!< Value
+
+    stream >> sl_
+	   >> sq_
+	   >> sm_
+	   >> sp_
+	   >> svalue_;
+
+    l_   = boost::lexical_cast<short>(sl_);
+    q_   = boost::lexical_cast<short>(sq_);
+    m_   = boost::lexical_cast<short>(sm_);
+    p_   = boost::lexical_cast<short>(sp_);
+    value_ = std::stod(svalue_);
+
+    fill_pe(pe, l_, q_, m_, p_, value_);
+  }
+
+  //
+  
   class ParticlePair {
   public:
     //
@@ -471,19 +604,26 @@ namespace enhancement {
   
   class Enhancement {
   public:
-
-    Enhancement(const darray& rarray_, const darray& qarray_,
+    //Enhancement() {
+    //}
+    
+    Enhancement(const darray& rarray_,
+		const darray& qarray_,
 		boost_array4d_ref efactor_,
 		boost_array4d_ref cpotentials_,
 		boost_array4d_ref bpotentials_,
 		boost_array4d_ref rbarriers_,
 		double eps_,
 		src::severity_logger< severity_level > lg_) :
-      rarray(rarray_), qarray(qarray_), efactor(efactor_),
-      cpotentials(cpotentials_), bpotentials(bpotentials_),
+      rarray(rarray_),
+      qarray(qarray_),
+      efactor(efactor_),
+      cpotentials(cpotentials_),
+      bpotentials(bpotentials_),
       rbarriers(rbarriers_),
-      eps(eps_), lg(lg_) {
-
+      eps(eps_),
+      lg(lg_) {
+      
       rarray_size = static_cast<unsigned short>(rarray.size());
       qarray_size = static_cast<unsigned short>(qarray.size());
 
@@ -508,6 +648,33 @@ namespace enhancement {
       // std::cerr << '\n';
       // std::terminate();
       
+    }
+
+    Enhancement(const darray& rarray_,
+    		const darray& qarray_,
+    		double eps_,
+    		src::severity_logger< severity_level > lg_) :
+      rarray(rarray_),
+      qarray(qarray_),
+      efactor(dummy),// Hack, references must belong to an actual object
+      cpotentials(dummy),
+      bpotentials(dummy),
+      rbarriers(dummy),
+      eps(eps_),
+      lg(lg_) {
+
+      rarray_size = static_cast<unsigned short>(rarray.size());
+      qarray_size = static_cast<unsigned short>(qarray.size());
+
+      ncombs = ((rarray_size*qarray_size)*(rarray_size*qarray_size+1))/2;
+      
+      particle_pairs.reserve(ncombs);
+
+      potential_threshold = 0.0;
+
+      nmin = 25;
+      nmax = 2000;
+      nstep = 5;
     }
 
     inline
@@ -569,6 +736,12 @@ namespace enhancement {
 	std::string line;
 	unsigned int nlines = 0;
 	std::getline(ppstream, line);
+	// if a comment first line isnt found, rewind the file
+	if(line.find("#")==std::string::npos) {
+	  ppstream.clear();
+	  ppstream.seekg(0);
+	}
+	// read line by line	
 	while (std::getline(ppstream, line)) {
 	  ParticlePair pp;
 	  std::istringstream iss(line);	
@@ -590,6 +763,12 @@ namespace enhancement {
 	std::string line;
 	unsigned int nlines = 0;
 	std::getline(npstream, line);
+	// if a comment first line isnt found, rewind the file
+	if(line.find("#")==std::string::npos) {
+	  npstream.clear();
+	  npstream.seekg(0);
+	}
+	// read line by line
 	while (std::getline(npstream, line)) {
 	  ParticlePair np;
 	  std::istringstream iss(line);	
@@ -611,6 +790,12 @@ namespace enhancement {
       	std::string line;
       	unsigned int nlines = 0;
       	std::getline(rpstream, line);
+	// if a comment first line isnt found, rewind the file
+	if(line.find("#")==std::string::npos) {
+	  rpstream.clear();
+	  rpstream.seekg(0);
+	}
+	// read line by line
       	while (std::getline(rpstream, line)) {
       	  ReducedParticlePair rp;
       	  std::istringstream iss(line);	
@@ -1293,14 +1478,323 @@ namespace enhancement {
       BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
       
     }
-    //
-    darray rarray;    
+    //////////////////////
+   
+    inline
+    void compute_enhancementfactor_frompairs() {
+
+      auto start = std::chrono::system_clock::now();
+	    
+      BOOST_LOG_SEV(lg, info) << "Size for array efactor : " << efactor.size();
+            
+      BOOST_LOG_SEV(lg, info) << "Enhancement: expanding pair potentials";
+
+      // iterate in reduced_pairs
+      #pragma omp parallel for
+      for (unsigned int irp=0; irp<reduced_pairs.size(); ++irp) {
+	
+	// this is the index of reduced pairs, i.e., non repeated pair
+	unsigned int index = reduced_pairs[irp].id_;
+
+	// contact potential for this reduced pairhas the same ordering
+	// of reduced pairs
+	double contact_potential = contact_potentials[irp].potential_;
+	
+	// get repeated combinations (of particle_pairs)
+	std::vector<long> reps = reduced_pairs[irp].repetitions_;
+
+	// find if index is in barrier_potentials, i.e., if a potential
+	// barrier exists
+	ContactPotentialIterator barrier_it = std::find_if(barrier_potentials.begin(),
+							   barrier_potentials.end(),
+							   find_id(irp));
+	
+        // iterate in vector of repeated combinations
+	for(unsigned int jrep=0; jrep<reps.size(); ++jrep) {
+	  long rep_index = reps[jrep];
+	  short l = particle_pairs[rep_index].l_;
+	  short q = particle_pairs[rep_index].q_;
+	  short m = particle_pairs[rep_index].m_;
+	  short p = particle_pairs[rep_index].p_;
+
+	  double tr1 = rarray[l];//(!notswapd ? rarray[l] : rarray[m]);
+	  //std::cerr << "\nn q is " << q;
+	  double tq1 = qarray[q];//(!notswapd ? qarray[q] : qarray[p]);
+	  double potprefactor = tq1*tq1/tr1;
+	  double phimin = potprefactor*contact_potential;
+	  //std::cerr << "\n\n";
+
+	  // we have potential barrier
+	  // ** if barrier compute eta       
+	  if(barrier_it != barrier_potentials.end()) {
+	    #pragma omp critical
+	    {
+	      // potential at contact
+	      PairElement bcpe1(m, p, l, q, phimin);
+	      bcpotentials_pe.push_back(bcpe1);
+	      PairElement bcpe2(l, q, m, p, phimin);
+	      bcpotentials_pe.push_back(bcpe2);
+	      
+	      double phimax = potprefactor*(*barrier_it).potential_;
+	      PairElement bpe1(m, p, l, q, phimax);
+	      bpotentials_pe.push_back(bpe1);
+	      PairElement bpe2(l, q, m, p, phimax);
+	      bpotentials_pe.push_back(bpe2);
+	      
+	      unsigned int idr = barrier_it - barrier_potentials.begin();
+	      double rbb = rbarrier_array[idr]*tr1;	      
+	      PairElement rpe1(m, p, l, q, rbb);
+	      rbarriers_pe.push_back(rpe1);
+	      PairElement rpe2(l, q, m, p, rbb);
+	      rbarriers_pe.push_back(rpe2);
+	      }
+	  }
+	  else {//we dont have a barrier
+            #pragma omp critical
+	    {
+	      PairElement cpe1(m, p, l, q, phimin);
+	      cpotentials_pe.push_back(cpe1);
+	      PairElement cpe2(l, q, m, p, phimin);
+	      cpotentials_pe.push_back(cpe2);
+	      }
+	  }
+	  //std::cout << std::endl << l << '\t' << q << '\t' << m << '\t' << p << '\t' << efactor[l][q][m][p];
+	}
+      }
+
+      auto end = std::chrono::system_clock::now();
+      std::chrono::duration<double> elapsed_seconds = end-start;
+      BOOST_LOG_SEV(lg, info) << "Done expanding pair potentials";
+      BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
+      
+      BOOST_LOG_SEV(lg, info) << "Computing Enhancement Factor";
+      start = std::chrono::system_clock::now();
+
+      // compute enhancement factor monotonic potential
+#pragma omp parallel for// ordered
+      for (unsigned int imon=0; imon<cpotentials_pe.size(); ++imon) {
+	short l, q, m, p;
+	double phimin;
+	
+	get_pe(cpotentials_pe[imon], l, q, m, p, phimin);
+
+	if(phimin > 0.0) {  
+          #pragma omp critical
+	  {
+	    double eta = eta_repulsive(phimin);
+	    PairElement eta_e(l, q, m, p, eta);
+	    efactor_pe.push_back(eta_e);
+	  }
+	}
+	else {
+          #pragma omp critical
+	  {
+	    double eta = eta_attractive(phimin);
+	    PairElement eta_e(l, q, m, p, eta);
+	    efactor_pe.push_back(eta_e);
+	  }
+	}
+      }
+      
+      // compute enhancement factor barrier potential
+#pragma omp parallel for// ordered
+      for (unsigned int ibar=0; ibar<rbarriers_pe.size(); ++ibar) {
+	short l, q, m, p;
+	short lx, qx, mx, px;
+	double phimin, phimax; 
+
+	get_pe(bcpotentials_pe[ibar], l, q, m, p, phimin);
+	get_pe(bpotentials_pe[ibar], lx, qx, mx, px, phimax);
+
+	// checks if a barrier exists over potential_threshold
+	// FIXME change to 0
+	if (fabs(phimax) > potential_threshold) {
+	  //double phimax = bpotentials[l][q][m][p];
+	  double eta = eta_barrier(phimin, phimax);
+
+	  // In the hybrid approach eta can be negative
+	  // in the case of phimin > phimax
+	  if (eta<0.0){
+	    BOOST_LOG_SEV(lg, warning) << "Negative enhancement factor";
+	    BOOST_LOG_SEV(lg, warning) << "phimin : " << phimin;
+	    BOOST_LOG_SEV(lg, warning) << "phimax : " << phimax;
+	    if(phimin > 0.0) {
+	      eta = eta_repulsive(phimin);
+	    }
+	    else {
+	      eta = eta_attractive(phimin);
+	    }		  
+	  }
+	  //#pragma omp atomic write
+
+	  #pragma omp critical
+	  {
+	    PairElement eta_e(l, q, m, p, eta);
+	    efactor_pe.push_back(eta_e);
+	  }
+
+	}
+      }
+      
+      end = std::chrono::system_clock::now();
+      elapsed_seconds = end-start;
+      BOOST_LOG_SEV(lg, info) << "Done computing enhancement factor...";
+      BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
+      
+      BOOST_LOG_SEV(lg, info) << "Computing neutral pairs : " << neutral_pairs.size();      
+      start = std::chrono::system_clock::now();
+
+      for (unsigned int i = 0; i<neutral_pairs.size(); ++i) {
+      	short l = neutral_pairs[i].l_;
+      	short q = neutral_pairs[i].q_;
+      	short m = neutral_pairs[i].m_;
+      	short p = neutral_pairs[i].p_;
+      	PairElement eta_1(l, q, m, p, 1.0);
+      	efactor_pe.push_back(eta_1);
+      	PairElement eta_2(m, p, l, q, 1.0);
+      	efactor_pe.push_back(eta_2);	
+      }
+
+      end = std::chrono::system_clock::now();
+      elapsed_seconds = end-start;
+      BOOST_LOG_SEV(lg, info) << "Done computing neutral pairs...";
+      BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
+
+      BOOST_LOG_SEV(lg, info) << "Enhancement factor to arrays : " << efactor_pe.size();      
+      start = std::chrono::system_clock::now();
+
+      bsgrid2d = {{static_cast<long int>(efactor_pe.size()), 4}};
+      efindices.resize(bsgrid2d);
+      daefactor.resize(efactor_pe.size());
+
+      //#pragma omp parallel for ordered
+      for (unsigned int ieta=0; ieta<efactor_pe.size(); ++ieta) {
+	short l, q, m, p;
+	double eta;	
+	get_pe(efactor_pe[ieta], l, q, m, p, eta);
+	efindices[ieta][0] = l;
+	efindices[ieta][1] = q;
+	efindices[ieta][2] = m;
+	efindices[ieta][3] = p;
+	daefactor[ieta] = eta;
+	//std::cerr << "\n" << l << '\t'  << q << '\t'  << m << '\t'  << p << '\t'  << eta;
+      }
+
+      // Contact monotonic potentials
+      bsgrid2d = {{static_cast<long int>(cpotentials_pe.size()), 4}};
+      cpindices.resize(bsgrid2d);
+      dacpotentials.resize(cpotentials_pe.size());
+      
+      for (unsigned int icp=0; icp<cpotentials_pe.size(); ++icp) {
+	short l, q, m, p;
+	double cpot;	
+	get_pe(cpotentials_pe[icp], l, q, m, p, cpot);
+	cpindices[icp][0] = l;
+	cpindices[icp][1] = q;
+	cpindices[icp][2] = m;
+	cpindices[icp][3] = p;
+	dacpotentials[icp] = cpot;
+	//std::cerr << "\n" << l << '\t'  << q << '\t'  << m << '\t'  << p << '\t'  << eta;
+      }
+
+      // Barrier potentials
+      bsgrid2d = {{static_cast<long int>(rbarriers_pe.size()), 4}};
+      bpindices.resize(bsgrid2d);
+      darbarriers.resize(rbarriers_pe.size());
+      dabpotentials.resize(rbarriers_pe.size());
+      dabcpotentials.resize(rbarriers_pe.size());
+      
+      for (unsigned int ibar=0; ibar<rbarriers_pe.size(); ++ibar) {
+	short l, q, m, p;
+	double rbar;	
+	get_pe(rbarriers_pe[ibar], l, q, m, p, rbar);
+	bpindices[ibar][0] = l;
+	bpindices[ibar][1] = q;
+	bpindices[ibar][2] = m;
+	bpindices[ibar][3] = p;
+	darbarriers[ibar] = rbar;
+	dabpotentials[ibar] = bpotentials_pe[ibar].value_;
+	dabcpotentials[ibar] = bcpotentials_pe[ibar].value_;
+	//std::cerr << "\n" << l << '\t'  << q << '\t'  << m << '\t'  << p << '\t'  << eta;
+      }
+      
+      end = std::chrono::system_clock::now();
+      elapsed_seconds = end-start;
+      BOOST_LOG_SEV(lg, info) << "Done enhancement factor to arrays...";
+      BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
+    }    
+
+    inline
+    void get_efindices(darray& daefactor_, boost_short_array2d& efindices_) {
+      // get number of elements
+      long int efsize = static_cast<long int>(efindices.shape()[0]);
+
+      // resize daefactor and copy elements
+      daefactor_.resize(efsize);
+      std::copy(std::begin(daefactor), std::end(daefactor), std::begin(daefactor_));
+
+      // resize indices and copy elements
+      bsgrid2d = {{efsize, 4}};
+      efindices_.resize(bsgrid2d);
+      std::copy(efindices.begin(), efindices.end(), efindices_.begin());
+
+    }
+
+    inline
+    void get_cpindices(darray& dacpotentials_, boost_short_array2d& cpindices_) {
+      // get number of elements
+      long int cpsize = static_cast<long int>(cpindices.shape()[0]);
+
+      // resize vectors and copy elements
+      dacpotentials_.resize(cpsize);
+      std::copy(std::begin(dacpotentials), std::end(dacpotentials), std::begin(dacpotentials_));
+
+      // resize indices and copy elements
+      bsgrid2d = {{cpsize, 4}};
+      cpindices_.resize(bsgrid2d);
+      std::copy(cpindices.begin(), cpindices.end(), cpindices_.begin());
+    }
+    
+    inline
+    void get_bpindices(darray& dabcpotentials_, darray& dabpotentials_,
+		       darray& darbarriers_, boost_short_array2d& bpindices_) {
+      // get number of elements
+      long int bpsize = static_cast<long int>(bpindices.shape()[0]);
+
+      // resize vectors and copy elements
+      dabcpotentials_.resize(bpsize);
+      std::copy(std::begin(dabcpotentials), std::end(dabcpotentials), std::begin(dabcpotentials_));
+
+      dabpotentials_.resize(bpsize);
+      std::copy(std::begin(dabpotentials), std::end(dabpotentials), std::begin(dabpotentials_));
+      
+      darbarriers_.resize(bpsize);
+      std::copy(std::begin(darbarriers), std::end(darbarriers), std::begin(darbarriers_));
+
+      // resize indices and copy elements
+      bsgrid2d = {{bpsize, 4}};
+      bpindices_.resize(bsgrid2d);
+      std::copy(bpindices.begin(), bpindices.end(), bpindices_.begin());
+
+    }
+    
+    //////////////////////
+    darray rarray;
     darray qarray;
 
+    // no ref
     boost_array4d_ref efactor;
     boost_array4d_ref cpotentials;
     boost_array4d_ref bpotentials;
     boost_array4d_ref rbarriers;
+
+    boost_array4d dummy;
+    
+    darray daefactor;
+    darray dacpotentials;
+    darray dabpotentials;
+    darray dabcpotentials;
+    darray darbarriers;
     
     double eps;
 
@@ -1320,6 +1814,18 @@ namespace enhancement {
     std::vector<ContactPotential> contact_potentials;
     std::vector<ContactPotential> error_potentials;  
     std::vector<ContactPotential> barrier_potentials;
+
+    std::vector<PairElement> efactor_pe;
+    std::vector<PairElement> cpotentials_pe;  //!< contact potential no barrier
+    std::vector<PairElement> bcpotentials_pe; //!< contact potential when barrier exists
+    std::vector<PairElement> bpotentials_pe;  //!< barrier potential
+    std::vector<PairElement> rbarriers_pe;    //!< barrier location
+    
+    boost_short_array2d efindices;    //!< Array for enhancement factor indices.
+    boost_short_array2d cpindices;    //!< Array for contact potential indices.
+    boost_short_array2d bpindices;    //!< Array for rbarrier and barrier potential indices.
+
+    bshortgrid2d bsgrid2d;            //!< Grid for indices
     
     double potential_threshold;
     double temperature = 300.0;

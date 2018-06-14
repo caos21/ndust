@@ -97,8 +97,9 @@ int main(int argc, char **argv) {
   CRate crate(dirname, prefix_filename, lg);
   crate.open();
   crate.read();  
-  crate.read_pairs();  
-  crate.write();
+  crate.read_pairs();
+  crate.compute_frompairs();
+  crate.write_frompairs();
   crate.close();
 
   clock_t end_crate = std::clock();

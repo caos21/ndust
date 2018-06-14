@@ -27,6 +27,8 @@
 #include <cstdlib>
 #include <cassert>
 #include <cstring>
+#include <type_traits>
+#include <typeinfo>
 
 #include <H5Cpp.h>
 
@@ -38,6 +40,33 @@
 
 // TODO add namespace
 // TODO overloading and template specialization
+
+
+// overloading types
+inline
+void set_datatype(H5::DataType& type, double value){
+  type = H5::DataType(H5::PredType::NATIVE_DOUBLE);
+} 
+
+inline
+void set_datatype(H5::DataType& type, unsigned int value){
+  type = H5::DataType(H5::PredType::NATIVE_UINT);
+} 
+
+inline
+void set_datatype(H5::DataType& type, int value){
+  type = H5::DataType(H5::PredType::NATIVE_INT);
+} 
+
+inline
+void set_datatype(H5::DataType& type, short value){
+  type = H5::DataType(H5::PredType::NATIVE_SHORT);
+} 
+
+inline
+void set_datatype(H5::DataType& type, long int value){
+  type = H5::DataType(H5::PredType::NATIVE_LONG);
+} 
 
 
 inline
@@ -62,7 +91,11 @@ int create_group_hdf5(H5::H5File file,
         group = file.createGroup(sgroup);
       }
       catch( H5::Exception gerror2 ) {
-        gerror2.printError();
+#ifdef H5API110
+	gerror2.printErrorStack();
+#else
+	gerror2.printError();
+#endif
         std::cout << std::endl << "[ee] h5 I/O error in group "
                   << sgroup << ". Terminate.\n";
         std::terminate();
@@ -72,7 +105,11 @@ int create_group_hdf5(H5::H5File file,
   // catch failure caused by the H5File operations
   catch( H5::FileIException error )
   {
+#ifdef H5API110
+    error.printErrorStack();
+#else
     error.printError();
+#endif
     return -1;
   }
   return 0;
@@ -114,7 +151,11 @@ int write_dataset2d_hdf5(H5::H5File file,
         group = file.createGroup(sgroup);
       }
       catch( H5::Exception gerror2 ) {
-        gerror2.printError();
+#ifdef H5API110
+	gerror2.printErrorStack();
+#else
+	gerror2.printError();
+#endif
         std::cout << std::endl << "[ee] h5 I/O error in group "
                   << sgroup << ". Terminate.\n";
         std::terminate();
@@ -144,7 +185,12 @@ int write_dataset2d_hdf5(H5::H5File file,
       }
       catch( H5::Exception aerror2 )
       {
-        aerror2.printError();
+
+#ifdef H5API110
+	aerror2.printErrorStack();
+#else
+	aerror2.printError();
+#endif	
         std::cout << std::endl << "[ee] h5 I/O error in dataset "
                   << sdataset << ". Terminate.\n";
         std::terminate();
@@ -170,25 +216,41 @@ int write_dataset2d_hdf5(H5::H5File file,
    // catch failure caused by the H5File operations
    catch( H5::FileIException error )
    {
-      error.printError();
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
       return -1;
    }
    // catch failure caused by the DataSet operations
    catch( H5::DataSetIException error )
    {
-      error.printError();
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
       return -1;
    }
    // catch failure caused by the DataSpace operations
    catch( H5::DataSpaceIException error )
    {
-      error.printError();
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
       return -1;
    }
    // catch failure caused by the DataSpace operations
    catch( H5::DataTypeIException error )
    {
-      error.printError();
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
       return -1;
    }
    return 0;
@@ -256,31 +318,544 @@ int read_dataset2d_hdf5(H5::H5File file,
    // catch failure caused by the H5File operations
    catch( H5::FileIException error )
    {
-      error.printError();
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
       return -1;
    }
    // catch failure caused by the DataSet operations
    catch( H5::DataSetIException error )
    {
-      error.printError();
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
       return -1;
    }
    // catch failure caused by the DataSpace operations
    catch( H5::DataSpaceIException error )
    {
-      error.printError();
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
       return -1;
    }
    // catch failure caused by the DataSpace operations
    catch( H5::DataTypeIException error )
    {
-      error.printError();
+#ifdef H5API110
+	error.printErrorStack();
+#else
+	error.printError();
+#endif
       return -1;
    }
    return 0;
 }
 
 
+
+
+// TODO
+// overload all array types and fundamental types
+inline
+int resizeArray1D(darray& array1d,
+		  long int nrow) {
+  
+  array1d.resize(nrow);
+  
+  return 0;
+}
+
+//////// read
+template < class ArrType1D, class ArrElemType >
+int read_dset_hdf5(H5::H5File file,
+		   std::string sgroup,
+		   std::string sdataset,
+		   ArrType1D& array1d) {
+  try
+  {
+    // Turn off the auto-printing
+    H5::Exception::dontPrint();
+
+    H5::Group group = file.openGroup(sgroup);
+
+    H5::DataSet dataset = group.openDataSet(sdataset);
+
+    H5::DataType type = dataset.getDataType();
+
+    H5::DataSpace dataspace = dataset.getSpace();
+    //Get the number of dimensions in the dataspace.
+    int rank = dataspace.getSimpleExtentNdims();   
+
+    // Get the dimension size of each dimension in the dataspace
+    hsize_t dims_out[0];
+    int ndims = dataspace.getSimpleExtentDims(dims_out, NULL);
+
+    ArrElemType* varray = new ArrElemType[dims_out[0]];
+
+    resizeArray1D(array1d, dims_out[0]);
+    
+    H5::DataSpace indataspace(rank, dims_out);
+    
+    dataset.read(&varray[0], type, indataspace, dataspace);
+
+    for(unsigned int i = 0; i<dims_out[0]; ++i) {
+      array1d[i] = varray[i];
+    }
+    
+    delete [] varray;
+    // close dataspace and dataset
+    indataspace.close();
+    dataspace.close();    
+    type.close();
+    dataset.close();
+    group.close();
+   }  // end of try block
+   // catch failure caused by the H5File operations
+   catch( H5::FileIException error )
+   {
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
+      return -1;
+   }
+   // catch failure caused by the DataSet operations
+   catch( H5::DataSetIException error )
+   {
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
+      return -1;
+   }
+   // catch failure caused by the DataSpace operations
+   catch( H5::DataSpaceIException error )
+   {
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
+      return -1;
+   }
+   // catch failure caused by the DataSpace operations
+   catch( H5::DataTypeIException error )
+   {
+#ifdef H5API110
+	error.printErrorStack();
+#else
+	error.printError();
+#endif
+      return -1;
+   }
+   return 0;
+}
+
+
+
+/////////////////////////////////////
+
+
+// write 1d dataset of type ArrElemType
+template < class ArrType1D >
+int write_dset_hdf5(H5::H5File file,
+		    std::string sgroup,
+		    std::string sdataset,
+		    const ArrType1D& array1d,
+		    unsigned int nrow) {
+
+  H5::DataType datatype;
+  set_datatype(datatype, array1d[0]);
+
+  try
+  {
+    // Turn off the auto-printing
+    H5::Exception::dontPrint();
+
+    H5::Group group;
+    // attempt to open group
+    try {
+      H5::Exception::dontPrint();
+      group = file.openGroup(sgroup);
+    }
+    catch( H5::Exception gerror ) {
+//       gerror.printError();
+      // if group does not exist, create it
+      try {
+        H5::Exception::dontPrint();
+        group = file.createGroup(sgroup);
+      }
+      catch( H5::Exception gerror2 ) {
+#ifdef H5API110
+	gerror2.printErrorStack();
+#else
+	gerror2.printError();
+#endif
+        std::cout << std::endl << "[ee] h5 I/O error in group "
+                  << sgroup << ". Terminate.\n";
+        std::terminate();
+      }
+    }
+
+    H5::DataSet dataset;
+    // attempt to open group
+    try {
+      H5::Exception::dontPrint();
+      dataset = group.openDataSet(sdataset);
+    }
+    catch( H5::Exception aerror )
+    {
+      try {
+        H5::Exception::dontPrint();
+        // dataset dimensions
+        hsize_t dimsf[1];
+        dimsf[0] = nrow;
+        H5::DataSpace idset(1, dimsf);
+        dataset = group.createDataSet(sdataset, datatype, idset);
+
+        //type.close();
+        idset.close();
+      }
+      catch( H5::Exception aerror2 )
+      {
+
+#ifdef H5API110
+	aerror2.printErrorStack();
+#else
+	aerror2.printError();
+#endif	
+        std::cout << std::endl << "[ee] h5 I/O error in dataset "
+                  << sdataset << ". Terminate.\n";
+        std::terminate();
+      }
+    }
+
+    // WARNING assuming contiguous data
+    dataset.write(&array1d[0], datatype);
+
+    // WARNING FIXME dataspace and group not closed
+    datatype.close();
+    dataset.close();
+//     dataspace.close();
+   }  // end of try block
+   // catch failure caused by the H5File operations
+   catch( H5::FileIException error )
+   {
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
+      return -1;
+   }
+   // catch failure caused by the DataSet operations
+   catch( H5::DataSetIException error )
+   {
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
+      return -1;
+   }
+   // catch failure caused by the DataSpace operations
+   catch( H5::DataSpaceIException error )
+   {
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
+      return -1;
+   }
+   // catch failure caused by the DataSpace operations
+   catch( H5::DataTypeIException error )
+   {
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
+      return -1;
+   }
+   return 0;
+}
+
+
+
+
+//--
+template < class ArrType2D, class ArrElemType >
+ArrElemType* flatten_array2d(const ArrType2D& inarray2d, unsigned int nrow, unsigned int ncol) {
+  ArrElemType *varray = new ArrElemType[nrow*ncol];
+  for(unsigned int i = 0; i<nrow; ++i) {
+    for(unsigned int j = 0; j<ncol; ++j) {
+      varray[i*ncol+j] = inarray2d[i][j];
+    }
+  }
+  return varray;
+} 
+
+
+// TODO
+// overload all array types and fundamental types
+inline
+int resizeArray2D(boost_short_array2d& array2d,
+		  long int nrow,
+		  long int ncol) {
+
+  bshortgrid2d bsgrid2d = {{nrow, ncol}};
+
+  array2d.resize(bsgrid2d);
+  
+  return 0;
+}
+
+//////// read
+template < class ArrType2D, class ArrElemType >
+int read_dset2d_hdf5(H5::H5File file,
+		     std::string sgroup,
+		     std::string sdataset,
+		     ArrType2D& array2D) {
+  try
+  {
+    // Turn off the auto-printing
+    H5::Exception::dontPrint();
+
+    H5::Group group = file.openGroup(sgroup);
+
+    H5::DataSet dataset = group.openDataSet(sdataset);
+
+    H5::DataType type = dataset.getDataType();
+
+    H5::DataSpace dataspace = dataset.getSpace();
+    //Get the number of dimensions in the dataspace.
+    int rank = dataspace.getSimpleExtentNdims();   
+
+    // Get the dimension size of each dimension in the dataspace
+    hsize_t dims_out[1];    
+    int ndims = dataspace.getSimpleExtentDims(dims_out, NULL);
+
+    // use boost multi array
+    ArrElemType* varray = new ArrElemType[dims_out[0]*dims_out[1]];
+
+    resizeArray2D(array2D, dims_out[0], dims_out[1]);
+    
+    H5::DataSpace indataspace(rank, dims_out);
+    
+    dataset.read(&varray[0], type, indataspace, dataspace);
+
+    for(unsigned int i = 0; i<dims_out[0]; ++i) {
+      for(unsigned int j = 0; j<dims_out[1]; ++j) {
+        array2D[i][j] = varray[i*dims_out[1]+j];
+      }
+    }
+    
+    delete [] varray;
+    // close dataspace and dataset
+    indataspace.close();
+    dataspace.close();    
+    type.close();
+    dataset.close();
+    group.close();
+   }  // end of try block
+   // catch failure caused by the H5File operations
+   catch( H5::FileIException error )
+   {
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
+      return -1;
+   }
+   // catch failure caused by the DataSet operations
+   catch( H5::DataSetIException error )
+   {
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
+      return -1;
+   }
+   // catch failure caused by the DataSpace operations
+   catch( H5::DataSpaceIException error )
+   {
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
+      return -1;
+   }
+   // catch failure caused by the DataSpace operations
+   catch( H5::DataTypeIException error )
+   {
+#ifdef H5API110
+	error.printErrorStack();
+#else
+	error.printError();
+#endif
+      return -1;
+   }
+   return 0;
+}
+
+
+//// read 2d
+
+
+
+// write 2d dataset of type ArrElemType
+template < class ArrType2D, class ArrElemType >
+int write_dset2d_hdf5(H5::H5File file,
+		      std::string sgroup,
+		      std::string sdataset,
+		      ArrType2D array2d,
+		      unsigned int nrow,
+		      unsigned int ncol) {
+
+  H5::DataType datatype;
+  set_datatype(datatype, array2d[0][0]);
+
+  ArrElemType *varray = flatten_array2d< ArrType2D, ArrElemType >(array2d, nrow, ncol);
+
+  try
+  {
+    // Turn off the auto-printing
+    H5::Exception::dontPrint();
+
+    H5::Group group;
+    // attempt to open group
+    try {
+      H5::Exception::dontPrint();
+      group = file.openGroup(sgroup);
+    }
+    catch( H5::Exception gerror ) {
+//       gerror.printError();
+      // if group does not exist, create it
+      try {
+        H5::Exception::dontPrint();
+        group = file.createGroup(sgroup);
+      }
+      catch( H5::Exception gerror2 ) {
+#ifdef H5API110
+	gerror2.printErrorStack();
+#else
+	gerror2.printError();
+#endif
+        std::cout << std::endl << "[ee] h5 I/O error in group "
+                  << sgroup << ". Terminate.\n";
+        std::terminate();
+      }
+    }
+
+    H5::DataSet dataset;
+    // attempt to open group
+    try {
+      H5::Exception::dontPrint();
+      dataset = group.openDataSet(sdataset);
+    }
+    catch( H5::Exception aerror )
+    {
+//       aerror.printError();
+      try {
+        H5::Exception::dontPrint();
+        //H5::DataType type(H5::PredType::NATIVE_DOUBLE);
+        // dataset dimensions
+        hsize_t dimsf[2];
+        dimsf[0] = nrow;
+        dimsf[1] = ncol;
+        H5::DataSpace idset(2, dimsf);
+        dataset = group.createDataSet(sdataset, datatype, idset);
+        //type.close();
+        idset.close();
+      }
+      catch( H5::Exception aerror2 )
+      {
+
+#ifdef H5API110
+	aerror2.printErrorStack();
+#else
+	aerror2.printError();
+#endif	
+        std::cout << std::endl << "[ee] h5 I/O error in dataset "
+                  << sdataset << ". Terminate.\n";
+        std::terminate();
+      }
+    }
+//     // dataset dimensions
+//     hsize_t dimsf[2];
+//     dimsf[0] = ncol;
+//     dimsf[1] = nrow;
+//     H5::DataSpace dataspace(2, dimsf);
+
+    //H5::DataType datatype(H5::PredType::NATIVE_DOUBLE);
+
+    dataset.write(varray, datatype);
+
+    delete [] varray;
+
+    // WARNING FIXME dataspace and group not closed
+    datatype.close();
+    dataset.close();
+//     dataspace.close();
+   }  // end of try block
+   // catch failure caused by the H5File operations
+   catch( H5::FileIException error )
+   {
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
+      return -1;
+   }
+   // catch failure caused by the DataSet operations
+   catch( H5::DataSetIException error )
+   {
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
+      return -1;
+   }
+   // catch failure caused by the DataSpace operations
+   catch( H5::DataSpaceIException error )
+   {
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
+      return -1;
+   }
+   // catch failure caused by the DataSpace operations
+   catch( H5::DataTypeIException error )
+   {
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
+      return -1;
+   }
+   return 0;
+}
+
+
+/////////////////////////////////////
 
 template < class ArrType2D >
 int write2d_hdf5(ArrType2D array2D, unsigned int nrow, unsigned int ncol,
@@ -291,13 +866,19 @@ int write2d_hdf5(ArrType2D array2D, unsigned int nrow, unsigned int ncol,
 //   const char* h5filename = filename.c_str();
 //   std::cout << std::endl << "[ii] Try " << h5filename << std::endl;
 
-  double* varray = new double[nrow*ncol];
-    for(unsigned int i = 0; i<nrow; ++i) {
-//       std::cout << std::endl;
-      for(unsigned int j = 0; j<ncol; ++j) {
-          varray[i+nrow*j] = array2D[i][j];
-//           std::cout << varray[i+nrow*j] << '\t';
-      }
+  H5::DataType datatype;
+  set_datatype(datatype, array2D[0][0]);
+
+  typedef typename std::remove_all_extents<decltype(array2D)>::type arrElemType;
+  
+  // serialize
+  arrElemType* varray = new arrElemType[nrow*ncol];
+  for(unsigned int i = 0; i<nrow; ++i) {
+    //       std::cout << std::endl;
+    for(unsigned int j = 0; j<ncol; ++j) {
+      varray[i+nrow*j] = array2D[i][j];
+      //           std::cout << varray[i+nrow*j] << '\t';
+    }
   }
 //   std::cout << std::endl << nrow << '\t' << ncol << std::endl;
   try
@@ -313,18 +894,17 @@ int write2d_hdf5(ArrType2D array2D, unsigned int nrow, unsigned int ncol,
     dimsf[0] = ncol;
     dimsf[1] = nrow;
     H5::DataSpace dataspace(2, dimsf);
-
-    H5::DataType datatype(H5::PredType::NATIVE_DOUBLE);
+    
+    //H5::DataType datatype(H5::PredType::NATIVE_DOUBLE);
 
     // FIXME datasetname is the same for all h5 files
     H5::DataSet dataset = file.createDataSet(datasetname, datatype, dataspace);
 
     //std::cout << std::endl << "[ii] Dataset filename: " << datasetname << std::endl;
 
-    dataset.write(varray, H5::PredType::NATIVE_DOUBLE);
+    dataset.write(varray, datatype);
 
     delete [] varray;
-
 
     dataset.close();
     dataspace.close();
@@ -333,25 +913,41 @@ int write2d_hdf5(ArrType2D array2D, unsigned int nrow, unsigned int ncol,
    // catch failure caused by the H5File operations
    catch( H5::FileIException error )
    {
-      error.printError();
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
       return -1;
    }
    // catch failure caused by the DataSet operations
    catch( H5::DataSetIException error )
    {
-      error.printError();
+#ifdef H5API110
+	error.printErrorStack();
+#else
+	error.printError();
+#endif
       return -1;
    }
    // catch failure caused by the DataSpace operations
    catch( H5::DataSpaceIException error )
    {
-      error.printError();
+#ifdef H5API110
+	error.printErrorStack();
+#else
+	error.printError();
+#endif
       return -1;
    }
    // catch failure caused by the DataSpace operations
    catch( H5::DataTypeIException error )
    {
-      error.printError();
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
       return -1;
    }
    return 0;
@@ -388,25 +984,41 @@ inline int open_hdf5(const std::string h5filename, H5::H5File& file,
    // catch failure caused by the H5File operations
    catch( H5::FileIException error )
    {
-      error.printError();
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
       return -1;
    }
    // catch failure caused by the DataSet operations
    catch( H5::DataSetIException error )
    {
-      error.printError();
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
       return -1;
    }
    // catch failure caused by the DataSpace operations
    catch( H5::DataSpaceIException error )
    {
-      error.printError();
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
       return -1;
    }
    // catch failure caused by the DataSpace operations
    catch( H5::DataTypeIException error )
    {
-      error.printError();
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
       return -1;
    }
 #ifdef VERBOSE
@@ -430,8 +1042,12 @@ inline int close_hdf5(H5::H5File& file) {
    // catch failure caused by the H5File operations
    catch( H5::FileIException error )
    {
-      error.printError();
-      return -1;
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
+     return -1;
    }
 #ifdef VERBOSE
    std::cout << std::endl << "[ii] h5 file closed.\n";
@@ -471,25 +1087,41 @@ int livewrite_hdf5(H5::H5File& file, const ArrType array,
    // catch failure caused by the H5File operations
    catch( H5::FileIException error )
    {
-      error.printError();
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
       return -1;
    }
    // catch failure caused by the DataSet operations
    catch( H5::DataSetIException error )
    {
-      error.printError();
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
       return -1;
    }
    // catch failure caused by the DataSpace operations
    catch( H5::DataSpaceIException error )
    {
-      error.printError();
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
       return -1;
    }
    // catch failure caused by the DataSpace operations
    catch( H5::DataTypeIException error )
    {
-      error.printError();
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
       return -1;
    }
    return 0;
@@ -555,25 +1187,41 @@ int liveread_hdf5(H5::H5File& file, ArrType &outarray,
    // catch failure caused by the H5File operations
    catch( H5::FileIException error )
    {
-      error.printError();
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
       return -1;
    }
    // catch failure caused by the DataSet operations
    catch( H5::DataSetIException error )
    {
-      error.printError();
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
       return -1;
    }
    // catch failure caused by the DataSpace operations
    catch( H5::DataSpaceIException error )
    {
-      error.printError();
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
       return -1;
    }
    // catch failure caused by the DataSpace operations
    catch( H5::DataTypeIException error )
    {
-      error.printError();
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
       return -1;
    }
    return 0;
@@ -602,7 +1250,11 @@ int create_attrib_hdf5(H5::H5File& file, const std::string sgroup,
         group = file.createGroup(sgroup);
       }
       catch( H5::Exception gerror2 ) {
-        gerror2.printError();
+#ifdef H5API110
+	gerror2.printErrorStack();
+#else
+	gerror2.printError();
+#endif	
         std::cout << std::endl << "[ee] h5 I/O error in group "
                   << sgroup << ". Terminate.\n";
         std::terminate();
@@ -627,7 +1279,11 @@ int create_attrib_hdf5(H5::H5File& file, const std::string sgroup,
       }
       catch( H5::Exception aerror2 )
       {
-        aerror2.printError();
+#ifdef H5API110
+	aerror2.printErrorStack();
+#else
+	aerror2.printError();
+#endif
         std::cout << std::endl << "[ee] h5 I/O error in attribute "
                   << sattr << ". Terminate.\n";
         std::terminate();
@@ -650,36 +1306,52 @@ int create_attrib_hdf5(H5::H5File& file, const std::string sgroup,
    // catch failure caused by the H5File operations
    catch( H5::FileIException error )
    {
-      error.printError();
-      std::cout << std::endl << "[ee] h5 I/O error in file. Terminate.\n";
-      std::terminate();
-      return -1;
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
+     std::cout << std::endl << "[ee] h5 I/O error in file. Terminate.\n";
+     std::terminate();
+     return -1;
    }
    // catch failure caused by the Group operations
    catch( H5::GroupIException error )
    {
-      error.printError();
-      std::cout << std::endl << "[ee] h5 I/O error in group "
-                << sgroup << ". Terminate.\n";
-      std::terminate();
-      return -1;
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
+     std::cout << std::endl << "[ee] h5 I/O error in group "
+	       << sgroup << ". Terminate.\n";
+     std::terminate();
+     return -1;
    }
    // catch failure caused by the Attribute operations
    catch( H5::AttributeIException error )
    {
-      error.printError();
-      std::cout << std::endl << "[ee] h5 I/O error in attribute "
-                << sattr << ". Terminate.\n";
-      std::terminate();
-      return -1;
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
+     std::cout << std::endl << "[ee] h5 I/O error in attribute "
+	       << sattr << ". Terminate.\n";
+     std::terminate();
+     return -1;
    }
    // catch failure caused by the DataType operations
    catch( H5::DataTypeIException error )
    {
-      error.printError();
-      std::cout << std::endl << "[ee] h5 I/O error in group DataType. Terminate.\n";
-      std::terminate();
-      return -1;
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
+     std::cout << std::endl << "[ee] h5 I/O error in group DataType. Terminate.\n";
+     std::terminate();
+     return -1;
    }
    return 0;
 }
@@ -709,7 +1381,12 @@ int create_attrib_hdf5(H5::H5File& file, const std::string sgroup,
         group = file.createGroup(sgroup);
       }
       catch( H5::Exception gerror2 ) {
-        gerror2.printError();
+
+#ifdef H5API110
+	gerror2.printErrorStack();
+#else
+	gerror2.printError();
+#endif
         std::cout << std::endl << "[ee] h5 I/O error in group "
                   << sgroup << ". Terminate.\n";
         std::terminate();
@@ -734,7 +1411,11 @@ int create_attrib_hdf5(H5::H5File& file, const std::string sgroup,
       }
       catch( H5::Exception aerror2 )
       {
-        aerror2.printError();
+#ifdef H5API110
+	aerror2.printErrorStack();
+#else
+	aerror2.printError();
+#endif
         std::cout << std::endl << "[ee] h5 I/O error in attribute "
                   << sattr << ". Terminate.\n";
         std::terminate();
@@ -757,60 +1438,55 @@ int create_attrib_hdf5(H5::H5File& file, const std::string sgroup,
    // catch failure caused by the H5File operations
    catch( H5::FileIException error )
    {
-      error.printError();
-      std::cout << std::endl << "[ee] h5 I/O error in file. Terminate.\n";
-      std::terminate();
-      return -1;
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
+     std::cout << std::endl << "[ee] h5 I/O error in file. Terminate.\n";
+     std::terminate();
+     return -1;
    }
    // catch failure caused by the Group operations
    catch( H5::GroupIException error )
    {
-      error.printError();
-      std::cout << std::endl << "[ee] h5 I/O error in group "
-                << sgroup << ". Terminate.\n";
-      std::terminate();
-      return -1;
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
+     std::cout << std::endl << "[ee] h5 I/O error in group "
+	       << sgroup << ". Terminate.\n";
+     std::terminate();
+     return -1;
    }
    // catch failure caused by the Attribute operations
    catch( H5::AttributeIException error )
    {
-      error.printError();
-      std::cout << std::endl << "[ee] h5 I/O error in attribute "
-                << sattr << ". Terminate.\n";
-      std::terminate();
-      return -1;
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif    
+     std::cout << std::endl << "[ee] h5 I/O error in attribute "
+	       << sattr << ". Terminate.\n";
+     std::terminate();
+     return -1;
    }
    // catch failure caused by the DataType operations
    catch( H5::DataTypeIException error )
    {
-      error.printError();
-      std::cout << std::endl << "[ee] h5 I/O error in group DataType. Terminate.\n";
-      std::terminate();
-      return -1;
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
+     std::cout << std::endl << "[ee] h5 I/O error in group DataType. Terminate.\n";
+     std::terminate();
+     return -1;
    }
    return 0;
 }
-
-// overloading types
-inline
-void set_datatype(H5::DataType& type, double value){
-  type = H5::DataType(H5::PredType::NATIVE_DOUBLE);
-} 
-
-inline
-void set_datatype(H5::DataType& type, unsigned int value){
-  type = H5::DataType(H5::PredType::NATIVE_UINT);
-} 
-
-inline
-void set_datatype(H5::DataType& type, int value){
-  type = H5::DataType(H5::PredType::NATIVE_INT);
-} 
-
-inline
-void set_datatype(H5::DataType& type, long int value){
-  type = H5::DataType(H5::PredType::NATIVE_LONG);
-} 
 
 template < class Type >
 int create_dsattrib_hdf5(H5::H5File& file, const std::string sgroup,
@@ -858,38 +1534,62 @@ int create_dsattrib_hdf5(H5::H5File& file, const std::string sgroup,
    // catch failure caused by the H5File operations
    catch( H5::FileIException error )
    {
-      error.printError();
-      return -1;
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
+     return -1;
    }
    // catch failure caused by the Group operations
    catch( H5::GroupIException error )
    {
-      error.printError();
-      return -1;
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
+     return -1;
    }
    // catch failure caused by the DataSet operations
    catch( H5::DataSetIException error )
    {
-      error.printError();
-      return H5_DSET_ERR;
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
+     return H5_DSET_ERR;
    }
    // catch failure caused by the DataSpace operations
    catch( H5::DataSpaceIException error )
    {
-      error.printError();
-      return -1;
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
+     return -1;
    }
    // catch failure caused by the DataSpace operations
    catch( H5::DataTypeIException error )
    {
-      error.printError();
-      return -1;
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
+     return -1;
    }
    // catch failure caused by the DataSet operations
    catch( H5::AttributeIException error )
    {
-      error.printError();
-      return -1;
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
+     return -1;
    }
    return 0;
 }
@@ -927,37 +1627,61 @@ int read_dsattrib_hdf5(H5::H5File& file, const std::string sgroup,
    // catch failure caused by the H5File operations
    catch( H5::FileIException error )
    {
-      error.printError();
-      return -1;
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
+     return -1;
    }
    // catch failure caused by the Group operations
    catch( H5::GroupIException error )
    {
-      error.printError();
-      return -1;
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
+     return -1;
    }
    // catch failure caused by the DataSet operations
    catch( H5::DataSetIException error )
    {
-      error.printError();
-      return H5_DSET_ERR;
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
+     return H5_DSET_ERR;
    }
    // catch failure caused by the DataSpace operations
    catch( H5::DataSpaceIException error )
    {
-      error.printError();
-      return -1;
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
+     return -1;
    }
    // catch failure caused by the DataSpace operations
    catch( H5::DataTypeIException error )
    {
-      error.printError();
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
       return -1;
    }
    // catch failure caused by the DataSet operations
    catch( H5::AttributeIException error )
    {
-      error.printError();
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
       return -1;
    }
    return 0;
@@ -994,26 +1718,42 @@ int write_attrib_hdf5(H5::H5File& file, const std::string sgroup,
    // catch failure caused by the H5File operations
    catch( H5::FileIException error )
    {
-      error.printError();
-      return -1;
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
+     return -1;
    }
    // catch failure caused by the Group operations
    catch( H5::GroupIException error )
    {
-      error.printError();
-      return -1;
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
+     return -1;
    }
    // catch failure caused by the Attribute operations
    catch( H5::AttributeIException error )
    {
-      error.printError();
-      return -1;
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
+     return -1;
    }
    // catch failure caused by the DataType operations
    catch( H5::DataTypeIException error )
    {
-      error.printError();
-      return -1;
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
+     return -1;
    }
    return 0;
 }
@@ -1047,26 +1787,42 @@ int read_attrib_hdf5(H5::H5File& file, const std::string sgroup,
    // catch failure caused by the H5File operations
    catch( H5::FileIException error )
    {
-      error.printError();
-      return -1;
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
+     return -1;
    }
    // catch failure caused by the Group operations
    catch( H5::GroupIException error )
    {
-      error.printError();
-      return -1;
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
+     return -1;
    }
    // catch failure caused by the Attribute operations
    catch( H5::AttributeIException error )
    {
-      error.printError();
-      return -1;
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
+     return -1;
    }
    // catch failure caused by the DataType operations
    catch( H5::DataTypeIException error )
    {
-      error.printError();
-      return -1;
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
+     return -1;
    }
    return 0;
 }
@@ -1099,26 +1855,42 @@ int read_str_attrib_hdf5(H5::H5File& file, const std::string sgroup,
    // catch failure caused by the H5File operations
    catch( H5::FileIException error )
    {
-      error.printError();
-      return -1;
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
+     return -1;
    }
    // catch failure caused by the Group operations
    catch( H5::GroupIException error )
    {
-      error.printError();
-      return -1;
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
+     return -1;
    }
    // catch failure caused by the Attribute operations
    catch( H5::AttributeIException error )
    {
-      error.printError();
-      return -1;
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
+     return -1;
    }
    // catch failure caused by the DataType operations
    catch( H5::DataTypeIException error )
    {
-      error.printError();
-      return -1;
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
+     return -1;
    }
    return 0;
 }
@@ -1179,32 +1951,52 @@ int read_dataset_hdf5(H5::H5File& file, ArrType &outarray,
    // catch failure caused by the H5File operations
    catch( H5::FileIException error )
    {
-      error.printError();
-      return -1;
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
+     return -1;
    }
    // catch failure caused by the Group operations
    catch( H5::GroupIException error )
    {
-      error.printError();
-      return -1;
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
+     return -1;
    }
    // catch failure caused by the DataSet operations
    catch( H5::DataSetIException error )
    {
-      error.printError();
-      return H5_DSET_ERR;
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
+     return H5_DSET_ERR;
    }
    // catch failure caused by the DataSpace operations
    catch( H5::DataSpaceIException error )
    {
-      error.printError();
-      return -1;
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
+     return -1;
    }
    // catch failure caused by the DataSpace operations
    catch( H5::DataTypeIException error )
    {
-      error.printError();
-      return -1;
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
+     return -1;
    }
    return 0;
 }
@@ -1248,6 +2040,7 @@ int write_dataset_hdf5(H5::H5File& file, const ArrType &outarray,
     H5::DataSpace indataspace(1, dims_out);
 //     outarray.resize(static_cast<unsigned long>(dims_out[0]));
 //     dataset.read(&outarray[0], H5::PredType::NATIVE_DOUBLE, indataspace, dataspace);
+    
     dataset.write(&outarray[0], H5::PredType::NATIVE_DOUBLE);
 
     // close dataspace and dataset
@@ -1260,32 +2053,52 @@ int write_dataset_hdf5(H5::H5File& file, const ArrType &outarray,
    // catch failure caused by the H5File operations
    catch( H5::FileIException error )
    {
-      error.printError();
-      return -1;
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
+     return -1;
    }
    // catch failure caused by the Group operations
    catch( H5::GroupIException error )
    {
-      error.printError();
-      return -1;
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
+     return -1;
    }
    // catch failure caused by the DataSet operations
    catch( H5::DataSetIException error )
    {
-      error.printError();
-      return H5_DSET_ERR;
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
+     return H5_DSET_ERR;
    }
    // catch failure caused by the DataSpace operations
    catch( H5::DataSpaceIException error )
    {
-      error.printError();
-      return -1;
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
+     return -1;
    }
    // catch failure caused by the DataSpace operations
    catch( H5::DataTypeIException error )
    {
-      error.printError();
-      return -1;
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
+     return -1;
    }
    return 0;
 }
@@ -1314,7 +2127,12 @@ int create_dataset_hdf5(H5::H5File& file, const ArrType &outarray,
         group = file.createGroup(sgroup);
       }
       catch( H5::Exception error_creategroup ) {
-        error_creategroup.printError();
+
+#ifdef H5API110
+	error_creategroup.printErrorStack();
+#else
+	error_creategroup.printError();
+#endif	
         std::cout << std::endl << "[ee] h5 I/O error in group "
                   << sgroup << ". Terminate.\n";
         std::terminate();
@@ -1344,7 +2162,12 @@ int create_dataset_hdf5(H5::H5File& file, const ArrType &outarray,
       }
       catch( H5::Exception error_createdset )
       {
-        error_createdset.printError();
+	
+#ifdef H5API110
+	error_createdset.printErrorStack();
+#else
+	error_createdset.printError();
+#endif
         std::cout << std::endl << "[ee] h5 I/O error in dataset "
                   << dsname << ". Terminate.\n";
         std::terminate();
@@ -1363,32 +2186,52 @@ int create_dataset_hdf5(H5::H5File& file, const ArrType &outarray,
    // catch failure caused by the H5File operations
    catch( H5::FileIException error )
    {
-      error.printError();
-      return -1;
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
+     return -1;
    }
    // catch failure caused by the Group operations
    catch( H5::GroupIException error )
    {
-      error.printError();
-      return -1;
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
+     return -1;
    }
    // catch failure caused by the DataSet operations
    catch( H5::DataSetIException error )
    {
-      error.printError();
-      return H5_DSET_ERR;
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
+     return H5_DSET_ERR;
    }
    // catch failure caused by the DataSpace operations
    catch( H5::DataSpaceIException error )
    {
-      error.printError();
-      return -1;
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
+     return -1;
    }
    // catch failure caused by the DataSpace operations
    catch( H5::DataTypeIException error )
    {
-      error.printError();
-      return -1;
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
+     return -1;
    }
    return 0;
 }

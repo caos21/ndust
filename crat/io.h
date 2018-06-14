@@ -168,4 +168,20 @@ void show_help(int argc, char** argv)
 }
 
 
+inline
+void show_help_merge(int argc, char** argv)
+{
+  if(cmd_option_exists(argv, argv+argc, "-h"))
+  {
+    std::cout << std::endl << "Options:" << std::endl;
+    std::cout << '\t' << "-d Directory for input/output files" << std::endl;
+    std::cout << '\t' << "-i Input file list" << std::endl;
+    std::cout << '\t' << "-o Prefix for input/output files" << std::endl;
+    std::cout << '\t' << "-t Number of OpenMP threads" << std::endl;
+    std::cout << std::endl;
+    exit(0);
+  }
+}
+
+
 #endif // IO_H

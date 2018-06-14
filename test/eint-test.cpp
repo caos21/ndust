@@ -160,7 +160,7 @@ BOOST_AUTO_TEST_CASE( microparticles ) {
 
     for (auto ra: rtarray) {
       double pmpc = potential_prefactor * pmpcfunct(ra);
-      double pipa = potential_prefactor * pipafunct(ra);      
+      double pipa = potential_prefactor * pipafunct(ra);
       potential_mpc.push_back(pmpc);
       potential_ipa.push_back(pipa);
     }

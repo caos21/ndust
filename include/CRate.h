@@ -23,6 +23,7 @@
 #include <functional>
 #include <chrono>
 #include <ctime>
+#include <memory>
 
 // hdf5 c++ bindings
 #include <H5Cpp.h>
@@ -108,7 +109,13 @@ public:
    * Read the crat's output file in dirname
   */
   int read_results();
-  
+
+  //! Read and merge h5 file list
+  /*! 
+   * Read and merge the crat list
+  */
+  int compute_list(std::vector<std::string>);
+
   //! Start calculations
   /*! 
    * Start to compute the calculations
@@ -133,6 +140,12 @@ public:
   */
   int write();
 
+  //! write h5 datafile from pairs, serialized
+  /*! 
+   * Write on file prefix_filename.h5 in dirname
+  */
+  int write_frompairs();
+  
   //! write particle pairs to datafile
   /*! 
    * Write 
@@ -316,11 +329,23 @@ private:
   */
   void write_efactor();
 
+  //! Write enhancement factor
+  /*! 
+    Write enhancement factor
+  */
+  void write_efactor_serial();
+
   //! Write potentials
   /*! 
     Writes contact and barrier potentials
   */
   void write_potentials();
+
+  //! Write potentials
+  /*! 
+    Writes contact and barrier potentials
+  */
+  void write_potentials_serial();
   
   //! Write coagulation rate
   /*! 
@@ -336,6 +361,16 @@ private:
   boost_array4d cpotentials;          //!< Array for contact potentials.
   boost_array4d bpotentials;          //!< Array for potential barriers.
   boost_array4d rbarriers;            //!< Array for potential barriers.
+
+  boost_short_array2d efindices;    //!< Array for enhancement factor indices.
+  boost_short_array2d cpindices;    //!< Array for contact potential indices.
+  boost_short_array2d bpindices;    //!< Array for rbarrier and barrier potential indices.
+    
+  darray daefactor;
+  darray dacpotentials;
+  darray dabpotentials;
+  darray dabcpotentials;
+  darray darbarriers;
   
   /* boost_array4d_ref efactor_ref;     //!< Reference to efactor */
   boost_array4d rcoag;                //!< Coagulation rate.
@@ -357,6 +392,8 @@ private:
 
   static const unsigned int neta = 8; //!< number of eta indices.
   static const unsigned int ndeath = 6;//!< number of death indices.
+
+  std::vector<std::string> sfilelist;
 };
 
 #endif // CRATE_H

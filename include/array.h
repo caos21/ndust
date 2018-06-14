@@ -54,6 +54,10 @@ typedef boost::array<boost_array2d::index, 2> bgrid2d;
 typedef boost::array<boost_array3d::index, 3> bgrid3d;
 typedef boost::array<boost_array4d::index, 4> bgrid4d;
 
+typedef boost::multi_array<short, 2> boost_short_array2d;
+typedef boost::array<boost_short_array2d::index, 2> bshortgrid2d;
+typedef boost::multi_array_ref<short, 2> boost_shortarray2d_ref;
+
 // u integer type
 typedef boost::multi_array<unsigned int, 2> boost_uint_array2d;
 typedef boost::array<boost_uint_array2d::index, 2> buigrid2d;
