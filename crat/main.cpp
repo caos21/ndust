@@ -29,18 +29,6 @@ int main(int argc, char **argv) {
     prefix_filename.append(input_opt);
   }
 
-//   // init logger
-//   blog::init(prefix_filename);
-//    
-//   logging::add_common_attributes();
-// 
-//   src::severity_logger< severity_level > lg;
-
-//   BOOST_LOG_SEV(lg, info) << "Logging started for crat";
-//   BOOST_LOG_SEV(lg, info) << "Prefix for output files: " << prefix_filename;
-  // add hyphen
-//   prefix_filename += "-";
-
   // Check environment variable dir
   std::string dirname = get_environment_variable("NDUST_DATA");
   if(dirname.empty()) {
@@ -113,9 +101,6 @@ int main(int argc, char **argv) {
   crate.open();
   crate.read();
   crate.compute();
-  //crate.compute_frompairs();
-  //crate.write_pairs();
-  //crate.compute_sym();
   crate.write();
   crate.close();
 

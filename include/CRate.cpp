@@ -122,6 +122,10 @@ int CRate::write_frompairs() {
 
 
 int CRate::compute_list(std::vector<std::string> sfilelist_) {
+  //
+  BOOST_LOG_SEV(lg, info) << "Processing pairs files...";
+  auto start = std::chrono::system_clock::now();
+
   sfilelist = sfilelist_;
 
   BOOST_LOG_SEV(lg, info) << "Reading h5 list";
@@ -162,11 +166,7 @@ int CRate::compute_list(std::vector<std::string> sfilelist_) {
     bpotentials.resize(grid4);
     rbarriers.resize(grid4);
     rcoag.resize(grid4);
-    
-    BOOST_LOG_SEV(lg, info) << "Size for array efactor : " << efactor.size();
-    BOOST_LOG_SEV(lg, info) << "Radii size : " << gm.vols.nsections;
-    BOOST_LOG_SEV(lg, info) << "Charge size : " << gm.chrgs.nsections;
-    
+   
 
     for (unsigned int i = 0; i<efindices.shape()[0]; ++i) {
       short l = efindices[i][0];
@@ -176,15 +176,79 @@ int CRate::compute_list(std::vector<std::string> sfilelist_) {
       double etaf = daefactor[i];
       efactor[l][q][m][p] = etaf;
     }
-	
-    std::cout << "\n\n read shape 0 " << efindices.shape()[0];
-    std::cerr << "\n\n read shape 1 " << efindices.shape()[1];
-    
+    /////////
+
+    std::string cpgname = "Contact_potential_serial";
+    std::string cpidsname = "Indices";
+    boost_short_array2d cpindices;
+    read_dset2d_hdf5<boost_short_array2d, short>(h5fl, cpgname, cpidsname, cpindices);
+
+    std::string cpdsname = "contact_potential";
+    darray dacpotentials;
+    read_dset_hdf5<darray, double>(h5fl, cpgname, cpdsname, dacpotentials);
+   
+
+    for (unsigned int i = 0; i<cpindices.shape()[0]; ++i) {
+      short l = cpindices[i][0];
+      short q = cpindices[i][1];
+      short m = cpindices[i][2];
+      short p = cpindices[i][3];
+      double cpot = dacpotentials[i];
+      cpotentials[l][q][m][p] = cpot;
+    }
+    ////////
+
+    std::string bpgname = "Barrier_potential_serial";
+    std::string bpidsname = "Indices";
+    boost_short_array2d bpindices;
+    read_dset2d_hdf5<boost_short_array2d, short>(h5fl, bpgname, bpidsname, bpindices);
+
+    std::string bpdsname = "barrier_potential";
+    darray dabpotentials;
+    read_dset_hdf5<darray, double>(h5fl, bpgname, bpdsname, dabpotentials);
+
+    std::string bcpdsname = "contact_potential";
+    darray dabcpotentials;
+    read_dset_hdf5<darray, double>(h5fl, bpgname, bcpdsname, dabcpotentials);
+
+    std::string rbdsname = "rbarrier";
+    darray darbarriers;
+    read_dset_hdf5<darray, double>(h5fl, bpgname, rbdsname, darbarriers);
+
+    for (unsigned int i = 0; i<bpindices.shape()[0]; ++i) {
+      short l = bpindices[i][0];
+      short q = bpindices[i][1];
+      short m = bpindices[i][2];
+      short p = bpindices[i][3];
+      double bpot = dabpotentials[i];
+      bpotentials[l][q][m][p] = bpot;
+      double cpot = dabcpotentials[i];
+      cpotentials[l][q][m][p] = cpot;
+      double rb = darbarriers[i];
+      rbarriers[l][q][m][p] = rb;
+    }        
+
+    ///////
     err = close_hdf5(h5fl);
     BOOST_LOG_SEV(lg, info) << "Closed file Id: " << id;
     
   }
-  
+
+  auto end = std::chrono::system_clock::now();
+  std::chrono::duration<double>  elapsed_seconds = end-start;
+  BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
+
+  // Compute beta0
+  beta0 = pow(3.0/(4.0*M_PI), 1.0/6.0)
+        * sqrt(6.0*Kboltz*gm.gsys.temperature/gm.gsys.nmdensity);
+
+  start = std::chrono::system_clock::now();
+  BOOST_LOG_SEV(lg, info) << "Computing coagulation rate";
+  compute_rcoagulation();
+  BOOST_LOG_SEV(lg, info) << "Done... coagulation rate";
+  end = std::chrono::system_clock::now();
+  elapsed_seconds = end-start;
+  BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
   return 0;
 }
 
@@ -1183,14 +1247,7 @@ void CRate::write_efactor_serial() {
   write_dset_hdf5<darray>(h5obj, gname, edsname,
 			  daefactor,
 			  efindices.shape()[0]);
- 
-  // std::cout << "\n\n shape 0 " << efindices.shape()[0];
-  // std::cerr << "\n\n shape 1 " << efindices.shape()[1];
-  // write_4d(gname, efactor);
-  // int err = create_attrib_hdf5(h5obj, gname,
-  //                              "electhermratio",
-  //                              electhermratio);
-  
+   
 }
 
 void CRate::write_potentials_serial() {
@@ -1230,12 +1287,6 @@ void CRate::write_potentials_serial() {
 			  darbarriers,
 			  bpindices.shape()[0]);
 
-  // std::cout << "\n\n shape 0 " << efindices.shape()[0];
-  // std::cerr << "\n\n shape 1 " << efindices.shape()[1];
-  // write_4d(gname, efactor);
-  // int err = create_attrib_hdf5(h5obj, gname,
-  //                              "electhermratio",
-  //                              electhermratio);
   
 }
 

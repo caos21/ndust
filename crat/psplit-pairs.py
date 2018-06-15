@@ -55,15 +55,38 @@ except Exception as e:
     print(e)
     sys.exit(-1)
 
-#l = os.listdir()
-#print(l)
 
+# strip first line of reduced pairs (usually the comment)
+# to be able to shuffle it
+try:
+    pline = "sed 1d {}_rp.dat -i".format(h5prefix)
+    print(pline)
+    p1 = subprocess.Popen(pline, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    #print('Exit code ', p1.returncode)
+    outstd, errstd = p1.communicate()
+    print(outstd.decode("utf-8"))
+    print(errstd.decode("utf-8"))
+except Exception as e:
+    print(e)
+    sys.exit(-1)
 
-
+# shuffle it, to balance load consider --parallel=N
+try:
+    pline = "time sort -R -o {}_rp.dat  {}_rp.dat".format(h5prefix, h5prefix)
+    print(pline)
+    p1 = subprocess.Popen(pline, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    #print('Exit code ', p1.returncode)
+    outstd, errstd = p1.communicate()
+    print(outstd.decode("utf-8"))
+    print(errstd.decode("utf-8"))
+except Exception as e:
+    print(e)
+    sys.exit(-1)
+    
 # split reduced pairs
 suffixes = []
 try:
-    pline = "split --verbose -d -nl/{} --additional-suffix=_rp.dat {}_rp.dat {}-".format(nchunks, h5prefix, h5prefix)
+    pline = "time split --verbose -d -nl/{} --additional-suffix=_rp.dat {}_rp.dat {}-".format(nchunks, h5prefix, h5prefix)
     print(pline)
     p1 = subprocess.Popen(pline, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     #print('Exit code ', p1.returncode)
@@ -105,10 +128,10 @@ for ns in numbersplit:
         print(e)
         sys.exit(-1)
 
-# duplicate particle pairs
+# symlink particle pairs
 for ns in numbersplit:
     try:
-        pline = "cp -v {}_pp.dat {}_pp.dat".format(h5prefix, ns)
+        pline = "ln -v -s {}_pp.dat {}_pp.dat".format(h5prefix, ns)
         print(pline)
         p1 = subprocess.Popen(pline, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         #print('Exit code ', p1.returncode)

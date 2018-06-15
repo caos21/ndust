@@ -635,19 +635,7 @@ namespace enhancement {
 
       nmin = 25;
       nmax = 2000;
-      nstep = 5;
-
-      // double kt = Kboltz*temperature;
-      // std::cerr << "\n KT "<< kt;
-      // std::cerr << '\n';
-      // std::cerr << "\n pot barrier "<< exp(-0.0 / kt);
-      // double pp = 0.0;
-      // std::cerr << "\n pot barrier "<< eta_barrier(-1e-19, pp);
-      // std::cerr << '\n';
-      // std::cerr << "\n q[1] "<< qarray[1];
-      // std::cerr << '\n';
-      // std::terminate();
-      
+      nstep = 5;      
     }
 
     Enhancement(const darray& rarray_,
@@ -1363,28 +1351,7 @@ namespace enhancement {
 	  // we have potential barrier
 	  // ** if barrier compute eta       
 	  if(barrier_it != barrier_potentials.end()) {
-	    // std::cerr << "\n*********************";
-	    // std::cerr << "\n* " << (*it).id_;
-	    // 			   std::cerr << "\n* " << (*it).potential_;
-	    //
 	    double phimax = potprefactor*(*barrier_it).potential_;
-	    // std::cerr << "\n*********************" << rep_index;
-	    // std::cerr << "\n(" << l << ", " << q << ") + (" << m << ", " << p << ")";
-	    // std::cerr << "\n*******contact**********\t" << contact_potential;
-	    // std::cerr << "\n*******barrier**********\t" << (*barrier_it).potential_;  
-	    // std::cerr << "\n*******phimin**********\t" << phimin;
-	    // std::cerr << "\n*******phimax**********\t" << phimax;
-	    // double eta = eta_barrier(phimin, phimax);
-	    // std::cerr << "\n*******eta**********\t" << eta
-	    // 	      << '\t' << tr1
-	    // 	      << '\t' << tq1
-	    // 	      << '\t' << rarray[m]
-	    // 	      << '\t' << qarray[p]
-	    // 	      << '\t' << particle_pairs[rep_index].notswapd_;
-	    // #pragma omp atomic write
-	    // efactor[l][q][m][p] = eta;
-	    // #pragma omp atomic write
-	    // efactor[m][p][l][q] = eta;
 	    // update potentials
 	    bpotentials[m][p][l][q] = phimax;
 	    bpotentials[l][q][m][p] = phimax;
