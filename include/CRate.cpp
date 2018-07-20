@@ -77,11 +77,11 @@ int CRate::read_results() {
 int CRate::write() {
   hid_t id = h5obj.getId();
 
-  // BOOST_LOG_SEV(lg, info) << "Writing eta creation factor";
-  // write_etafactor();
+  BOOST_LOG_SEV(lg, info) << "Writing eta creation factor";
+  write_etafactor();
 
-  // BOOST_LOG_SEV(lg, info) << "Writing death factor";
-  // write_deathfactor();
+  BOOST_LOG_SEV(lg, info) << "Writing death factor";
+  write_deathfactor();
 
   BOOST_LOG_SEV(lg, info) << "Writing potentials";
   write_potentials();
@@ -98,14 +98,14 @@ int CRate::write() {
 int CRate::write_frompairs() {
   hid_t id = h5obj.getId();
 
-  // BOOST_LOG_SEV(lg, info) << "Writing eta creation factor";
-  // write_etafactor();
+  BOOST_LOG_SEV(lg, info) << "Writing eta creation factor";
+  write_etafactor();
 
-  // BOOST_LOG_SEV(lg, info) << "Writing death factor";
-  // write_deathfactor();
+  BOOST_LOG_SEV(lg, info) << "Writing death factor";
+  write_deathfactor();
 
-  // BOOST_LOG_SEV(lg, info) << "Writing potentials";
-  // write_potentials();
+  BOOST_LOG_SEV(lg, info) << "Writing potentials";
+  write_potentials();
   
   BOOST_LOG_SEV(lg, info) << "Writing enhancement factor!!";
   write_efactor_serial();
@@ -475,30 +475,31 @@ int CRate::compute_frompairs() {
   //  std::cout << '\n' << daefactor[ii];
   //}
   
-  // // Compute beta0
-  // beta0 = pow(3.0/(4.0*M_PI), 1.0/6.0)
-  //       * sqrt(6.0*Kboltz*gm.gsys.temperature/gm.gsys.nmdensity);
+  // Compute beta0
+  beta0 = pow(3.0/(4.0*M_PI), 1.0/6.0)
+        * sqrt(6.0*Kboltz*gm.gsys.temperature/gm.gsys.nmdensity);
 
   // // BOOST_LOG_SEV(lg, info) << "Computing enhancement factor grid";
   // // compute_efactor_grid();
   // // BOOST_LOG_SEV(lg, info) << "Done... ehancement factor grid";
 
-  // start = std::chrono::system_clock::now();
-  // BOOST_LOG_SEV(lg, info) << "Computing coagulation rate";
-  // compute_rcoagulation();
-  // BOOST_LOG_SEV(lg, info) << "Done... coagulation rate";
-  // end = std::chrono::system_clock::now();
-  // elapsed_seconds = end-start;
-  // BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
+  // for a large grid 100x300 comment lines below
+  start = std::chrono::system_clock::now();
+  BOOST_LOG_SEV(lg, info) << "Computing coagulation rate";
+  compute_rcoagulation();
+  BOOST_LOG_SEV(lg, info) << "Done... coagulation rate";
+  end = std::chrono::system_clock::now();
+  elapsed_seconds = end-start;
+  BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
   
 
-  // // BOOST_LOG_SEV(lg, info) << "Computing eta creation rate";
-  // // compute_etafactor();
-  // // BOOST_LOG_SEV(lg, info) << "Done... eta";
+  BOOST_LOG_SEV(lg, info) << "Computing eta creation rate";
+  compute_etafactor();
+  BOOST_LOG_SEV(lg, info) << "Done... eta";
 
-  // // BOOST_LOG_SEV(lg, info) << "Computing death rate";
-  // // compute_deathfactor();
-  // // BOOST_LOG_SEV(lg, info) << "Done... death";
+  BOOST_LOG_SEV(lg, info) << "Computing death rate";
+  compute_deathfactor();
+  BOOST_LOG_SEV(lg, info) << "Done... death";
 
   return 0;
 }
@@ -635,9 +636,9 @@ int CRate::compute() {
   beta0 = pow(3.0/(4.0*M_PI), 1.0/6.0)
         * sqrt(6.0*Kboltz*gm.gsys.temperature/gm.gsys.nmdensity);
 
-  // BOOST_LOG_SEV(lg, info) << "Computing enhancement factor grid";
-  // compute_efactor_grid();
-  // BOOST_LOG_SEV(lg, info) << "Done... ehancement factor grid";
+  //BOOST_LOG_SEV(lg, info) << "Computing enhancement factor grid";
+  //compute_efactor_grid();
+  //BOOST_LOG_SEV(lg, info) << "Done... ehancement factor grid";
 
   start = std::chrono::system_clock::now();
   BOOST_LOG_SEV(lg, info) << "Computing coagulation rate";
@@ -647,13 +648,13 @@ int CRate::compute() {
   elapsed_seconds = end-start;
   BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
   
-  // BOOST_LOG_SEV(lg, info) << "Computing eta creation rate";
-  // compute_etafactor();
-  // BOOST_LOG_SEV(lg, info) << "Done... eta";
+  BOOST_LOG_SEV(lg, info) << "Computing eta creation rate";
+  compute_etafactor();
+  BOOST_LOG_SEV(lg, info) << "Done... eta";
 
-  // BOOST_LOG_SEV(lg, info) << "Computing death rate";
-  // compute_deathfactor();
-  // BOOST_LOG_SEV(lg, info) << "Done... death";
+  BOOST_LOG_SEV(lg, info) << "Computing death rate";
+  compute_deathfactor();
+  BOOST_LOG_SEV(lg, info) << "Done... death";
 
   return 0;
 }
