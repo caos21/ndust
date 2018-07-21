@@ -18,6 +18,11 @@
 #ifndef ETA_H
 #define ETA_H
 
+#include <boost/lexical_cast.hpp>
+#include <boost/algorithm/string.hpp>
+
+#include <H5Cpp.h>
+
 #include <sstream>
 #include <fstream>
 //! Eta factor
@@ -32,22 +37,22 @@ public:
     fill_eta(*this, 0, 0, 0, 0, 0, 0, 0, 0.0);
   }
   unsigned int id_;           //!< Identifier
-  unsigned int l_;            //!< Index l of current volume section
-  unsigned int q_;            //!< Index q of current charge section
-  unsigned int m_;            //!< Index m of coalescing volume
-  unsigned int p_;            //!< Index p of coalescing charge
-  unsigned int n_;            //!< Index n of coalescing volume
-  unsigned int r_;            //!< Index r of coalescing volume
+  short l_;            //!< Index l of current volume section
+  short q_;            //!< Index q of current charge section
+  short m_;            //!< Index m of coalescing volume
+  short p_;            //!< Index p of coalescing charge
+  short n_;            //!< Index n of coalescing volume
+  short r_;            //!< Index r of coalescing volume
   double eta_;                //!< Value for \f$\eta_{mp,nr}(v_l, Q_q)\f$
 
   friend void fill_eta(EtaCreationFactor &ecf,
                        const unsigned int id,
-                       const unsigned int l,
-                       const unsigned int q,
-                       const unsigned int m,
-                       const unsigned int p,
-                       const unsigned int n,
-                       const unsigned int r,
+                       const short l,
+                       const short q,
+                       const short m,
+                       const short p,
+                       const short n,
+                       const short r,
                        const double eta);
 
   friend void etafactor_tostream(const EtaCreationFactor &ecf,
@@ -59,12 +64,12 @@ public:
 
 inline void fill_eta(EtaCreationFactor &ecf,
                      const unsigned int id,
-                     const unsigned int l,
-                     const unsigned int q,
-                     const unsigned int m,
-                     const unsigned int p,
-                     const unsigned int n,
-                     const unsigned int r,
+                     const short l,
+                     const short q,
+                     const short m,
+                     const short p,
+                     const short n,
+                     const short r,
                      const double eta) {
   ecf.id_=id;
   ecf.l_=l;
@@ -88,6 +93,133 @@ void etafactor_tostream(const EtaCreationFactor &ecf, std::fstream& etafactor_fi
                  << ecf.eta_;
 }
 
+inline
+int etafactorvector_toh5file(const std::vector<EtaCreationFactor> efvec,
+			     H5::H5File file,
+			     std::string sgroup = "Electrostatic_interaction",
+			     std::string sdataset = "eta_factor_vector") {
+
+  try
+    {    
+      // Turn off the auto-printing
+      H5::Exception::dontPrint();      
+      
+      hsize_t dim[] = {efvec.size()};
+      H5::DataSpace dspace(1, dim);
+      
+      H5::CompType etatype(sizeof(EtaCreationFactor));
+      
+      etatype.insertMember("Id", HOFFSET(EtaCreationFactor, id_), H5::PredType::NATIVE_UINT);
+      etatype.insertMember("l", HOFFSET(EtaCreationFactor, l_), H5::PredType::NATIVE_SHORT);
+      etatype.insertMember("q", HOFFSET(EtaCreationFactor, q_), H5::PredType::NATIVE_SHORT);
+      etatype.insertMember("m", HOFFSET(EtaCreationFactor, m_), H5::PredType::NATIVE_SHORT);
+      etatype.insertMember("p", HOFFSET(EtaCreationFactor, p_), H5::PredType::NATIVE_SHORT);
+      etatype.insertMember("n", HOFFSET(EtaCreationFactor, n_), H5::PredType::NATIVE_SHORT);
+      etatype.insertMember("r", HOFFSET(EtaCreationFactor, r_), H5::PredType::NATIVE_SHORT);
+      etatype.insertMember("eta", HOFFSET(EtaCreationFactor, eta_), H5::PredType::NATIVE_DOUBLE);
+
+
+      H5::Group group;
+      // attempt to open group
+      try
+	{
+	  H5::Exception::dontPrint();
+	  group = file.openGroup(sgroup);
+	}
+      catch( H5::Exception gerror ) {
+	// if group does not exist, create it
+	try
+	  {
+	    H5::Exception::dontPrint();
+	    group = file.createGroup(sgroup);
+	  }
+	catch( H5::Exception gerror2 ) {
+#ifdef H5API110
+	  gerror2.printErrorStack();
+#else
+	  gerror2.printError();
+#endif
+	  std::cout << std::endl << "[ee] h5 I/O error in group "
+		    << sgroup << ". Terminate.\n";
+	  std::terminate();
+	}
+      }
+      
+      H5::DataSet dataset;
+      // attempt to open dataset
+      try
+	{
+	  H5::Exception::dontPrint();
+	  dataset = group.openDataSet(sdataset);
+	}
+      catch( H5::Exception aerror )
+	{
+	  // create dataset if not exists
+	  try
+	    {
+	      dataset = group.createDataSet(sdataset, etatype, dspace);
+	      dspace.close();
+	    }
+	  catch( H5::Exception aerror2 )
+	    {	      
+#ifdef H5API110
+	      aerror2.printErrorStack();
+#else
+	      aerror2.printError();
+#endif	
+	      std::cout << std::endl << "[ee] h5 I/O error in dataset "
+			<< sdataset << ". Terminate.\n";
+	      std::terminate();
+	    }
+	}      
+      
+      // Write data to the dataset, pass plain array
+      dataset.write(&efvec[0], etatype);
+      
+      dataset.close();      
+    }// end try block
+  // catch failure caused by the H5File operations
+  catch( H5::FileIException error )
+    {
+#ifdef H5API110
+      error.printErrorStack();
+#else
+      error.printError();
+#endif
+      return -1;
+    }
+   // catch failure caused by the DataSet operations
+  catch( H5::DataSetIException error )
+   {
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
+     return -1;
+   }
+  // catch failure caused by the DataSpace operations
+  catch( H5::DataSpaceIException error )
+    {
+#ifdef H5API110
+      error.printErrorStack();
+#else
+      error.printError();
+#endif
+      return -1;
+   }
+  // catch failure caused by the DataSpace operations
+  catch( H5::DataTypeIException error )
+    {
+#ifdef H5API110
+      error.printErrorStack();
+#else
+      error.printError();
+#endif
+      return -1;
+    }
+  return 0;  
+}
 
 inline
 void etafactor_fromstream(EtaCreationFactor &ecf, std::istringstream &ss) {
@@ -101,12 +233,12 @@ void etafactor_fromstream(EtaCreationFactor &ecf, std::istringstream &ss) {
   std::string seta_;                //!< Value for \f$\eta_{mp,nr}(v_l, Q_q)\f$
   
   unsigned int id_;           //!< Identifier
-  unsigned int l_;            //!< Index l of current volume section
-  unsigned int q_;            //!< Index q of current charge section
-  unsigned int m_;            //!< Index m of coalescing volume
-  unsigned int p_;            //!< Index p of coalescing charge
-  unsigned int n_;            //!< Index n of coalescing volume
-  unsigned int r_;            //!< Index r of coalescing volume
+  short l_;            //!< Index l of current volume section
+  short q_;            //!< Index q of current charge section
+  short m_;            //!< Index m of coalescing volume
+  short p_;            //!< Index p of coalescing charge
+  short n_;            //!< Index n of coalescing volume
+  short r_;            //!< Index r of coalescing volume
   double eta_;                //!< Value for \f$\eta_{mp,nr}(v_l, Q_q)\f$
 
   ss >> sid_
@@ -118,13 +250,13 @@ void etafactor_fromstream(EtaCreationFactor &ecf, std::istringstream &ss) {
      >> sr_
      >> seta_;
 
-  id_  = std::stoul(sid_ );
-  l_   = std::stoul(sl_  );
-  q_   = std::stoul(sq_  );
-  m_   = std::stoul(sm_  );
-  p_   = std::stoul(sp_  );
-  n_   = std::stoul(sn_  );
-  r_   = std::stoul(sr_  );
+  id_  = boost::lexical_cast<unsigned int>(sid_ );
+  l_   = boost::lexical_cast<short>(sl_  );
+  q_   = boost::lexical_cast<short>(sq_  );
+  m_   = boost::lexical_cast<short>(sm_  );
+  p_   = boost::lexical_cast<short>(sp_  );
+  n_   = boost::lexical_cast<short>(sn_  );
+  r_   = boost::lexical_cast<short>(sr_  );
   eta_ = std::stod(seta_);
 
   fill_eta(ecf, id_, l_, q_, m_, p_, n_, r_, eta_);
@@ -140,18 +272,18 @@ public:
   }
 
   unsigned int id_;           //!< Identifier
-  unsigned int l_;            //!< Index l of current volume section
-  unsigned int q_;            //!< Index q of current charge section
-  unsigned int m_;            //!< Index m of coalescing volume
-  unsigned int p_;            //!< Index p of coalescing charge
+  short l_;            //!< Index l of current volume section
+  short q_;            //!< Index q of current charge section
+  short m_;            //!< Index m of coalescing volume
+  short p_;            //!< Index p of coalescing charge
   double death_;              //!< Value for death term
 
   friend void fill_death(DeathFactor &dth,
                        unsigned int id,
-                       unsigned int l,
-                       unsigned int q,
-                       unsigned int m,
-                       unsigned int p,
+                       short l,
+                       short q,
+                       short m,
+                       short p,
                        double death);
 
   friend void deathfactor_tostream(const DeathFactor &dth,
@@ -164,10 +296,10 @@ public:
 inline
 void fill_death(DeathFactor &dth,
                 unsigned int id,
-                unsigned int l,
-                unsigned int q,
-                unsigned int m,
-                unsigned int p,
+                short l,
+                short q,
+                short m,
+                short p,
                 double death) {
   dth.id_=id;
   dth.l_=l;
@@ -197,10 +329,10 @@ void deathfactor_fromstream(DeathFactor &df, std::istringstream &ss) {
   std::string sdeath_;        //!< Value for death term
   
   unsigned int id_;           //!< Identifier
-  unsigned int l_;            //!< Index l of current volume section
-  unsigned int q_;            //!< Index q of current charge section
-  unsigned int m_;            //!< Index m of coalescing volume
-  unsigned int p_;            //!< Index p of coalescing charge
+  short l_;            //!< Index l of current volume section
+  short q_;            //!< Index q of current charge section
+  short m_;            //!< Index m of coalescing volume
+  short p_;            //!< Index p of coalescing charge
   double death_;              //!< Value for \f$\eta_{mp,nr}(v_l, Q_q)\f$
 
   ss >> sid_
@@ -210,13 +342,139 @@ void deathfactor_fromstream(DeathFactor &df, std::istringstream &ss) {
      >> sp_
      >> sdeath_;
 
-  id_  = std::stoul(sid_ );
-  l_   = std::stoul(sl_  );
-  q_   = std::stoul(sq_  );
-  m_   = std::stoul(sm_  );
-  p_   = std::stoul(sp_  );
+  id_  = boost::lexical_cast<unsigned int>(sid_ );
+  l_   = boost::lexical_cast<short>(sl_  );
+  q_   = boost::lexical_cast<short>(sq_  );
+  m_   = boost::lexical_cast<short>(sm_  );
+  p_   = boost::lexical_cast<short>(sp_  );
   death_ = std::stod(sdeath_);
 
   fill_death(df, id_, l_, q_, m_, p_, death_);
+}
+
+
+inline
+int deathfactorvector_toh5file(const std::vector<DeathFactor> dfvec,
+			     H5::H5File file,
+			     std::string sgroup = "Electrostatic_interaction",
+			     std::string sdataset = "death_factor_vector") {
+
+  try
+    {    
+      // Turn off the auto-printing
+      H5::Exception::dontPrint();      
+      
+      hsize_t dim[] = {dfvec.size()};
+      H5::DataSpace dspace(1, dim);
+      
+      H5::CompType etatype(sizeof(DeathFactor));
+      
+      etatype.insertMember("Id", HOFFSET(DeathFactor, id_), H5::PredType::NATIVE_UINT);
+      etatype.insertMember("l", HOFFSET(DeathFactor, l_), H5::PredType::NATIVE_SHORT);
+      etatype.insertMember("q", HOFFSET(DeathFactor, q_), H5::PredType::NATIVE_SHORT);
+      etatype.insertMember("m", HOFFSET(DeathFactor, m_), H5::PredType::NATIVE_SHORT);
+      etatype.insertMember("p", HOFFSET(DeathFactor, p_), H5::PredType::NATIVE_SHORT);
+      etatype.insertMember("death", HOFFSET(DeathFactor, death_), H5::PredType::NATIVE_DOUBLE);
+
+      H5::Group group;
+      // attempt to open group
+      try
+	{
+	  H5::Exception::dontPrint();
+	  group = file.openGroup(sgroup);
+	}
+      catch( H5::Exception gerror ) {
+	// if group does not exist, create it
+	try
+	  {
+	    H5::Exception::dontPrint();
+	    group = file.createGroup(sgroup);
+	  }
+	catch( H5::Exception gerror2 ) {
+#ifdef H5API110
+	  gerror2.printErrorStack();
+#else
+	  gerror2.printError();
+#endif
+	  std::cout << std::endl << "[ee] h5 I/O error in group "
+		    << sgroup << ". Terminate.\n";
+	  std::terminate();
+	}
+      }
+      
+      H5::DataSet dataset;
+      // attempt to open dataset
+      try
+	{
+	  H5::Exception::dontPrint();
+	  dataset = group.openDataSet(sdataset);
+	}
+      catch( H5::Exception aerror )
+	{
+	  // create dataset if not exists
+	  try
+	    {
+	      dataset = group.createDataSet(sdataset, etatype, dspace);
+	      dspace.close();
+	    }
+	  catch( H5::Exception aerror2 )
+	    {	      
+#ifdef H5API110
+	      aerror2.printErrorStack();
+#else
+	      aerror2.printError();
+#endif	
+	      std::cout << std::endl << "[ee] h5 I/O error in dataset "
+			<< sdataset << ". Terminate.\n";
+	      std::terminate();
+	    }
+	}      
+      
+      // Write data to the dataset, pass plain array
+      dataset.write(&dfvec[0], etatype);
+      
+      dataset.close();      
+    }// end try block
+  // catch failure caused by the H5File operations
+  catch( H5::FileIException error )
+    {
+#ifdef H5API110
+      error.printErrorStack();
+#else
+      error.printError();
+#endif
+      return -1;
+    }
+   // catch failure caused by the DataSet operations
+  catch( H5::DataSetIException error )
+   {
+#ifdef H5API110
+     error.printErrorStack();
+#else
+     error.printError();
+#endif
+     return -1;
+   }
+  // catch failure caused by the DataSpace operations
+  catch( H5::DataSpaceIException error )
+    {
+#ifdef H5API110
+      error.printErrorStack();
+#else
+      error.printError();
+#endif
+      return -1;
+   }
+  // catch failure caused by the DataSpace operations
+  catch( H5::DataTypeIException error )
+    {
+#ifdef H5API110
+      error.printErrorStack();
+#else
+      error.printError();
+#endif
+      return -1;
+    }
+  return 0;  
 }
 #endif

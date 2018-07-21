@@ -68,8 +68,8 @@ int CRate::read_results() {
   BOOST_LOG_SEV(lg, info) << "Reading eta creation factor";
   read_etafactor();
 
-  BOOST_LOG_SEV(lg, info) << "Reading death factor";
-  read_deathfactor();
+  //BOOST_LOG_SEV(lg, info) << "Reading death factor";
+  //read_deathfactor();
 
   return 0;
 }
@@ -996,40 +996,45 @@ void CRate::compute_deathfactor()
 void CRate::write_etafactor() {
   
   long int etasize = static_cast<long int>(eta_factor_vector.size());
-  bgrid2d etagrid = {{etasize, neta}};
+  // bgrid2d etagrid = {{etasize, neta}};
  
-  eta2d.resize(etagrid);
+  // eta2d.resize(etagrid);
   
-  unsigned int row=0;
-  for(auto ecf : eta_factor_vector) {
-      eta2d[row][0] = ecf.id_;
-      eta2d[row][1] = ecf.l_;
-      eta2d[row][2] = ecf.q_;
-      eta2d[row][3] = ecf.m_;
-      eta2d[row][4] = ecf.p_;
-      eta2d[row][5] = ecf.n_;
-      eta2d[row][6] = ecf.r_;
-      eta2d[row][7] = ecf.eta_;
-      ++row;
-  }
+  // unsigned int row=0;
+  // for(auto ecf : eta_factor_vector) {
+  //   eta2d[row][0] = boost::lexical_cast<double>(ecf.id_);
+  //   eta2d[row][1] = boost::lexical_cast<double>(ecf.l_);
+  //   eta2d[row][2] = boost::lexical_cast<double>(ecf.q_);
+  //   eta2d[row][3] = boost::lexical_cast<double>(ecf.m_);
+  //   eta2d[row][4] = boost::lexical_cast<double>(ecf.p_);
+  //   eta2d[row][5] = boost::lexical_cast<double>(ecf.n_);
+  //   eta2d[row][6] = boost::lexical_cast<double>(ecf.r_);
+  //   eta2d[row][7] = ecf.eta_;
+  //   ++row;
+  // }
   
   int err;
   
   std::string gname = "Electrostatic_interaction";
   std::string dsname = "eta_factor_vector";
+
   
-  err = write_dataset2d_hdf5(h5obj,
-                             gname,
-                             dsname,
-                             eta2d,
-                             etasize,
-                             neta);
+
+  // write_dset2d_hdf5<boost_array2d, double>(h5obj, gname, dsname,
+  // 					   eta2d,
+  // 					   eta2d.shape()[0],
+  // 					   eta2d.shape()[1]);
+    
+
+  etafactorvector_toh5file(eta_factor_vector, h5obj, gname, dsname);
 
   err = create_dsattrib_hdf5<long int>(h5obj,
                                        gname,
                                        dsname,
                                        "size",
                                        etasize);
+  
+
 }
 
 // Write creation eta to file
@@ -1048,17 +1053,31 @@ void CRate::read_etafactor() {
                                      "size",
                                      etasize);
 
+
+  BOOST_LOG_SEV(lg, info)<< "eta size: " << etasize;
+  
+  
   bgrid2d etagrid = {{etasize, neta}};
   eta2d.resize(etagrid);
-  
+
+  /*
   err = read_dataset2d_hdf5(h5obj,
                             gname,
                             dsname,
                             eta2d,
                             etasize,
                             neta);
-  
-
+  */
+  /*err = read_dataset2d_hdf5(h5obj,
+                            gname,
+                            dsname,
+                            eta2d,
+                            neta,
+			    etasize);
+  */
+  err = read_dset2d_hdf5<boost_array2d, double>(h5obj, gname, dsname, eta2d);
+  BOOST_LOG_SEV(lg, info)<< "eta size: " << etasize;
+ 
   // flatten
   eta_factor_vector.clear();  
   for (unsigned int i = 0; i < etasize; ++i) {
@@ -1089,34 +1108,36 @@ void CRate::read_etafactor() {
 void CRate::write_deathfactor() {
  
   long int deathsize = static_cast<long int>(death_factor_vector.size());
-  bgrid2d deathgrid = {{deathsize, ndeath}};
-//   boost_array2d death2d(deathgrid);
+//   bgrid2d deathgrid = {{deathsize, ndeath}};
+// //   boost_array2d death2d(deathgrid);
   
-  death2d.resize(deathgrid);
+//   death2d.resize(deathgrid);
   
-  unsigned int row=0;
-  for(auto ecf : death_factor_vector) {
-      death2d[row][0] = ecf.id_;
-      death2d[row][1] = ecf.l_;
-      death2d[row][2] = ecf.q_;
-      death2d[row][3] = ecf.m_;
-      death2d[row][4] = ecf.p_;
-      death2d[row][5] = ecf.death_;
-      ++row;
-  }
+//   unsigned int row=0;
+//   for(auto ecf : death_factor_vector) {
+//       death2d[row][0] = ecf.id_;
+//       death2d[row][1] = ecf.l_;
+//       death2d[row][2] = ecf.q_;
+//       death2d[row][3] = ecf.m_;
+//       death2d[row][4] = ecf.p_;
+//       death2d[row][5] = ecf.death_;
+//       ++row;
+//   }
   
   int err;
   
   std::string gname = "Electrostatic_interaction";
   std::string dsname = "death_factor_vector";
   
-  err = write_dataset2d_hdf5(h5obj,
-                             gname,
-                             dsname,
-                             death2d,
-                             deathsize,
-                             ndeath);
+  // err = write_dataset2d_hdf5(h5obj,
+  //                            gname,
+  //                            dsname,
+  //                            death2d,
+  //                            deathsize,
+  //                            ndeath);
 
+  deathfactorvector_toh5file(death_factor_vector, h5obj, gname, dsname);
+  
   err = create_dsattrib_hdf5<long int>(h5obj,
                                        gname,
                                        dsname,

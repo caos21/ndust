@@ -84,6 +84,8 @@ int NEvo::close() {
   moments_file->close();
   delete(moments_file);
   BOOST_LOG_SEV(lg, info) << "Closed file moments";
+
+  return 0;
 }
 
 int NEvo::read() {
@@ -315,6 +317,7 @@ int NEvo::compute_nanoparticle_potential() {
                  *(1.0/cr.gm.vols.radii[l]);
     }
   }
+  return 0;
 }
 
 int NEvo::compute_collisionfreq() {
@@ -451,6 +454,7 @@ int NEvo::compute_collisionfreq() {
   BOOST_LOG_SEV(lg, info) << "Min tunnel collision frequency "
             << min_tfreq;
 
+  return 0;
 }
 
 int NEvo::write_collisionfreq() {
@@ -531,6 +535,7 @@ int NEvo::write_moments(double ctime) {
     BOOST_LOG_SEV(lg, fatal) << "\nParticle number is not finite. Terminate.\n";
 //     std::terminate();
   }
+  return 0;
 }
 
 int NEvo::compute_explicit_charging(double dt) {
@@ -653,6 +658,8 @@ int NEvo::write_partial_results(double ctime) {
 
   compute_moments(ndens);
   write_moments(ctime);
+
+  return 0;
 }
 
 int NEvo::evolve_one_step(double ctime) {
@@ -898,5 +905,7 @@ int NEvo::compute_coagulation() {
       birth_vector[l][q]=0.0; death_vector[l][q]=0.0;
     }
   }
+  
+  return 0;
 }
 

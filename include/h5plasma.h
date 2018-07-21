@@ -620,6 +620,18 @@ int resizeArray2D(boost_short_array2d& array2d,
   return 0;
 }
 
+inline
+int resizeArray2D(boost_array2d& array2d,
+		  long int nrow,
+		  long int ncol) {
+
+  bgrid2d grid2d = {{nrow, ncol}};
+
+  array2d.resize(grid2d);
+  
+  return 0;
+}
+
 //////// read
 template < class ArrType2D, class ArrElemType >
 int read_dset2d_hdf5(H5::H5File file,
