@@ -93,111 +93,105 @@ void etafactor_tostream(const EtaCreationFactor &ecf, std::fstream& etafactor_fi
                  << ecf.eta_;
 }
 
+// write vector of etafactor to h5 object file
 inline
 int etafactorvector_toh5file(const std::vector<EtaCreationFactor> efvec,
 			     H5::H5File file,
 			     std::string sgroup = "Electrostatic_interaction",
 			     std::string sdataset = "eta_factor_vector") {
 
-  try
-    {    
-      // Turn off the auto-printing
-      H5::Exception::dontPrint();      
+  try {    
+    // Turn off the auto-printing
+    H5::Exception::dontPrint();      
       
-      hsize_t dim[] = {efvec.size()};
-      H5::DataSpace dspace(1, dim);
+    hsize_t dim[] = {efvec.size()};
+    H5::DataSpace dspace(1, dim);
       
-      H5::CompType etatype(sizeof(EtaCreationFactor));
+    H5::CompType etatype(sizeof(EtaCreationFactor));
       
-      etatype.insertMember("Id", HOFFSET(EtaCreationFactor, id_), H5::PredType::NATIVE_UINT);
-      etatype.insertMember("l", HOFFSET(EtaCreationFactor, l_), H5::PredType::NATIVE_SHORT);
-      etatype.insertMember("q", HOFFSET(EtaCreationFactor, q_), H5::PredType::NATIVE_SHORT);
-      etatype.insertMember("m", HOFFSET(EtaCreationFactor, m_), H5::PredType::NATIVE_SHORT);
-      etatype.insertMember("p", HOFFSET(EtaCreationFactor, p_), H5::PredType::NATIVE_SHORT);
-      etatype.insertMember("n", HOFFSET(EtaCreationFactor, n_), H5::PredType::NATIVE_SHORT);
-      etatype.insertMember("r", HOFFSET(EtaCreationFactor, r_), H5::PredType::NATIVE_SHORT);
-      etatype.insertMember("eta", HOFFSET(EtaCreationFactor, eta_), H5::PredType::NATIVE_DOUBLE);
+    etatype.insertMember("Id", HOFFSET(EtaCreationFactor, id_), H5::PredType::NATIVE_UINT);
+    etatype.insertMember("l", HOFFSET(EtaCreationFactor, l_), H5::PredType::NATIVE_SHORT);
+    etatype.insertMember("q", HOFFSET(EtaCreationFactor, q_), H5::PredType::NATIVE_SHORT);
+    etatype.insertMember("m", HOFFSET(EtaCreationFactor, m_), H5::PredType::NATIVE_SHORT);
+    etatype.insertMember("p", HOFFSET(EtaCreationFactor, p_), H5::PredType::NATIVE_SHORT);
+    etatype.insertMember("n", HOFFSET(EtaCreationFactor, n_), H5::PredType::NATIVE_SHORT);
+    etatype.insertMember("r", HOFFSET(EtaCreationFactor, r_), H5::PredType::NATIVE_SHORT);
+    etatype.insertMember("eta", HOFFSET(EtaCreationFactor, eta_), H5::PredType::NATIVE_DOUBLE);
 
 
-      H5::Group group;
-      // attempt to open group
-      try
-	{
-	  H5::Exception::dontPrint();
-	  group = file.openGroup(sgroup);
-	}
-      catch( H5::Exception gerror ) {
-	// if group does not exist, create it
-	try
-	  {
-	    H5::Exception::dontPrint();
-	    group = file.createGroup(sgroup);
-	  }
-	catch( H5::Exception gerror2 ) {
-#ifdef H5API110
-	  gerror2.printErrorStack();
-#else
-	  gerror2.printError();
-#endif
-	  std::cout << std::endl << "[ee] h5 I/O error in group "
-		    << sgroup << ". Terminate.\n";
-	  std::terminate();
-	}
-      }
-      
-      H5::DataSet dataset;
-      // attempt to open dataset
-      try
-	{
-	  H5::Exception::dontPrint();
-	  dataset = group.openDataSet(sdataset);
-	}
-      catch( H5::Exception aerror )
-	{
-	  // create dataset if not exists
-	  try
-	    {
-	      dataset = group.createDataSet(sdataset, etatype, dspace);
-	      dspace.close();
-	    }
-	  catch( H5::Exception aerror2 )
-	    {	      
-#ifdef H5API110
-	      aerror2.printErrorStack();
-#else
-	      aerror2.printError();
-#endif	
-	      std::cout << std::endl << "[ee] h5 I/O error in dataset "
-			<< sdataset << ". Terminate.\n";
-	      std::terminate();
-	    }
-	}      
-      
-      // Write data to the dataset, pass plain array
-      dataset.write(&efvec[0], etatype);
-      
-      dataset.close();      
-    }// end try block
-  // catch failure caused by the H5File operations
-  catch( H5::FileIException error )
-    {
-#ifdef H5API110
-      error.printErrorStack();
-#else
-      error.printError();
-#endif
-      return -1;
+    H5::Group group;
+    // attempt to open group
+    try {
+      H5::Exception::dontPrint();
+      group = file.openGroup(sgroup);
     }
-   // catch failure caused by the DataSet operations
-  catch( H5::DataSetIException error )
-   {
+    catch( H5::Exception gerror ) {
+      // if group does not exist, create it
+      try {
+	H5::Exception::dontPrint();
+	group = file.createGroup(sgroup);
+      }
+      catch( H5::Exception gerror2 ) {
 #ifdef H5API110
-     error.printErrorStack();
+	gerror2.printErrorStack();
+#else
+	gerror2.printError();
+#endif
+	std::cout << std::endl << "[ee] h5 I/O error in group "
+		  << sgroup << ". Terminate.\n";
+	std::terminate();
+      }
+    }
+      
+    H5::DataSet dataset;
+    // attempt to open dataset
+    try {
+      H5::Exception::dontPrint();
+      dataset = group.openDataSet(sdataset);
+    }
+    catch( H5::Exception aerror )
+      {
+	// create dataset if not exists
+	try {
+	  dataset = group.createDataSet(sdataset, etatype, dspace);
+	  dspace.close();
+	}
+	catch( H5::Exception aerror2 )
+	  {	      
+#ifdef H5API110
+	    aerror2.printErrorStack();
+#else
+	    aerror2.printError();
+#endif	
+	    std::cout << std::endl << "[ee] h5 I/O error in dataset "
+		      << sdataset << ". Terminate.\n";
+	    std::terminate();
+	  }
+      }      
+      
+    // Write data to the dataset, pass plain array
+    dataset.write(&efvec[0], etatype);
+    
+    dataset.close();      
+  }// end try block
+  // catch failure caused by the H5File operations
+  catch( H5::FileIException error ) {
+#ifdef H5API110
+    error.printErrorStack();
+#else
+    error.printError();
+#endif
+    return -1;
+  }
+   // catch failure caused by the DataSet operations
+  catch( H5::DataSetIException error ) {
+#ifdef H5API110
+    error.printErrorStack();
 #else
      error.printError();
 #endif
      return -1;
-   }
+  }
   // catch failure caused by the DataSpace operations
   catch( H5::DataSpaceIException error )
     {
@@ -207,19 +201,137 @@ int etafactorvector_toh5file(const std::vector<EtaCreationFactor> efvec,
       error.printError();
 #endif
       return -1;
-   }
+    }
   // catch failure caused by the DataSpace operations
-  catch( H5::DataTypeIException error )
-    {
+  catch( H5::DataTypeIException error ) {
 #ifdef H5API110
-      error.printErrorStack();
+    error.printErrorStack();
+#else
+    error.printError();
+#endif
+    return -1;
+  }
+  return 0;  
+}
+
+
+// read vector of eta factor from h5 object file
+inline
+int etafactorvector_fromh5file(std::vector<EtaCreationFactor> &efvec,
+			       H5::H5File file,
+			       std::string sgroup = "Electrostatic_interaction",
+			       std::string sdataset = "eta_factor_vector") {
+
+  try {
+    // Turn off the auto-printing
+    H5::Exception::dontPrint();
+    
+    H5::Group group;
+    // attempt to open group
+    try {
+      H5::Exception::dontPrint();
+      group = file.openGroup(sgroup);
+    }
+    catch( H5::Exception gerror ) {
+      // if group does not exist, create it	
+#ifdef H5API110
+      gerror.printErrorStack();
+#else
+      gerror.printError();
+#endif
+      std::cout << std::endl << "[ee] h5 I/O error in group "
+		<< sgroup << ". Terminate.\n";
+      std::terminate();
+    }
+      
+    
+    H5::DataSet dataset;
+      // attempt to open dataset
+    try {
+      H5::Exception::dontPrint();
+      dataset = group.openDataSet(sdataset);
+    }
+    catch( H5::Exception derror ) {  
+#ifdef H5API110
+      derror.printErrorStack();
+#else
+      derror.printError();
+#endif	
+      std::cout << std::endl << "[ee] h5 I/O error in dataset "
+		<< sdataset << ". Terminate.\n";
+      std::terminate();
+    }
+     
+
+    H5::DataSpace dataspace = dataset.getSpace();
+    //Get the number of dimensions in the dataspace.
+    int rank = dataspace.getSimpleExtentNdims();
+
+    // Get the dimension size of each dimension in the dataspace
+    hsize_t dims_out[rank];
+    int ndims = dataspace.getSimpleExtentDims( dims_out, NULL);
+
+    
+    H5::CompType etatype(sizeof(EtaCreationFactor));
+      
+    etatype.insertMember("Id", HOFFSET(EtaCreationFactor, id_), H5::PredType::NATIVE_UINT);
+    etatype.insertMember("l", HOFFSET(EtaCreationFactor, l_), H5::PredType::NATIVE_SHORT);
+    etatype.insertMember("q", HOFFSET(EtaCreationFactor, q_), H5::PredType::NATIVE_SHORT);
+    etatype.insertMember("m", HOFFSET(EtaCreationFactor, m_), H5::PredType::NATIVE_SHORT);
+    etatype.insertMember("p", HOFFSET(EtaCreationFactor, p_), H5::PredType::NATIVE_SHORT);
+    etatype.insertMember("n", HOFFSET(EtaCreationFactor, n_), H5::PredType::NATIVE_SHORT);
+    etatype.insertMember("r", HOFFSET(EtaCreationFactor, r_), H5::PredType::NATIVE_SHORT);
+    etatype.insertMember("eta", HOFFSET(EtaCreationFactor, eta_), H5::PredType::NATIVE_DOUBLE);
+
+    efvec.resize(dims_out[0]);
+
+    // read dataset
+    dataset.read(&efvec[0], etatype);
+    
+    dataspace.close();
+    dataset.close();
+    group.close();
+    
+  }// end try block
+  // catch failure caused by the H5File operations
+  catch( H5::FileIException error ) {
+#ifdef H5API110
+    error.printErrorStack();
+#else
+    error.printError();
+#endif
+      return -1;
+  }
+  // catch failure caused by the DataSet operations
+  catch( H5::DataSetIException error ) {
+#ifdef H5API110
+    error.printErrorStack();
+#else
+    error.printError();
+#endif
+    return -1;
+  }
+  // catch failure caused by the DataSpace operations
+  catch( H5::DataSpaceIException error ) {
+#ifdef H5API110
+    error.printErrorStack();
 #else
       error.printError();
 #endif
       return -1;
-    }
+  }
+  // catch failure caused by the DataSpace operations
+  catch( H5::DataTypeIException error ) {
+#ifdef H5API110
+    error.printErrorStack();
+#else
+    error.printError();
+#endif
+    return -1;
+  }
   return 0;  
 }
+
 
 inline
 void etafactor_fromstream(EtaCreationFactor &ecf, std::istringstream &ss) {
@@ -477,4 +589,121 @@ int deathfactorvector_toh5file(const std::vector<DeathFactor> dfvec,
     }
   return 0;  
 }
+
+
+// read vector of eta factor from h5 object file
+inline
+int deathfactorvector_fromh5file(std::vector<DeathFactor> &dfvec,
+				 H5::H5File file,
+				 std::string sgroup = "Electrostatic_interaction",
+				 std::string sdataset = "death_factor_vector") {
+
+  try {
+    // Turn off the auto-printing
+    H5::Exception::dontPrint();
+    
+    H5::Group group;
+    // attempt to open group
+    try {
+      H5::Exception::dontPrint();
+      group = file.openGroup(sgroup);
+    }
+    catch( H5::Exception gerror ) {
+      // if group does not exist, create it	
+#ifdef H5API110
+      gerror.printErrorStack();
+#else
+      gerror.printError();
+#endif
+      std::cout << std::endl << "[ee] h5 I/O error in group "
+		<< sgroup << ". Terminate.\n";
+      std::terminate();
+    }
+      
+    
+    H5::DataSet dataset;
+      // attempt to open dataset
+    try {
+      H5::Exception::dontPrint();
+      dataset = group.openDataSet(sdataset);
+    }
+    catch( H5::Exception derror ) {  
+#ifdef H5API110
+      derror.printErrorStack();
+#else
+      derror.printError();
+#endif	
+      std::cout << std::endl << "[ee] h5 I/O error in dataset "
+		<< sdataset << ". Terminate.\n";
+      std::terminate();
+    }
+     
+
+    H5::DataSpace dataspace = dataset.getSpace();
+    //Get the number of dimensions in the dataspace.
+    int rank = dataspace.getSimpleExtentNdims();
+
+    // Get the dimension size of each dimension in the dataspace
+    hsize_t dims_out[rank];
+    int ndims = dataspace.getSimpleExtentDims( dims_out, NULL);
+    
+    H5::CompType etatype(sizeof(DeathFactor));
+    
+    etatype.insertMember("Id", HOFFSET(DeathFactor, id_), H5::PredType::NATIVE_UINT);
+    etatype.insertMember("l", HOFFSET(DeathFactor, l_), H5::PredType::NATIVE_SHORT);
+    etatype.insertMember("q", HOFFSET(DeathFactor, q_), H5::PredType::NATIVE_SHORT);
+    etatype.insertMember("m", HOFFSET(DeathFactor, m_), H5::PredType::NATIVE_SHORT);
+    etatype.insertMember("p", HOFFSET(DeathFactor, p_), H5::PredType::NATIVE_SHORT);
+    etatype.insertMember("death", HOFFSET(DeathFactor, death_), H5::PredType::NATIVE_DOUBLE);
+
+
+    dfvec.resize(dims_out[0]);
+
+    // read dataset
+    dataset.read(&dfvec[0], etatype);
+    
+    dataspace.close();
+    dataset.close();
+    group.close();
+    
+  }// end try block
+  // catch failure caused by the H5File operations
+  catch( H5::FileIException error ) {
+#ifdef H5API110
+    error.printErrorStack();
+#else
+    error.printError();
+#endif
+      return -1;
+  }
+  // catch failure caused by the DataSet operations
+  catch( H5::DataSetIException error ) {
+#ifdef H5API110
+    error.printErrorStack();
+#else
+    error.printError();
+#endif
+    return -1;
+  }
+  // catch failure caused by the DataSpace operations
+  catch( H5::DataSpaceIException error ) {
+#ifdef H5API110
+    error.printErrorStack();
+#else
+      error.printError();
+#endif
+      return -1;
+  }
+  // catch failure caused by the DataSpace operations
+  catch( H5::DataTypeIException error ) {
+#ifdef H5API110
+    error.printErrorStack();
+#else
+    error.printError();
+#endif
+    return -1;
+  }
+  return 0;  
+}
+
 #endif

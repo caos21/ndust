@@ -285,7 +285,7 @@ int read_dataset2d_hdf5(H5::H5File file,
     
 
     // Get the dimension size of each dimension in the dataspace
-    hsize_t dims_out[1];    
+    hsize_t dims_out[1];
     int ndims = dataspace.getSimpleExtentDims( dims_out, NULL);
 
 //     std::cerr << "rank " << rank << ", dimensions "
@@ -1921,7 +1921,7 @@ int read_dataset_hdf5(H5::H5File& file, ArrType &outarray,
 
     H5::Group group = file.openGroup(sgroup);
 
-    H5::DataSet dataset = group.openDataSet( dsname );
+    H5::DataSet dataset = group.openDataSet(dsname);
 
     /*
      * Get the class of the datatype that is used by the dataset.
@@ -1939,25 +1939,18 @@ int read_dataset_hdf5(H5::H5File& file, ArrType &outarray,
      * Get the dimension size of each dimension in the dataspace.
      */
     hsize_t dims_out[1];
-    int ndims = dataspace.getSimpleExtentDims( dims_out, NULL);
-//     std::cout << "rank " << rank << ", dimensions " <<
-//         static_cast<unsigned long>(dims_out[0]) << " x ";/* <<
-//         static_cast<unsigned long>(dims_out[1]) << std::endl;*/
+    int ndims = dataspace.getSimpleExtentDims(dims_out, NULL);
 
     H5::DataSpace indataspace(1, dims_out);
-    outarray.resize(static_cast<unsigned long>(dims_out[0]));
+
+    // WARNING valgrind complains here
+    outarray.resize(dims_out[0]);
     dataset.read(&outarray[0], H5::PredType::NATIVE_DOUBLE, indataspace, dataspace);
-//     for (unsigned int i = 0; i<outarray.size(); ++i)
-//     {
-//       std::cout << std::endl << outarray[i];
-//     }
+
     // close dataspace and dataset
-    indataspace.close();
-    
+    indataspace.close();    
     dataspace.close();
-
     dataset.close();
-
     group.close();
    }  // end of try block
    // catch failure caused by the H5File operations
