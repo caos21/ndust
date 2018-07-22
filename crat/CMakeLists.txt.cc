@@ -83,18 +83,81 @@ add_executable(crat-writer "crat-writer.cpp" ${INCSRCS})
 
 add_executable(crat-reader "crat-reader.cpp" ${INCSRCS})
 
+add_executable(crat-merge "crat-merge.cpp" ${INCSRCS})
+
 # target libraries
-set(TLIBS "boost_log hdf5 hdf5_cpp boost_system boost_thread boost_atomic boost_chrono boost_regex boost_date_time boost_filesystem mkl")
+#list(APPEND TLIBS "boost_log hdf5 hdf5_cpp boost_system boost_thread boost_atomic boost_chrono boost_regex boost_date_time boost_filesystem mkl")
     
-target_link_libraries(CRate GridModel ${TLIBS})
+target_link_libraries(CRate
+  GridModel
+  boost_log
+  hdf5
+  hdf5_cpp
+  boost_system
+  boost_thread
+  boost_atomic
+  boost_chrono
+  boost_regex
+  boost_date_time
+  boost_filesystem
+  mkl)
 
-target_link_libraries(crat CRate ${TLIBS})
+target_link_libraries(crat
+  CRate
+  boost_log
+  hdf5
+  hdf5_cpp
+  boost_system
+  boost_thread
+  boost_atomic
+  boost_chrono
+  boost_regex
+  boost_date_time
+  boost_filesystem
+  mkl)
 
-target_link_libraries(crat-writer CRate ${TLIBS})
-		    
-target_link_libraries(crat-reader CRate ${TLIBS})
+target_link_libraries(crat-writer
+  CRate
+  boost_log
+  hdf5
+  hdf5_cpp
+  boost_system
+  boost_thread
+  boost_atomic
+  boost_chrono
+  boost_regex
+  boost_date_time
+  boost_filesystem
+  mkl)
 
-target_link_libraries(crat-merge CRate ${TLIBS})
+target_link_libraries(crat-reader
+  CRate
+  boost_log
+  hdf5
+  hdf5_cpp
+  boost_system
+  boost_thread
+  boost_atomic
+  boost_chrono
+  boost_regex
+  boost_date_time
+  boost_filesystem
+  mkl)
+
+target_link_libraries(crat-merge
+  CRate
+  boost_log
+  hdf5
+  hdf5_cpp
+  boost_system
+  boost_thread
+  boost_atomic
+  boost_chrono
+  boost_regex
+  boost_date_time
+  boost_filesystem
+  mkl)
+  
 
 enable_testing()
 
