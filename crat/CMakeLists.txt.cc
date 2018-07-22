@@ -23,7 +23,7 @@ file(GLOB INCSRCS RELATIVE "../include/" "*.cpp")
 # project includes
 include_directories("../include/")
 # include local boost-numeric-bindings
-include_directories("~/lib/include/boost-numeric-bindings/")
+include_directories("~/local/include/boost-numeric-bindings/")
 # include  boost
 #include_directories("~/lib/boost/include/")
 # include lapack blas cblas
@@ -83,62 +83,19 @@ add_executable(crat-writer "crat-writer.cpp" ${INCSRCS})
 
 add_executable(crat-reader "crat-reader.cpp" ${INCSRCS})
 
-target_link_libraries(CRate
-                      GridModel
-                      boost_log
-		      hdf5
-		      hdf5_cpp
-		      boost_system
-		      boost_thread
-		      boost_atomic
-		      boost_chrono
-		      boost_regex
-		      boost_date_time
-		      boost_filesystem
-		      mkl)
+# target libraries
+set(TLIBS "boost_log hdf5 hdf5_cpp boost_system boost_thread boost_atomic boost_chrono boost_regex boost_date_time boost_filesystem mkl")
+    
+target_link_libraries(CRate GridModel ${TLIBS})
 
-target_link_libraries(crat                      
-                      CRate
-                      boost_log
-		      hdf5
-		      hdf5_cpp
-		      boost_system
-		      boost_thread
-		      boost_atomic
-		      boost_chrono
-		      boost_regex
-		      boost_date_time
-		      boost_filesystem
-		      mkl)
+target_link_libraries(crat CRate ${TLIBS})
 
-
-target_link_libraries(crat-writer
-                      CRate
-                      boost_log
-		      hdf5
-		      hdf5_cpp
-		      boost_system
-		      boost_thread
-		      boost_atomic
-		      boost_chrono
-		      boost_regex
-		      boost_date_time
-		      boost_filesystem
-		      mkl)
+target_link_libraries(crat-writer CRate ${TLIBS})
 		    
-target_link_libraries(crat-reader                      
-                      CRate
-                      boost_log
-		      hdf5
-		      hdf5_cpp
-		      boost_system
-		      boost_thread
-		      boost_atomic
-		      boost_chrono
-		      boost_regex
-		      boost_date_time
-		      boost_filesystem
-		      mkl)		    
+target_link_libraries(crat-reader CRate ${TLIBS})
+
+target_link_libraries(crat-merge CRate ${TLIBS})
+
 enable_testing()
 
 install(TARGETS crat RUNTIME DESTINATION bin)

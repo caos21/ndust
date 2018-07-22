@@ -44,6 +44,17 @@ if(OPENMP_FOUND)
   add_definitions(-DOPENMP)
 endif()
 
+find_package(HDF5)
+if(HDF5_VERSION VERSION_LESS "1.10.0")
+  # use old api 1.8
+  message("HDF5 version 1.10 < ${HDF5_VERSION}")
+else()
+  # use new api
+  message("HDF5 version ${HDF5_VERSION} > 1.10.0")
+  add_definitions("-DH5API110")
+endif()
+
+
 add_executable(nevo main.cpp)
 
 target_link_libraries(NEvo

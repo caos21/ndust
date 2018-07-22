@@ -21,6 +21,12 @@
 #include <iostream>
 #include <string>
 #include <functional>
+#include <chrono>
+#include <ctime>
+#include <memory>
+
+#include <boost/lexical_cast.hpp>
+#include <boost/algorithm/string.hpp>
 
 // hdf5 c++ bindings
 #include <H5Cpp.h>
@@ -29,6 +35,7 @@
 #include "h5plasma.h"
 #include "GridModel.h"
 #include "eint.h"
+#include "enhancement.h"
 #include "eta.h"
 
 /**
@@ -77,6 +84,7 @@ public:
     @param  lg_ Logger instance.
   */
   CRate() {
+    
   }
   
 // Public methods
@@ -104,13 +112,25 @@ public:
    * Read the crat's output file in dirname
   */
   int read_results();
-  
+
+  //! Read and merge h5 file list
+  /*! 
+   * Read and merge the crat list
+  */
+  int compute_list(std::vector<std::string>);
+
   //! Start calculations
   /*! 
    * Start to compute the calculations
   */
   int compute();
 
+  //! Start calculations, need to read pairs first
+  /*! 
+   * Start to compute the with pairs from a file
+  */
+  int compute_frompairs();
+  
   //! Start calculations WARNING TESTING
   /*! 
    * Testing symmetrization
@@ -122,6 +142,25 @@ public:
    * Write on file prefix_filename.h5 in dirname
   */
   int write();
+
+  //! write h5 datafile from pairs, serialized
+  /*! 
+   * Write on file prefix_filename.h5 in dirname
+  */
+  int write_frompairs();
+  
+  //! write particle pairs to datafile
+  /*! 
+   * Write 
+  */
+  int write_pairs();
+
+  //! read particle pairs from datafile
+  /*! 
+   * Read
+  */
+  int read_pairs();
+  
 //
 // Public attributes
 //
@@ -177,12 +216,13 @@ private:
   double compute_efactor_mpc(double r1, double r2,
                              double q1, double q2) {
 
-    return eint::efactor_mpc(r1, r2,
-                             q1, q2,
-                             gm.einter.dconstant,
-                             gm.gsys.temperature,
-                             gm.einter.terms,
-                             gm.einter.terms);
+    /* return eint::efactor_mpc(r1, r2, */
+    /*                          q1, q2, */
+    /*                          gm.einter.dconstant, */
+    /*                          gm.gsys.temperature, */
+    /*                          gm.einter.terms, */
+    /*                          gm.einter.terms); */
+    return 1.0;
   }
 
   //! Compute efactor using ipa method
@@ -196,12 +236,13 @@ private:
   double compute_efactor_ipa(double r1, double r2,
                              double q1, double q2) {
 
-    return eint::efactor_ipa(r1, r2,
-                             q1, q2,
-                             gm.einter.dconstant,
-                             gm.gsys.temperature,
-    			     gm.einter.terms,
-                             gm.einter.terms);
+    /* return eint::efactor_ipa(r1, r2, */
+    /*                          q1, q2, */
+    /*                          gm.einter.dconstant, */
+    /*                          gm.gsys.temperature, */
+    /* 			     gm.einter.terms, */
+    /*                          gm.einter.terms); */
+    return 1.0;
   }
 
   //! Compute efactor using Coulomb method
@@ -291,6 +332,24 @@ private:
   */
   void write_efactor();
 
+  //! Write enhancement factor
+  /*! 
+    Write enhancement factor
+  */
+  void write_efactor_serial();
+
+  //! Write potentials
+  /*! 
+    Writes contact and barrier potentials
+  */
+  void write_potentials();
+
+  //! Write potentials
+  /*! 
+    Writes contact and barrier potentials
+  */
+  void write_potentials_serial();
+  
   //! Write coagulation rate
   /*! 
     Write coagulation rate
@@ -302,6 +361,21 @@ private:
 // 
 
   boost_array4d efactor;              //!< Array for enhancement factor.
+  boost_array4d cpotentials;          //!< Array for contact potentials.
+  boost_array4d bpotentials;          //!< Array for potential barriers.
+  boost_array4d rbarriers;            //!< Array for potential barriers.
+
+  boost_short_array2d efindices;    //!< Array for enhancement factor indices.
+  boost_short_array2d cpindices;    //!< Array for contact potential indices.
+  boost_short_array2d bpindices;    //!< Array for rbarrier and barrier potential indices.
+    
+  darray daefactor;
+  darray dacpotentials;
+  darray dabpotentials;
+  darray dabcpotentials;
+  darray darbarriers;
+  
+  /* boost_array4d_ref efactor_ref;     //!< Reference to efactor */
   boost_array4d rcoag;                //!< Coagulation rate.
 
   double electhermratio;          //!< Electrostatic energy to thermal ratio.
@@ -321,6 +395,8 @@ private:
 
   static const unsigned int neta = 8; //!< number of eta indices.
   static const unsigned int ndeath = 6;//!< number of death indices.
+
+  std::vector<std::string> sfilelist;
 };
 
 #endif // CRATE_H

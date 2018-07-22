@@ -8,9 +8,14 @@ file(GLOB SRCS *.cpp)
 file(GLOB INCSRCS RELATIVE "../include/" "*.cpp")
 
 include_directories("../include/")
+include_directories(SYSTEM "/usr/include/eigen3")
 
+add_definitions(-DH5_USE_18_API)
 add_definitions(-DBOOST_LOG_DYN_LINK)
 add_definitions(-DNDEBUG)
+add_definitions(-DBOOST_UBLAS_DNDEBUG)
+add_definitions(-DUSING_EIGEN)
+add_definitions(-DEIGEN_DONT_PARALLELIZE)
 
 add_library(GridModel STATIC ../include/GridModel.cpp)
 add_library(CRate STATIC ../include/CRate.cpp)
@@ -50,9 +55,28 @@ if(OPENMP_FOUND)
   add_definitions(-DOPENMP)
 endif()
 
+
+find_package(HDF5)
+if(HDF5_VERSION VERSION_LESS "1.10.0")
+  # use old api 1.8
+  message("HDF5 version 1.10 < ${HDF5_VERSION}")
+else()
+  # use new api
+  message("HDF5 version ${HDF5_VERSION} > 1.10.0")
+  add_definitions("-DH5API110")
+endif()
+
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Ofast -frecord-gcc-switches -march=znver1")
 
-add_executable(crat ${SRCS} ${INCSRCS})
+add_executable(crat "main.cpp" ${INCSRCS})
+
+add_executable(crat-writer "crat-writer.cpp" ${INCSRCS})
+
+add_executable(crat-reader "crat-reader.cpp" ${INCSRCS})
+
+add_executable(crat-merge "crat-merge.cpp" ${INCSRCS})
+
+add_executable(potentials "potentials.cpp" ${INCSRCS})
 
 target_link_libraries(CRate
                       GridModel
@@ -61,6 +85,21 @@ target_link_libraries(CRate
 target_link_libraries(crat
                       CRate
                       ${LIBS})
+
+target_link_libraries(crat-writer
+                      CRate
+                      ${LIBS})
+
+target_link_libraries(crat-reader
+                      CRate
+                      ${LIBS})
+
+target_link_libraries(crat-merge
+                      CRate
+                      ${LIBS})
+
+target_link_libraries(potentials ${LIBS})
+
 
 enable_testing()
 

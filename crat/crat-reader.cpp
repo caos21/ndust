@@ -51,8 +51,9 @@ int main(int argc, char **argv) {
 
   std::cerr << "\n[ii] Prefix for output files: " << prefix_filename << '\n';
 
+  
   // init logger
-  blog::init(dirname+prefix_filename);
+  blog::init(std::string(dirname+prefix_filename+"-reader"));
 
   logging::add_common_attributes();
 
@@ -62,10 +63,6 @@ int main(int argc, char **argv) {
   BOOST_LOG_SEV(lg, info) << "Prefix for output files: " << prefix_filename;
 
   BOOST_LOG_SEV(lg, info) << "Output directory: " << dirname;
-    // init logger
-//   blog::close();
-  // add /
-//   dirname += "/";
 
   // get num threads
   int num_threads = omp_get_num_threads();
@@ -99,16 +96,17 @@ int main(int argc, char **argv) {
 
   CRate crate(dirname, prefix_filename, lg);
   crate.open();
-  crate.read();
-  crate.compute();
-  crate.write();
+  crate.read();  
+  crate.read_pairs();
+  crate.compute_frompairs();
+  crate.write_frompairs();
   crate.close();
 
   clock_t end_crate = std::clock();
   double elapsed_secs = double(end_crate - begin_crate) / CLOCKS_PER_SEC;
   std::cout << "\n[ii] CRat elapsed time: "
             << elapsed_secs << '\n';
-  BOOST_LOG_SEV(lg, info)<< "CRat elapsed time: " << elapsed_secs;
+  BOOST_LOG_SEV(lg, info)<< "CRat reader elapsed time: " << elapsed_secs;
 
   return 0;
 }

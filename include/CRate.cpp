@@ -83,12 +83,172 @@ int CRate::write() {
   BOOST_LOG_SEV(lg, info) << "Writing death factor";
   write_deathfactor();
 
+  BOOST_LOG_SEV(lg, info) << "Writing potentials";
+  write_potentials();
+  
   BOOST_LOG_SEV(lg, info) << "Writing enhancement factor";
   write_efactor();
 
   BOOST_LOG_SEV(lg, info) << "Writing coagulation rate";
   write_rcoagulation();
 
+  return 0;
+}
+
+int CRate::write_frompairs() {
+  hid_t id = h5obj.getId();
+
+  BOOST_LOG_SEV(lg, info) << "Writing eta creation factor";
+  write_etafactor();
+
+  BOOST_LOG_SEV(lg, info) << "Writing death factor";
+  write_deathfactor();
+
+  BOOST_LOG_SEV(lg, info) << "Writing potentials";
+  write_potentials();
+  
+  BOOST_LOG_SEV(lg, info) << "Writing enhancement factor!!";
+  write_efactor_serial();
+
+  BOOST_LOG_SEV(lg, info) << "Writing potentials";
+  write_potentials_serial();
+  
+  BOOST_LOG_SEV(lg, info) << "Writing coagulation rate!!";
+  write_rcoagulation();
+
+  return 0;
+}
+
+
+
+int CRate::compute_list(std::vector<std::string> sfilelist_) {
+  //
+  BOOST_LOG_SEV(lg, info) << "Processing pairs files...";
+  auto start = std::chrono::system_clock::now();
+
+  sfilelist = sfilelist_;
+
+  BOOST_LOG_SEV(lg, info) << "Reading h5 list";
+  
+  for(unsigned int isf=0; isf<sfilelist.size(); ++isf) {
+
+    H5::H5File h5fl;
+     
+    std::string fullname = dirname + sfilelist[isf];
+    
+    int err = open_hdf5(fullname, h5fl, "write");
+    if(err!=0) {
+      BOOST_LOG_SEV(lg, error) << "h5 I/O error opening file. Terminate.";
+      std::terminate();
+    }
+    hid_t id = h5fl.getId();
+    BOOST_LOG_SEV(lg, info) << "Open file for read/write: "
+			    << fullname << " -> Success. Id: "
+			    << id;
+
+    std::string gname = "Enhancement_factor_serial";
+    std::string dsname = "Indices";
+    boost_short_array2d efindices;
+    read_dset2d_hdf5<boost_short_array2d, short>(h5fl, gname, dsname, efindices);
+
+    std::string edsname = "efactor";
+    darray daefactor;
+    read_dset_hdf5<darray, double>(h5fl, gname, edsname, daefactor);
+
+    // grid definition
+    grid = {{gm.vols.nsections, gm.chrgs.nsections}};
+    grid4 = {{gm.vols.nsections, gm.chrgs.nsections,
+	      gm.vols.nsections, gm.chrgs.nsections}};
+  
+    // resizing
+    efactor.resize(grid4);
+    cpotentials.resize(grid4);
+    bpotentials.resize(grid4);
+    rbarriers.resize(grid4);
+    rcoag.resize(grid4);
+   
+
+    for (unsigned int i = 0; i<efindices.shape()[0]; ++i) {
+      short l = efindices[i][0];
+      short q = efindices[i][1];
+      short m = efindices[i][2];
+      short p = efindices[i][3];
+      double etaf = daefactor[i];
+      efactor[l][q][m][p] = etaf;
+    }
+    /////////
+
+    std::string cpgname = "Contact_potential_serial";
+    std::string cpidsname = "Indices";
+    boost_short_array2d cpindices;
+    read_dset2d_hdf5<boost_short_array2d, short>(h5fl, cpgname, cpidsname, cpindices);
+
+    std::string cpdsname = "contact_potential";
+    darray dacpotentials;
+    read_dset_hdf5<darray, double>(h5fl, cpgname, cpdsname, dacpotentials);
+   
+
+    for (unsigned int i = 0; i<cpindices.shape()[0]; ++i) {
+      short l = cpindices[i][0];
+      short q = cpindices[i][1];
+      short m = cpindices[i][2];
+      short p = cpindices[i][3];
+      double cpot = dacpotentials[i];
+      cpotentials[l][q][m][p] = cpot;
+    }
+    ////////
+
+    std::string bpgname = "Barrier_potential_serial";
+    std::string bpidsname = "Indices";
+    boost_short_array2d bpindices;
+    read_dset2d_hdf5<boost_short_array2d, short>(h5fl, bpgname, bpidsname, bpindices);
+
+    std::string bpdsname = "barrier_potential";
+    darray dabpotentials;
+    read_dset_hdf5<darray, double>(h5fl, bpgname, bpdsname, dabpotentials);
+
+    std::string bcpdsname = "contact_potential";
+    darray dabcpotentials;
+    read_dset_hdf5<darray, double>(h5fl, bpgname, bcpdsname, dabcpotentials);
+
+    std::string rbdsname = "rbarrier";
+    darray darbarriers;
+    read_dset_hdf5<darray, double>(h5fl, bpgname, rbdsname, darbarriers);
+
+    for (unsigned int i = 0; i<bpindices.shape()[0]; ++i) {
+      short l = bpindices[i][0];
+      short q = bpindices[i][1];
+      short m = bpindices[i][2];
+      short p = bpindices[i][3];
+      double bpot = dabpotentials[i];
+      bpotentials[l][q][m][p] = bpot;
+      double cpot = dabcpotentials[i];
+      cpotentials[l][q][m][p] = cpot;
+      double rb = darbarriers[i];
+      rbarriers[l][q][m][p] = rb;
+    }        
+
+    ///////
+    err = close_hdf5(h5fl);
+    BOOST_LOG_SEV(lg, info) << "Closed file Id: " << id;
+    
+  }
+
+  auto end = std::chrono::system_clock::now();
+  std::chrono::duration<double>  elapsed_seconds = end-start;
+  BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
+
+  // Compute beta0
+  beta0 = pow(3.0/(4.0*M_PI), 1.0/6.0)
+        * sqrt(6.0*Kboltz*gm.gsys.temperature/gm.gsys.nmdensity);
+
+  start = std::chrono::system_clock::now();
+  BOOST_LOG_SEV(lg, info) << "Computing coagulation rate";
+  compute_rcoagulation();
+  BOOST_LOG_SEV(lg, info) << "Done... coagulation rate";
+  end = std::chrono::system_clock::now();
+  elapsed_seconds = end-start;
+  BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
   return 0;
 }
 
@@ -114,39 +274,380 @@ void CRate::bind_efactorfunc(){
   }
 }
 
-int CRate::compute() {
 
-  // bind efactorfunc
-  bind_efactorfunc();
+int CRate::write_pairs() {
+
+  BOOST_LOG_SEV(lg, info) << "Computing and writing particle pairs...";
+  
+  // grid definition
+  grid = {{gm.vols.nsections, gm.chrgs.nsections}};
+  grid4 = {{gm.vols.nsections, gm.chrgs.nsections,
+            gm.vols.nsections, gm.chrgs.nsections}};
+  
+  // resizing
+  efactor.resize(grid4);
+  cpotentials.resize(grid4);
+  bpotentials.resize(grid4);
+  rbarriers.resize(grid4);
+  rcoag.resize(grid4);
+
+  BOOST_LOG_SEV(lg, info) << "Size for array efactor : " << efactor.size();
+  // BOOST_LOG_SEV(lg, info) <<"\n r size " << gm.vols.radii.size();
+  // std::cerr << "\n q size " << gm.chrgs.charges.size();
+  BOOST_LOG_SEV(lg, info) << "Radii size : " << gm.vols.nsections;
+  BOOST_LOG_SEV(lg, info) << "Charge size : " << gm.chrgs.nsections;
+  
+  enhancement::Enhancement enh(gm.vols.radii,
+			       gm.chrgs.charges*eCharge,
+			       efactor,
+			       cpotentials,
+			       bpotentials,
+			       rbarriers,
+			       gm.einter.dconstant,
+			       lg);
+
+  BOOST_LOG_SEV(lg, info) << "Computing reduced particle pairs...";
+  auto start = std::chrono::system_clock::now();
+  //
+  enh.compute_reducedpairs();
+  //
+  auto end = std::chrono::system_clock::now();
+  std::chrono::duration<double> elapsed_seconds = end-start;
+  BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
+
+
+  std::string fullname = dirname + prefix_filename;
+  
+  BOOST_LOG_SEV(lg, info) << "Writing particle pairs...";
+  start = std::chrono::system_clock::now();
+  //
+  enh.write_particlepairs(fullname);
+  //
+  end = std::chrono::system_clock::now();
+  elapsed_seconds = end-start;
+  BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
+
+  return 0;
+}
+
+
+int CRate::read_pairs() {
+
+  BOOST_LOG_SEV(lg, info) << "Reading particle pairs...";
+  
+  // grid definition
+  grid = {{gm.vols.nsections, gm.chrgs.nsections}};
+  grid4 = {{gm.vols.nsections, gm.chrgs.nsections,
+            gm.vols.nsections, gm.chrgs.nsections}};
+  
+  // resizing
+  efactor.resize(grid4);
+  cpotentials.resize(grid4);
+  bpotentials.resize(grid4);
+  rbarriers.resize(grid4);
+  rcoag.resize(grid4);
+
+  BOOST_LOG_SEV(lg, info) << "Size for array efactor : " << efactor.size();
+  // BOOST_LOG_SEV(lg, info) <<"\n r size " << gm.vols.radii.size();
+  // std::cerr << "\n q size " << gm.chrgs.charges.size();
+  BOOST_LOG_SEV(lg, info) << "Radii size : " << gm.vols.nsections;
+  BOOST_LOG_SEV(lg, info) << "Charge size : " << gm.chrgs.nsections;
+  
+  enhancement::Enhancement enh(gm.vols.radii,
+			       gm.chrgs.charges*eCharge,
+			       efactor,
+			       cpotentials,
+			       bpotentials,
+			       rbarriers,
+			       gm.einter.dconstant,
+			       lg);
+
+  std::string fullname = dirname + prefix_filename;
+  
+  BOOST_LOG_SEV(lg, info) << "Reading particle pairs...";
+  auto start = std::chrono::system_clock::now();
+  //
+  enh.read_particlepairs(fullname);
+  //
+  auto end = std::chrono::system_clock::now();
+  std::chrono::duration<double>  elapsed_seconds = end-start;
+  BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
+
+  return 0;
+}
+
+int CRate::compute_frompairs() {
+
+  BOOST_LOG_SEV(lg, info) << "Reading particle pairs...";
+  
+  BOOST_LOG_SEV(lg, info) << "Radii size : " << gm.vols.nsections;
+  BOOST_LOG_SEV(lg, info) << "Charge size : " << gm.chrgs.nsections;
+  
+    
+  enhancement::Enhancement enh(gm.vols.radii,
+			       gm.chrgs.charges*eCharge,
+  			       gm.einter.dconstant,
+			       lg);
+
+  std::string fullname = dirname + prefix_filename;
+  
+  BOOST_LOG_SEV(lg, info) << "Reading particle pairs...";
+  auto start = std::chrono::system_clock::now();
+  //
+  enh.read_particlepairs(fullname);
+  //
+  auto end = std::chrono::system_clock::now();
+  std::chrono::duration<double>  elapsed_seconds = end-start;
+  BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
+
+
+  switch(gm.einter.method) {
+    case 0:
+      BOOST_LOG_SEV(lg, info) << "Bounded method MPC : " << gm.einter.method;
+      BOOST_LOG_SEV(lg, info) << "Computing MPC potentials at contact...";
+      start = std::chrono::system_clock::now();
+      //
+      enh.compute_mpcpotential_contact();
+      //
+      end = std::chrono::system_clock::now();
+      elapsed_seconds = end-start;
+      BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
+      BOOST_LOG_SEV(lg, info) << "Computing MPC potentials barriers...";
+      start = std::chrono::system_clock::now();
+      //
+      enh.compute_mpcpotential_barrier();
+      //
+      end = std::chrono::system_clock::now();
+      elapsed_seconds = end-start;
+      BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
+      break;
+    case 1:
+      BOOST_LOG_SEV(lg, info) << "Bounded method IPA : " << gm.einter.method;
+      BOOST_LOG_SEV(lg, info) << "Computing IPA potentials at contact...";
+      start = std::chrono::system_clock::now();
+      //
+      enh.compute_ipapotential_contact();
+      //
+      end = std::chrono::system_clock::now();
+      elapsed_seconds = end-start;
+      BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
+      BOOST_LOG_SEV(lg, info) << "Computing IPA potentials barriers...";
+      start = std::chrono::system_clock::now();
+      //      
+      enh.compute_ipapotential_barrier();
+      //
+      end = std::chrono::system_clock::now();
+      elapsed_seconds = end-start;
+      BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
+      break; 
+    case 2:
+      BOOST_LOG_SEV(lg, info) << "Bounded method Coulomb : " << gm.einter.method;
+      BOOST_LOG_SEV(lg, info) << "Computing coulomb potentials at contact...";
+      start = std::chrono::system_clock::now();
+      //      
+      enh.compute_coulombpotential_contact();
+      //
+      end = std::chrono::system_clock::now();
+      elapsed_seconds = end-start;
+      BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
+      break;
+  default:
+    BOOST_LOG_SEV(lg, error) << "Method " << gm.einter.method
+  			     << " not known";
+      std::terminate();
+  }
+ 
+  BOOST_LOG_SEV(lg, info) << "Computing enhancement factor grid";
+  start = std::chrono::system_clock::now();
+  //
+  enh.compute_enhancementfactor_frompairs();
+  //
+  end = std::chrono::system_clock::now();
+  elapsed_seconds = end-start;
+  BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
+
+  enh.get_efindices(daefactor, efindices);
+
+  enh.get_cpindices(dacpotentials, cpindices);
+    
+  enh.get_bpindices(dabcpotentials, dabpotentials, darbarriers, bpindices);
+  //for (unsigned int ii=0; ii<daefactor.size(); ++ii) {
+  //  std::cout << '\n' << daefactor[ii];
+  //}
+  
+  // Compute beta0
+  beta0 = pow(3.0/(4.0*M_PI), 1.0/6.0)
+        * sqrt(6.0*Kboltz*gm.gsys.temperature/gm.gsys.nmdensity);
+
+  // // BOOST_LOG_SEV(lg, info) << "Computing enhancement factor grid";
+  // // compute_efactor_grid();
+  // // BOOST_LOG_SEV(lg, info) << "Done... ehancement factor grid";
+
+  // for a large grid 100x300 comment lines below
+  start = std::chrono::system_clock::now();
+  BOOST_LOG_SEV(lg, info) << "Computing coagulation rate";
+  compute_rcoagulation();
+  BOOST_LOG_SEV(lg, info) << "Done... coagulation rate";
+  end = std::chrono::system_clock::now();
+  elapsed_seconds = end-start;
+  BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
+  
+
+  BOOST_LOG_SEV(lg, info) << "Computing eta creation rate";
+  compute_etafactor();
+  BOOST_LOG_SEV(lg, info) << "Done... eta";
+
+  BOOST_LOG_SEV(lg, info) << "Computing death rate";
+  compute_deathfactor();
+  BOOST_LOG_SEV(lg, info) << "Done... death";
+
+  return 0;
+}
+
+
+int CRate::compute() {
 
   // grid definition
   grid = {{gm.vols.nsections, gm.chrgs.nsections}};
   grid4 = {{gm.vols.nsections, gm.chrgs.nsections,
             gm.vols.nsections, gm.chrgs.nsections}};
-
+  
   // resizing
-  efactor.resize(grid4); 
+  efactor.resize(grid4);
+  cpotentials.resize(grid4);
+  bpotentials.resize(grid4);
+  rbarriers.resize(grid4);
   rcoag.resize(grid4);
 
-  // Compute electrostatic to thermal ratio
-  electhermratio = 1.0*eCharge*eCharge
-                  / (4.0*M_PI*EpsilonZero*Kboltz*gm.gsys.temperature);
+  BOOST_LOG_SEV(lg, info) << "Size for array efactor : " << efactor.size();
+  BOOST_LOG_SEV(lg, info) << "Radii size : " << gm.vols.nsections;
+  BOOST_LOG_SEV(lg, info) << "Charge size : " << gm.chrgs.nsections;     
 
-  BOOST_LOG_SEV(lg, info) << "Electrostatic to thermal ratio: "
-                          << electhermratio;
+  enhancement::Enhancement enh(gm.vols.radii,
+			       gm.chrgs.charges*eCharge,
+			       efactor,
+			       cpotentials,
+			       bpotentials,
+			       rbarriers,
+			       gm.einter.dconstant,
+			       lg);
+
+  BOOST_LOG_SEV(lg, info) << "Computing reduced particle pairs...";
+  auto start = std::chrono::system_clock::now();
+  //
+  enh.compute_reducedpairs();
+  //
+  auto end = std::chrono::system_clock::now();
+  std::chrono::duration<double> elapsed_seconds = end-start;
+  BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();  
+  
+  switch(gm.einter.method) {
+    case 0:
+      BOOST_LOG_SEV(lg, info) << "Bounded method MPC : " << gm.einter.method;
+      BOOST_LOG_SEV(lg, info) << "Computing MPC potentials at contact...";
+      start = std::chrono::system_clock::now();
+      //
+      enh.compute_mpcpotential_contact();
+      //      
+      end = std::chrono::system_clock::now();
+      elapsed_seconds = end-start;
+      BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
+      BOOST_LOG_SEV(lg, info) << "Computing MPC potentials barriers...";
+      start = std::chrono::system_clock::now();
+      //
+      enh.compute_mpcpotential_barrier();
+      //
+      end = std::chrono::system_clock::now();
+      elapsed_seconds = end-start;
+      BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
+      break;
+    case 1:
+      BOOST_LOG_SEV(lg, info) << "Bounded method IPA : " << gm.einter.method;
+      BOOST_LOG_SEV(lg, info) << "Computing IPA potentials at contact...";
+      start = std::chrono::system_clock::now();
+      //
+      enh.compute_ipapotential_contact();
+      //
+      end = std::chrono::system_clock::now();
+      elapsed_seconds = end-start;
+      BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
+      BOOST_LOG_SEV(lg, info) << "Computing IPA potentials barriers...";
+      start = std::chrono::system_clock::now();
+      //      
+      enh.compute_ipapotential_barrier();
+      //
+      end = std::chrono::system_clock::now();
+      elapsed_seconds = end-start;
+      BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
+      break; 
+    case 2:
+      BOOST_LOG_SEV(lg, info) << "Bounded method Coulomb : " << gm.einter.method;
+      BOOST_LOG_SEV(lg, info) << "Computing coulomb potentials at contact...";
+      start = std::chrono::system_clock::now();
+      //      
+      enh.compute_coulombpotential_contact();
+      //
+      end = std::chrono::system_clock::now();
+      elapsed_seconds = end-start;
+      BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
+      break;
+    case 3:
+      BOOST_LOG_SEV(lg, info) << "Bounded Hybrid method : " << gm.einter.method;
+      BOOST_LOG_SEV(lg, info) << "Computing MPC potentials at contact...";
+      start = std::chrono::system_clock::now();
+      //
+      enh.compute_mpcpotential_contact();
+      //
+      end = std::chrono::system_clock::now();
+      elapsed_seconds = end-start;
+      BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
+      BOOST_LOG_SEV(lg, info) << "Computing IPA potentials barriers...";
+      start = std::chrono::system_clock::now();
+      //
+      enh.compute_ipapotential_barrier();
+      //
+      end = std::chrono::system_clock::now();
+      elapsed_seconds = end-start;
+      BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
+      break;      
+  default:
+    BOOST_LOG_SEV(lg, error) << "Method " << gm.einter.method
+  			     << " not known";
+      std::terminate();
+  }
+ 
+  BOOST_LOG_SEV(lg, info) << "Computing enhancement factor grid";
+  start = std::chrono::system_clock::now();
+  //
+  enh.compute_enhancement_factor();
+  //
+  end = std::chrono::system_clock::now();
+  elapsed_seconds = end-start;
+  BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
+  
+  // // Compute electrostatic to thermal ratio
+  // electhermratio = 1.0*eCharge*eCharge
+  //                 / (4.0*M_PI*EpsilonZero*Kboltz*gm.gsys.temperature);
+
+  // BOOST_LOG_SEV(lg, info) << "Electrostatic to thermal ratio: "
+  //                         << electhermratio;
 
   // Compute beta0
   beta0 = pow(3.0/(4.0*M_PI), 1.0/6.0)
         * sqrt(6.0*Kboltz*gm.gsys.temperature/gm.gsys.nmdensity);
 
-  BOOST_LOG_SEV(lg, info) << "Computing enhancement factor grid";
-  compute_efactor_grid();
-  BOOST_LOG_SEV(lg, info) << "Done... ehancement factor grid";
+  //BOOST_LOG_SEV(lg, info) << "Computing enhancement factor grid";
+  //compute_efactor_grid();
+  //BOOST_LOG_SEV(lg, info) << "Done... ehancement factor grid";
 
+  start = std::chrono::system_clock::now();
   BOOST_LOG_SEV(lg, info) << "Computing coagulation rate";
   compute_rcoagulation();
   BOOST_LOG_SEV(lg, info) << "Done... coagulation rate";
-
+  end = std::chrono::system_clock::now();
+  elapsed_seconds = end-start;
+  BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
+  
   BOOST_LOG_SEV(lg, info) << "Computing eta creation rate";
   compute_etafactor();
   BOOST_LOG_SEV(lg, info) << "Done... eta";
@@ -495,47 +996,25 @@ void CRate::compute_deathfactor()
 void CRate::write_etafactor() {
   
   long int etasize = static_cast<long int>(eta_factor_vector.size());
-  bgrid2d etagrid = {{etasize, neta}};
- 
-  eta2d.resize(etagrid);
-  
-  unsigned int row=0;
-  for(auto ecf : eta_factor_vector) {
-      eta2d[row][0] = ecf.id_;
-      eta2d[row][1] = ecf.l_;
-      eta2d[row][2] = ecf.q_;
-      eta2d[row][3] = ecf.m_;
-      eta2d[row][4] = ecf.p_;
-      eta2d[row][5] = ecf.n_;
-      eta2d[row][6] = ecf.r_;
-      eta2d[row][7] = ecf.eta_;
-      ++row;
-  }
   
   int err;
   
   std::string gname = "Electrostatic_interaction";
   std::string dsname = "eta_factor_vector";
-  
-  err = write_dataset2d_hdf5(h5obj,
-                             gname,
-                             dsname,
-                             eta2d,
-                             etasize,
-                             neta);
+
+  etafactorvector_toh5file(eta_factor_vector, h5obj, gname, dsname);
 
   err = create_dsattrib_hdf5<long int>(h5obj,
                                        gname,
                                        dsname,
                                        "size",
-                                       etasize);
+                                       etasize);  
+
 }
 
 // Write creation eta to file
 void CRate::read_etafactor() {
-  
-//   long int etasize = static_cast<long int>(eta_factor_vector.size());
-  
+   
   int err;
   long int etasize = 0;
   std::string gname = "Electrostatic_interaction";
@@ -547,75 +1026,28 @@ void CRate::read_etafactor() {
                                      "size",
                                      etasize);
 
-  bgrid2d etagrid = {{etasize, neta}};
-  eta2d.resize(etagrid);
-  
-  err = read_dataset2d_hdf5(h5obj,
-                            gname,
-                            dsname,
-                            eta2d,
-                            etasize,
-                            neta);
-  
 
-  // flatten
-  eta_factor_vector.clear();  
-  for (unsigned int i = 0; i < etasize; ++i) {
-    EtaCreationFactor eta_factor_aux;
-    fill_eta(eta_factor_aux,
-             eta2d[i][0],
-             eta2d[i][1],
-             eta2d[i][2],
-             eta2d[i][3],
-             eta2d[i][4],
-             eta2d[i][5],
-             eta2d[i][6],
-             eta2d[i][7]);
-    eta_factor_vector.push_back(eta_factor_aux);
-  }
+  BOOST_LOG_SEV(lg, info)<< "eta size: " << etasize; 
 
-//     for(unsigned int i = 0; i<etasize; ++i) {
-//        std::cerr << std::endl;
-//       for(unsigned int j = 0; j<neta; ++j) {
-// //          array2D[i][j] = varray[i+nrow*j];
-//         std::cerr << eta2d[i][j] << '\t';
-//       }
-//     }
-  BOOST_LOG_SEV(lg, info)<< "eta read: " << etasize;
+  eta_factor_vector.clear();
+
+  etafactorvector_fromh5file(eta_factor_vector, h5obj, gname, dsname);
+
+  BOOST_LOG_SEV(lg, info)<< "eta read: " << eta_factor_vector.size();
 }
 
 // Write death factor to file
 void CRate::write_deathfactor() {
  
   long int deathsize = static_cast<long int>(death_factor_vector.size());
-  bgrid2d deathgrid = {{deathsize, ndeath}};
-//   boost_array2d death2d(deathgrid);
-  
-  death2d.resize(deathgrid);
-  
-  unsigned int row=0;
-  for(auto ecf : death_factor_vector) {
-      death2d[row][0] = ecf.id_;
-      death2d[row][1] = ecf.l_;
-      death2d[row][2] = ecf.q_;
-      death2d[row][3] = ecf.m_;
-      death2d[row][4] = ecf.p_;
-      death2d[row][5] = ecf.death_;
-      ++row;
-  }
-  
+
   int err;
   
   std::string gname = "Electrostatic_interaction";
   std::string dsname = "death_factor_vector";
   
-  err = write_dataset2d_hdf5(h5obj,
-                             gname,
-                             dsname,
-                             death2d,
-                             deathsize,
-                             ndeath);
-
+  deathfactorvector_toh5file(death_factor_vector, h5obj, gname, dsname);
+  
   err = create_dsattrib_hdf5<long int>(h5obj,
                                        gname,
                                        dsname,
@@ -626,8 +1058,6 @@ void CRate::write_deathfactor() {
 
 // Write death eta to file
 void CRate::read_deathfactor() {
-  
-//   long int etasize = static_cast<long int>(eta_factor_vector.size());
   
   int err;
   long int deathsize = 0;
@@ -641,39 +1071,14 @@ void CRate::read_deathfactor() {
                                      "size",
                                      deathsize);
 
-  bgrid2d deathgrid = {{deathsize, ndeath}};
-  death2d.resize(deathgrid);
   
-  err = read_dataset2d_hdf5(h5obj,
-                            gname,
-                            dsname,
-                            death2d,
-                            deathsize,
-                            ndeath);
-  
-  // flatten
-  death_factor_vector.clear();  
-  for (unsigned int i = 0; i < deathsize; ++i) {
-    DeathFactor death_factor_aux;
-    fill_death(death_factor_aux,
-               death2d[i][0],
-               death2d[i][1],
-               death2d[i][2],
-               death2d[i][3],
-               death2d[i][4],
-               death2d[i][5]);
-    death_factor_vector.push_back(death_factor_aux);
-  }
-  
-//     for(unsigned int i = 0; i<deathsize; ++i) {
-// //        std::cerr << std::endl;
-//       for(unsigned int j = 0; j<ndeath; ++j) {
-// //          array2D[i][j] = varray[i+nrow*j];
-// //         std::cerr << death2d[i][j] << '\t';
-//       }
-//     }
-  BOOST_LOG_SEV(lg, info)<< "death read: " << deathsize;
+  BOOST_LOG_SEV(lg, info)<< "death size: " << deathsize; 
 
+  death_factor_vector.clear();
+
+  deathfactorvector_fromh5file(death_factor_vector, h5obj, gname, dsname);
+  
+  BOOST_LOG_SEV(lg, info)<< "death read: " << death_factor_vector.size();
 }
 
 
@@ -731,6 +1136,75 @@ void CRate::write_efactor() {
   int err = create_attrib_hdf5(h5obj, gname,
                                "electhermratio",
                                electhermratio);
+}
+
+void CRate::write_efactor_serial() {
+  std::string gname = "Enhancement_factor_serial";
+  std::string dsname = "Indices";
+  //  create_group_hdf5(h5obj, gname);
+
+  write_dset2d_hdf5<boost_short_array2d, short>(h5obj, gname, dsname,
+						efindices,
+						efindices.shape()[0],
+						efindices.shape()[1]);
+
+  std::string edsname = "efactor";
+  write_dset_hdf5<darray>(h5obj, gname, edsname,
+			  daefactor,
+			  efindices.shape()[0]);
+   
+}
+
+void CRate::write_potentials_serial() {
+  std::string cgname = "Contact_potential_serial";
+  std::string dsname = "Indices";
+
+  write_dset2d_hdf5<boost_short_array2d, short>(h5obj, cgname, dsname,
+						cpindices,
+						cpindices.shape()[0],
+						cpindices.shape()[1]);
+  
+  std::string csname = "contact_potential";
+  write_dset_hdf5<darray>(h5obj, cgname, csname,
+			  dacpotentials,
+			  cpindices.shape()[0]);
+  
+
+  std::string gname = "Barrier_potential_serial";
+  write_dset2d_hdf5<boost_short_array2d, short>(h5obj, gname, dsname,
+						bpindices,
+						bpindices.shape()[0],
+						bpindices.shape()[1]);
+
+  
+  std::string bcsname = "contact_potential";
+  write_dset_hdf5<darray>(h5obj, gname, bcsname,
+			  dabcpotentials,
+			  bpindices.shape()[0]);
+
+  std::string bsname = "barrier_potential";
+  write_dset_hdf5<darray>(h5obj, gname, bsname,
+			  dabpotentials,
+			  bpindices.shape()[0]);
+
+  std::string rbsname = "rbarrier";
+  write_dset_hdf5<darray>(h5obj, gname, rbsname,
+			  darbarriers,
+			  bpindices.shape()[0]);
+
+  
+}
+
+
+void CRate::write_potentials() {
+  std::string cname = "Contact_potential";
+  write_4d(cname, cpotentials);
+
+  std::string bname = "Barrier_potential";
+  write_4d(bname, bpotentials);
+
+  std::string rname = "Barrier_location";
+  write_4d(rname, rbarriers);  
 }
 
 void CRate::write_rcoagulation() {

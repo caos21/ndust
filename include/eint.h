@@ -18,12 +18,15 @@
 #ifndef EINT_H
 #define EINT_H
 
+#define FINITE 1
+
 #include <iostream>
 #include <fstream>
 #include <cmath>
 #include <string>
 #include <vector>
 #include <utility>
+#include <algorithm>
 
 #include <omp.h>
 
@@ -34,14 +37,20 @@
 //#include <boost/math/special_functions/factorials.hpp>
 
 #include <boost/numeric/ublas/matrix.hpp>
+#include <boost/numeric/ublas/matrix_proxy.hpp>
+#include <boost/numeric/ublas/symmetric.hpp>
+#include <boost/numeric/ublas/vector_proxy.hpp>
 #include <boost/numeric/ublas/io.hpp>
+#include <boost/numeric/ublas/operation.hpp>
 #include <boost/numeric/bindings/traits/ublas_matrix.hpp>
 #include <boost/numeric/bindings/traits/ublas_sparse.hpp>
 #include <boost/numeric/bindings/lapack/gesv.hpp>
+#include <boost/numeric/bindings/lapack/sysv.hpp>
 #include <boost/numeric/bindings/traits/ublas_vector2.hpp>
 
 // #include <boost/numeric/bindings/umfpack/umfpack.hpp>
 
+#include "array.h"
 #include "constants.h"
 
 namespace tools = boost::math::tools;
@@ -50,6 +59,18 @@ namespace lapack = boost::numeric::bindings::lapack;
 // namespace umf = boost::numeric::bindings::umfpack;
 namespace bmath = boost::math;
 
+#include <boost/multiprecision/cpp_int.hpp>
+using boost::multiprecision::cpp_int;
+#include <boost/multiprecision/cpp_dec_float.hpp>
+using boost::multiprecision::cpp_dec_float_50;
+using boost::multiprecision::cpp_dec_float_100;
+
+typedef boost::multiprecision::number<boost::multiprecision::cpp_dec_float<50>> mpfloat;
+
+//typedef double mpfloat;
+
+//typedef long double mpfloat;
+
 struct TerminationCondition  {
   bool operator() (double min, double max)  {
     return abs((min - max)/min) <= 0.0001;
@@ -57,9 +78,23 @@ struct TerminationCondition  {
 };  
 
 namespace eint {
-  typedef ublas::matrix<double, ublas::column_major> ubmatrix;
+  typedef ublas::matrix<double> ubmatrix;
   typedef ublas::vector<double> ubvector;
 
+  //! Factorized (dimensionless) Coulomb potential
+  /*!
+    \param rt the separation.
+    \param r21 the ratio r2/r1.
+    \param q21 the ratio q2/q1.
+    \param eps the dielectric constant.
+  */
+  inline
+  double potential_coulomb_fact(const double rt, const double r21,
+				const double q21) {
+
+    return Kcoul*q21/rt;
+  }
+  
   //! Factorized (dimensionless) potential approximation IPA.
   /*!
     \param rt the separation.
@@ -194,50 +229,315 @@ namespace eint {
     return (n == 1 || n == 0) ? 1 : factorial(n - 1) * n;
   }
 
-  // compute multipolar coefficients
+  template <typename T>
+  T from_stirling(double x){
+    // helper, derived from Stirling's approximation
+    T y = x;
+    T ret = y*log(y)+0.5*log(2.*pi*y);
+    return ret;
+  }
+
+  template <typename T>
+  T stirling_quotient(double x, double y){
+    T ret = from_stirling<T>(x+y) - from_stirling<T>(x) - from_stirling<T>(y);
+    return ret;
+  }
+
+  // compute D matrix elements
   inline
-  void compute_Acoefficients(ubmatrix &coefficients, ubvector &independent,
-                            double &A10,
-                            const double r1, const double q1,
-                            const double r2, const double q2,
-                            const double rn,
-                            const double eps,
-                            const unsigned int j1max=5,
-                            const unsigned int j2max=5) {
-
-    A10 = Kcoul*q1;
-    for(unsigned int j1=1; j1<j1max; ++j1){
-      double prefac1 = (eps-1.0)*j1/((eps+1.0)*j1 + 1.0);
-      // term due to Q2, j1!=0, always negative
-      double f2 = -prefac1*pow(r1, 2*j1+1)*Kcoul*q2/pow(rn, j1+1);
-      // this term is independent of coefficients A
-      independent[j1-1] = f2;
-      for(unsigned int j3=0; j3<j1max; ++j3){
-        for(unsigned int j2=1; j2<j2max; ++j2){
-          double prefac2 = (eps-1.0)*j2/((eps+1.0)*j2 + 1.0);
-          double denom = (Facts[j1]
-                          *Facts[j2]
-                          *Facts[j2]
-                          *Facts[j3])
-                          *pow(rn, j1+2*j2+j3+2);
-          double numer = prefac1 * prefac2 * Facts[j1+j2]
-                      * Facts[j2+j3]
-                      * pow(r1, 2*j1+1) * pow(r2, 2*j2+1);
-
-          if(j3!=0) {
-            coefficients(j1-1, j3-1) -= numer / denom;
-          }
-          else {
-            independent[j1-1] += A10*numer / denom;
-          }
-        }
-        if(j3==j1) {
-          coefficients(j1-1, j3-1) += 1.0;
-        }
-      }
+  double dijlm(double rt, double r1, double r2, unsigned int l, unsigned int m) {
+    if (m==0) {
+      return pow(r1/rt, l);
+    }
+    
+    unsigned int lm = l+m;
+    if (lm <= NFMAX-1){
+      // use exact factorials
+      return (Facts[lm]/(Facts[l]*Facts[m]))*pow(r1/rt, l)*pow(r2/rt, m);
+    }
+    else {
+      // Stirling's approximation
+      double lpart = l*(log((lm)*r1/(l*rt)));
+      double mpart = m*(log((lm)*r2/(m*rt)));
+      double apart = 0.5*log(lm/(2.*pi*l*m));
+      double hoterms = 1./(12*lm) - 1./(360*lm*lm*lm);
+      return exp(lpart+mpart+apart+hoterms);
     }
   }
 
+  // compute C Matrix
+  inline
+  double clm(double rt, double r21, unsigned int l, unsigned int m, double eps) {
+    if (l==m) {
+      double cval = (rt/r21)*(((eps+1)*l+1)/((eps-1)*l));
+      return cval;
+    }
+    return 0.0;
+  }
+  
+  // compute multipolar coefficients
+  inline
+  void compute_MPCoefficients(ubvector &A1coefficients,
+			      ubvector &A2coefficients,
+			      double &A10,
+			      double &A20,
+			      const double rt,
+			      const double r21,
+			      const double q21,
+			      const double eps,
+			      const unsigned int nterms) {
+
+    A10 = Kcoul;
+    A20 = Kcoul*q21/r21;
+
+    // system is nterms - 0th term
+    unsigned int ssize = nterms-1;
+
+#ifdef USING_EIGEN
+
+    VectorDD b1 = VectorDD::Zero(ssize);
+    VectorDD b2 = VectorDD::Zero(ssize);
+
+    MatrixDD C1 = MatrixDD::Zero(ssize, ssize);
+    MatrixDD C2 = MatrixDD::Zero(ssize, ssize);
+
+    MatrixDD C1_inv = MatrixDD::Zero(ssize, ssize);
+    MatrixDD C2_inv = MatrixDD::Zero(ssize, ssize);
+    
+    MatrixDD D1 = MatrixDD::Zero(ssize, ssize);
+    MatrixDD D2 = MatrixDD::Zero(ssize, ssize); 
+    
+#else
+    ubvector b1 = ublas::zero_vector<double>(ssize);
+    ubvector b2 = ublas::zero_vector<double>(ssize);
+
+    ubmatrix C1 = ublas::zero_matrix<double>(ssize, ssize);
+    ubmatrix C2 = ublas::zero_matrix<double>(ssize, ssize);
+
+    ubmatrix C1_inv = ublas::zero_matrix<double>(ssize, ssize);
+    ubmatrix C2_inv = ublas::zero_matrix<double>(ssize, ssize);
+    
+    ubmatrix D1 = ublas::zero_matrix<double>(ssize, ssize);
+    ubmatrix D2 = ublas::zero_matrix<double>(ssize, ssize);
+#endif
+    
+    for (unsigned int l=0; l<ssize; ++l) {
+      // b vectors
+      b1(l) = -dijlm(rt, 1.0, r21, l+1, 0) * A20;
+      b2(l) = -dijlm(rt, r21, 1.0, l+1, 0) * A10;
+      
+      //Fill C Matrices (diagonal)
+      C1(l, l) = clm(rt, r21, l+1, l+1, eps);
+      C2(l, l) = clm(rt, 1.0, l+1, l+1, eps);
+
+      //inverse C diagonal matrices
+      C1_inv(l, l) =  1.0/C1(l, l);
+      C2_inv(l, l) =  1.0/C2(l, l);
+    }
+    for (unsigned int l=0; l<ssize; ++l) {
+      for (unsigned int m=0; m<ssize; ++m) {
+	//Fill D Matrices
+	D1(l, m) = dijlm(rt, 1.0, r21, l+1, m+1);
+	D2(l, m) = dijlm(rt, r21, 1.0, l+1, m+1);
+      }
+    }
+
+#ifdef USING_EIGEN
+ #ifdef USING_AMPC//using complete matrix A
+    MatrixDD M = MatrixDD::Zero(2*ssize, 2*ssize);
+
+    M.block(0    ,       0, ssize  ,   ssize) = C1;
+    M.block(0    ,   ssize, ssize  ,   ssize) = D1;
+    
+    M.block(ssize,       0, ssize  ,   ssize) = C2;
+    M.block(ssize,   ssize, ssize  ,   ssize) = D2;
+
+    VectorDD B = VectorDD::Zero(2*ssize);
+
+    B.segment(0    , ssize) = b1;
+    B.segment(ssize, ssize) = b2;
+
+    /* MatrixDD S = M.selfadjointView<Eigen::Upper>(); */
+
+    /* Eigen::ConjugateGradient<MatrixDD, Eigen::Upper> cg; */
+    /* cg.compute(S); */
+
+    /* VectorDD X(2*ssize); */
+
+    /* X = cg.solve(B); */
+    
+    /* std::cerr << "[ii] #iterations:     " << cg.iterations() << std::endl; */
+    /* std::cerr << "[ii] estimated error: " << cg.error()      << std::endl; */
+
+    VectorDD X = VectorDD::Zero(2*ssize);
+    X = M.colPivHouseholderQr().solve(B);
+
+    for (unsigned int l=0; l<ssize; ++l) {
+      A1coefficients(l) = X(l);
+      A2coefficients(l) = X(l+ssize);
+    }
+ #else//USING_AMPC
+    MatrixDD M12 = MatrixDD::Zero(ssize, ssize);
+    VectorDD B1 = VectorDD::Zero(ssize);
+
+    M12 = C1 - D1 * (C2_inv * D2);
+    B1 =  b1 - D1 * (C2_inv * b2);
+
+    VectorDD X1 = VectorDD::Zero(ssize);
+    //X1 = M12.colPivHouseholderQr().solve(B1);
+    X1 = M12.partialPivLu().solve(B1);
+
+    /* MatrixDD M21 = MatrixDD::Zero(ssize, ssize); */
+    /* VectorDD B2 = VectorDD::Zero(ssize); */
+
+    /* M21 = C2 - D2 * (C1_inv * D1); */
+    /* B2 =  b2 - D2 * (C1_inv * b1); */
+
+    VectorDD X2 = VectorDD::Zero(ssize);
+    //X2 = M21.colPivHouseholderQr().solve(B2);
+    // X2 = C2inv * (b2 - D2 * X1)
+    X2 = C2_inv * (b2 - D2 * X1);
+    
+    for (unsigned int l=0; l<ssize; ++l) {
+      A1coefficients(l) = X1(l);
+      A2coefficients(l) = X2(l);
+    }
+ #endif//USING_AMPC
+#else//USING_EIGEN
+ #ifdef USING_AMPC//using complete matrix A
+    //
+    // ************  Slower, using full matrix ****************
+    //
+    ubmatrix M = ublas::zero_matrix<double>(2*ssize, 2*ssize);
+
+    ublas::range r0s = ublas::range(0, ssize);
+    ublas::range rs2s = ublas::range(ssize, 2*ssize);
+
+    project(M, r0s, r0s) = C1;
+    project(M, r0s, rs2s) = D1;
+
+    project(M, rs2s, r0s) = C2;
+    project(M, rs2s, rs2s) = D2;
+
+    ubvector B = ublas::zero_vector<double>(2*ssize);
+
+    project(B, r0s) = b1;
+    project(B, rs2s) = b2;
+
+    ublas::symmetric_adaptor<ublas::matrix<double>, ublas::lower> SM(M);
+    lapack::sysv(SM, B);
+    //lapack::gesv(M, B);
+
+    A1coefficients = project(B, r0s);
+    A2coefficients = project(B, rs2s);
+
+ #else//USING_AMPC using complete matrix A
+    //
+    // ************  Using reduced system  ****************
+    //    
+    ubmatrix M12 = ublas::zero_matrix<double>(ssize, ssize);
+    ubvector B1 = ublas::zero_vector<double>(ssize);
+
+    // WARNING future optimisation prod(A, temp_type(prod(B,C));
+
+    //M12 = C1 - D1 * ublas::prod(C2_inv, D2);
+    ubmatrix MTemp = ublas::prod(C2_inv, D2);
+    M12 = C1 - ublas::prod(D1, MTemp);
+
+    // B1 =  b1 - D1 * (C2_inv * b2);
+    ubvector VTemp = ublas::prod(C2_inv, b2);
+    B1 =  b1 - ublas::prod(D1, VTemp);
+    
+    ubmatrix M21 = ublas::zero_matrix<double>(ssize, ssize);
+    ubvector B2 = ublas::zero_vector<double>(ssize);
+
+    //M21 = C2 - D2 * ublas::prod(C1_inv, D1);
+    MTemp = ublas::prod(C1_inv, D1);
+    M21 = C2 - ublas::prod(D2, MTemp);
+
+    //B2 =  b2 - D2 * (C1_inv * b1);
+    VTemp = ublas::prod(C1_inv, b1);
+    B2 =  b2 - ublas::prod(D2, VTemp);
+
+    //    lapack::gesv(M12, B1);
+    // solve symmetric linear system of equations
+    /* lapack::gesv(M12, B1); */
+    ublas::symmetric_adaptor<ublas::matrix<double>, ublas::lower> SM12(M12);
+    lapack::sysv(SM12, B1);
+
+    // results
+    A1coefficients = B1;
+
+    // solve symmetric linear system of equations
+    ublas::symmetric_adaptor<ublas::matrix<double>, ublas::lower> SM21(M21);
+    lapack::sysv(SM21, B2);
+
+    A2coefficients = B2;    
+    /* ubvector VTemp2  = ublas::zero_vector<double>(ssize); // = ublas::prod(D2, A1coefficients); */
+    /* ublas::axpy_prod(D2, A1coefficients, VTemp2, true); */
+    /* VTemp = b2 - VTemp2; */
+    /* //A2coefficients = ublas::prod(C2_inv, VTemp); */
+    /* ublas::axpy_prod(C2_inv, VTemp, A2coefficients, true); */
+    
+    
+    //    std::cerr << "\n A1 " << A1coefficients << '\n';
+    /* std::cerr << "\n A2 " << A2coefficients << '\n'; */
+ #endif//USING_AMPC
+#endif//USING_EIGEN
+  }
+
+  //! Bichoutskaia potential.
+  /*!
+   *
+   *As defined in equation A7 of
+    Lindgren, E. B., Chan, H.-K., Stace, A. J. & Besley, E.
+    Progress in the theory of electrostatic interactions between charged particles.
+    Phys. Chem. Chem. Phys. 18, 5883–5895 (2016)
+    \param r1 radius of particle 1.
+    \param r2 radius of particle 2.
+    \param q1 charge of particle 1.
+    \param q2 charge of particle 2.
+    \param h separation between particles.
+    \param eps the dielectric constant.
+    \param acoefficients the multipole moment coefficients
+    \
+  */
+  inline
+  double mpc_potential(const double& rt, const double& r21, const double& q21,
+                       const ubvector& A1coefficients, const ubvector& A2coefficients,
+		       const double& eps) {
+
+    unsigned int size = A1coefficients.size();
+
+    double invK = 1.0/Kcoul;
+    
+    double potc = Kcoul*q21/rt;
+    
+    double epsm = eps-1.0;
+    double epsp = eps+1.0;
+    
+    double pot1 = 0.0;
+    for(unsigned int mp=1; mp<size+1; ++mp) {
+      pot1 += A2coefficients(mp-1)*pow(r21/rt, mp+1);
+      //std::cerr << "\n pot1 " << pot1;
+    }
+    //std::cerr << "\n";
+
+    double pot2 = 0.0;
+    for(unsigned int lp=1; lp<size+1; ++lp) {
+      double prefac = (epsp*lp+1)/(epsm*lp);
+      pot2 += prefac * A1coefficients(lp-1) * A1coefficients(lp-1);
+    }    
+    // NOTE 1/2 factor correction to potential as stated in
+    // 1.Stace, A. J. & Bichoutskaia, E. Reply to the ‘Comment on “Treating
+    // highly charged carbon and fullerene clusters as dielectric particles”’
+    // by H. Zettergren and H. Cederquist, Phys. Chem. Chem. Phys., 2012, 14,
+    // DOI: 10.1039/c2cp42883k. Phys. Chem. Chem. Phys. 14, 16771–16772 (2012).
+    /* std::cerr << '\n' << pot_coul << '\t' << pot_2 << '\t' << pot_3 << '\n'; */
+    return potc + 0.5*pot1 - 0.5*invK*pot2;
+  }
+
+  
   //! Bichoutskaia potential.
   /*!
    *
@@ -261,48 +561,56 @@ namespace eint {
                                 const ubvector& acoefficients,
                                 const double eps) {
 
-    unsigned int size = acoefficients.size();
-
-    double invK = 1.0/Kcoul;
-
-    double pot_coul = Kcoul*q1*q2/h;// Coulomb term
-
-    double pot_2 = 0.0;
-    for(unsigned int m=1; m<size; ++m) {// m:1 -> lns
-      for(unsigned int l=0; l<size; ++l) {
-        double numer = (acoefficients[l]*(eps-1.0)*m
-                      *Facts[l+m]*pow(r2, 2*m+1));
-        double denom = ((eps+1.0)*m+1)*(Facts[l]
-                      *Facts[m])*pow(h, 2*m+l+2);
-        pot_2 += numer / denom;
-      }
-    }
-    pot_2 *= -q1;
-
-    double pot_3 = 0.0;
-    for(unsigned int l=1; l<size; ++l) {
-      double numer = (acoefficients[l]*acoefficients[l])*((eps+1.0)*(l)+1);
-      double denom = (eps-1.0)*l*pow(r1, 2*l+1);
-      pot_3 += numer / denom;
-    }
-    pot_3 *= -invK;
-
-    // NOTE 1/2 factor correction to potential as stated in
-    // 1.Stace, A. J. & Bichoutskaia, E. Reply to the ‘Comment on “Treating
-    // highly charged carbon and fullerene clusters as dielectric particles”’
-    // by H. Zettergren and H. Cederquist, Phys. Chem. Chem. Phys., 2012, 14,
-    // DOI: 10.1039/c2cp42883k. Phys. Chem. Chem. Phys. 14, 16771–16772 (2012).
-    return pot_coul + 0.5*pot_2 + 0.5*pot_3;
+    // WARNING
+    return 1.0;
   }
 
   //! Bichoutskaia force.
   /*!
   * 
-  *As defined in equation 9 of 
+  *As defined in equation 5 of 
     Lindgren, E. B., Chan, H.-K., Stace, A. J. & Besley, E.
     Progress in the theory of electrostatic interactions between charged particles.
-    Phys. Chem. Chem. Phys. 18, 5883–5895 (2016) (and A7 of Bichoutskaia)
-    \param r1 radius of particle 1.
+    Phys. Chem. Chem. Phys. 18, 5883–5895 (2016)
+
+    This is the scaled force.
+
+    \param A10 Multipolar coefficent 0.
+    \param A1coefficients Multipolar coefficients
+  */
+  inline
+  double mpc_force(const double& A10,
+		   const ubvector& A1coefficients,
+		   double eps) {
+    
+    unsigned int size = A1coefficients.size();
+    
+    double invK = 1.0/Kcoul;
+    
+    double epsm = eps-1.0;
+    double epsp = eps+1.0;
+    
+    double force = 0.0;
+
+    // Populate new vector with A1 coefficients
+    ubvector Acoeffs = ublas::zero_vector<double>(size+1);
+    
+    for(unsigned int m=1; m<size+1; ++m) {
+      Acoeffs(m) = A1coefficients(m-1);
+    }
+    Acoeffs(0) = A10;
+    
+    for(unsigned int l=0; l<size; ++l) {
+      double prefac = (epsp*(l+1)+1)/epsm;
+      force += prefac*Acoeffs(l)*Acoeffs(l+1);
+    }
+    
+    return -invK * force;
+  }
+
+  //! Bichoutskaia force.
+  /*!
+  * \param r1 radius of particle 1.
     \param r2 radius of particle 2.
     \param q1 charge of particle 1.
     \param q2 charge of particle 2.
@@ -317,43 +625,33 @@ namespace eint {
                             const double h,
                             const ubvector& acoefficients,
                             const double eps) {
-    unsigned int size = acoefficients.size();
-
-    double invK = 1.0/Kcoul;
-
-    double force_coul = Kcoul*q1*q2/(h*h);// Coulomb term
-
-    double epsm = eps-1.0;
-    double epsp = eps+1.0;
-    
-    double force_2 = 0.0;
-    for(unsigned int m=1; m<size; ++m) {// m:1 -> lns
-      for(unsigned int l=0; l<size; ++l) {
-        double numer = (acoefficients[l]*(epsm)*m*(m+1)
-                      *Facts[l+m]*pow(r2, 2*m+1));
-        double denom = ((epsp)*m+1)*(Facts[l]
-                      *Facts[m])*pow(h, 2*m+l+3);
-        force_2 += numer / denom;
-      }
-    }
-    force_2 *= -q1;
-
-    double force_3 = 0.0;
-    for(unsigned int l=1; l<size-1; ++l) {
-      double numer = (acoefficients[l]*acoefficients[l+1])*((epsp)*(l+1)+1);
-      double denom = (epsm)*pow(r1, 2*l+3);
-      force_3 += numer / denom;
-    }
-    force_3 *= -invK;
-
-    return force_coul + force_2 + force_3;
+    // WARNING to complete
+    return -1.0;
   }
-
+  
   inline
   double relative_error(const double trueval, const double expval){
     return abs((expval-trueval)/trueval);
   }
 
+  inline
+  double max_relative_error(const double a, const double b){
+    return abs((a-b)/std::min(a,b));
+  }
+
+  struct potential_coulomb_funct
+  {
+    potential_coulomb_funct(double r21_, double q21_): r21(r21_), q21(q21_){
+    }
+
+    double operator()(double const& rt) {
+      return potential_coulomb_fact(rt, r21, q21);
+    }
+
+    double r21;
+    double q21;
+  };
+  
   struct potential_ipa_funct
   {
     potential_ipa_funct(double r21_, double q21_, double eps_):
@@ -385,298 +683,140 @@ namespace eint {
   };
 
 
-//   // compute ipa enhancement factor for a pair of particles
-//   inline
-//   double efactor_ipa(double r1, double r2,
-//                     double q1, double q2,
-//                     double eps, double temperature) {
-// 
-//     double r21 = r2/r1;
-//     double q21 = q2/q1;
-//     // check q1==0
-//     if(fabs(q1)<1.e-200){
-//       // q1=0, permute particle 1 with 2
-//       double raux = r2;
-//       r2 = r1;
-//       r1 = raux;
-//       double qaux = q2;
-//       q2 = q1;
-//       q1 = qaux;
-//       r21 = r2/r1;
-//       q21 = 0.0;
-//     }
-// 
-//     double max = 500.0;
-//     boost::uintmax_t max_iter = 1000;
-//     tools::eps_tolerance<double> tol(30);
-// 
-//     double rt = 1.0 + r21;
-// 
-//     double min = rt;
-// 
-//     // potential function
-//     potential_ipa_funct pipafunct(r21, q21, eps);
-//     double pipa = pipafunct(rt);
-// 
-//     // force function
-//     force_ipa_funct forceipafunct(r21, q21, eps);
-// 
-//     std::pair<double, double> pair_pipa;
-//     bool failed = false;
-//     try {
-// //       pair_pipa = tools::toms748_solve(pipafunct, min, max, tol, max_iter);
-//       pair_pipa = tools::toms748_solve(forceipafunct, min, max, tol, max_iter);
-//     }
-//     catch(const std::exception& e) {
-//       failed = true;
-//       pair_pipa.first = 0.0;
-//     }
-//     bool attcontact = (pipa<0.0? true: false);
-//     bool fullatt = attcontact && failed;
-//     bool withphimax = !failed || attcontact;
-// 
-//     double potprefactor = q1*q1*eCharge*eCharge/r1;
-//     double eta = 0.0;
-//     double phimin = potprefactor*pipa;
-// 
-//     if(withphimax){
-// //       double phimax = potprefactor*pair_pipa.first;
-//       double phimax = 0.0;
-//       if (pair_pipa.first>0.0){
-//         phimax = potprefactor*pipafunct(pair_pipa.first);
-//       }
-//       // WARNING 2.0*phimin
-//       eta = exp(-phimax/(Kboltz*temperature))
-//           *(1.0+(phimax-2.0*phimin)/(Kboltz*temperature));
-//     std::cout << std::endl
-//               << "\t pipa.first = " << pair_pipa.first
-//               << "\t pipa.second = " << pair_pipa.second;
-// 
-//     }
-//     if(fullatt){// WARNING 2.0*phimin
-//       eta = 1.0 - 2.0*phimin /(Kboltz*temperature);
-//     }
-//     if(!attcontact){
-//       eta = exp(-phimin/(Kboltz*temperature));
-//     }
-// 
-// //     std::cout << std::endl << "r21 = " << r21 << "\tq21 = " << q21 
-// //               << "\t phimax = " << potprefactor*pair_pipa.first
-// //               << "\t phimin = " << phimin << "\tcontact = " << attcontact
-// //               << "\tfullatt = " << fullatt << "\teta = " << eta;
-//     return eta;
-//   }
-// 
 
 
   // multipolar coefficients potential functor
   struct potential_mpc_funct
   {
-    potential_mpc_funct(double const& r21_,
-                        double const& q21_,
-                        double const& eps_,
-                        unsigned int const& j1max_,
-                        unsigned int const& j2max_):
+    potential_mpc_funct(double r21_,
+                        double q21_,
+                        double eps_,
+                        unsigned int nterms_):
                         r21(r21_), q21(q21_), eps(eps_),
-                        j1max(j1max_), j2max(j2max_){
+                        nterms(nterms_) {
 
-      coefficients = ublas::zero_matrix<double>(j1max-1, j1max-1);
-      independent = ublas::zero_vector<double>(j1max-1);
-      acoefficients = ublas::zero_vector<double>(j1max);
+      // system is nterms - 0th term
+      unsigned int ssize = nterms-1;
+    
+      // 1, n-1 terms
+      A1coefficients = ublas::zero_vector<double>(ssize);
+      A2coefficients = ublas::zero_vector<double>(ssize);
+
+      // 0 terms
+      A10 = 0.0;
+      A20 = 0.0;
     }
 
+    // constructor if coefficients are known
+    potential_mpc_funct(const ubvector &A1coefficients_,
+			const ubvector &A2coefficients_,
+			double A10_,
+			double A20_,
+			double eps_,
+			unsigned int nterms_):
+                        A1coefficients(A1coefficients_),
+		        A2coefficients(A2coefficients_),
+		        eps(eps_),
+                        nterms(nterms_) {
+
+    }
+    
     double operator()(double const& rt) {
-      double A10=0.0;
 
       // compute coefficients
-      compute_Acoefficients(coefficients, independent, A10, 1.0, 1.0,
-                            r21, q21, rt, eps, j1max, j2max);
-      // solve linear system
-      lapack::gesv(coefficients, independent);
+      compute_MPCoefficients(A1coefficients, A2coefficients,
+			     A10, A20, rt, r21, q21, eps, nterms);
 
-      // fill acoefficients
-      acoefficients[0] = A10;
-      for(unsigned int l=0; l<independent.size(); ++l){
-        acoefficients[l+1] = independent[l];
-      }
-
-      // compute Bichoutskaia potential
-      return potential_bichoutskaia(1.0, 1.0, r21, q21, rt,
-                                    acoefficients, eps);
-
+      // compute Bichoutskaia force
+      return mpc_potential(rt, r21, q21, A1coefficients, A2coefficients, eps);
     }
 
+    ubvector A1coefficients;
+    ubvector A2coefficients;
+    double A10;
+    double A20;
+    
     double r21;
     double q21;
     double eps;
-    unsigned int j1max;
-    unsigned int j2max;
-    ubmatrix coefficients;
-    ubvector independent;
-    ubvector acoefficients;
+    unsigned int nterms;   
+
   };
 
   // multipolar coefficients force functor
-  struct force_mpc_funct
-  {
-    force_mpc_funct(double const& r21_,
-                    double const& q21_,
-                    double const& eps_,
-                    unsigned int const& j1max_,
-                    unsigned int const& j2max_):
+  struct force_mpc_funct {
+    force_mpc_funct(double r21_,
+                    double q21_,
+                    double eps_,
+                    unsigned int nterms_):
                     r21(r21_), q21(q21_), eps(eps_),
-                    j1max(j1max_), j2max(j2max_){
+                    nterms(nterms_) {
 
-      coefficients = ublas::zero_matrix<double>(j1max-1, j1max-1);
-      independent = ublas::zero_vector<double>(j1max-1);
-      acoefficients = ublas::zero_vector<double>(j1max);
+      // system is nterms - 0th term
+      unsigned int ssize = nterms-1;
+
+      // 1, n-1 terms
+      A1coefficients = ublas::zero_vector<double>(ssize);
+      A2coefficients = ublas::zero_vector<double>(ssize);
+
+      // 0 terms
+      A10 = 0.0;
+      A20 = 0.0;
     }
 
+    // constructor if coefficients are known
+    force_mpc_funct(const ubvector &A1coefficients_,
+		    const ubvector &A2coefficients_,
+		    double A10_,
+		    double A20_,
+                    double eps_,
+                    unsigned int nterms_):
+                      A1coefficients(A1coefficients_),
+		      A2coefficients(A2coefficients_),			
+		      eps(eps_),
+                      nterms(nterms_) {
+
+    }
+    
     double operator()(double const& rt) {
-      double A10=0.0;
 
       // compute coefficients
-      compute_Acoefficients(coefficients, independent, A10, 1.0, 1.0,
-                            r21, q21, rt, eps, j1max, j2max);
-      // solve linear system
-      lapack::gesv(coefficients, independent);
-
-      // fill acoefficients
-      acoefficients[0] = A10;
-      for(unsigned int l=0; l<independent.size(); ++l){
-        acoefficients[l+1] = independent[l];
-      }
+      compute_MPCoefficients(A1coefficients, A2coefficients,
+      			     A10, A20, rt, r21, q21, eps, nterms);
 
       // compute Bichoutskaia force
-      return force_bichoutskaia(1.0, 1.0, r21, q21, rt,
-                                    acoefficients, eps);
+      return mpc_force(A10, A1coefficients, eps);
 
     }
 
+
+    ubvector A1coefficients;
+    ubvector A2coefficients;
+    double A10;
+    double A20;
+    
     double r21;
     double q21;
     double eps;
-    unsigned int j1max;
-    unsigned int j2max;
-    ubmatrix coefficients;
-    ubvector independent;
-    ubvector acoefficients;
+    unsigned int nterms;
+
+#ifdef USING_EIGEN
+
+    /* MatrixDD  */
+    
+#endif
+
   };
-
- // compute eta factor for a pair of particles
-  inline
-  double efactor_mpc2(double r1, double r2,
-                    double q1, double q2,
-                    double eps, double temperature,
-                    unsigned int j1max, unsigned int j2max) {
-
-    double r21 = r2/r1;
-    double q21 = q2/q1;
-    // check q1==0
-    if(fabs(q1)<1.e-200){
-      // q1=0, permute particle 1 with 2
-      double raux = r2;
-      r2 = r1;
-      r1 = raux;
-      double qaux = q2;
-      q2 = q1;
-      q1 = qaux;
-      r21 = r2/r1;
-      q21 = 0.0;
-    }
-
-    double max = 500.0;
-    boost::uintmax_t max_iter = 1000;
-    tools::eps_tolerance<double> tol(30);
-
-    double rt = 1.0 + r21;
-
-    double min = rt;
-
-    potential_mpc_funct pmpcfunct(r21, q21, eps,
-                                  j1max, j2max);
-    double pmpc = pmpcfunct(rt);
-
-    force_mpc_funct forcempcfunct(r21, q21, eps,
-                                  j1max, j2max);
-
-    std::pair<double, double> pair_pmpc;
-    bool failed = false;
-    try {
-      pair_pmpc = tools::toms748_solve(forcempcfunct, min, max, tol, max_iter);
-    }
-    catch(const std::exception& e) {
-      failed = true;
-      //std::terminate();
-      //pair_pmpc.first = 0.0;
-    }
-    bool attcontact = (pmpc<0.0? true: false);
-    bool fullatt = attcontact && failed;
-    bool withphimax = !failed || attcontact;
-
-    double potprefactor = q1*q1*eCharge*eCharge/r1;
-    double eta = 0.0;
-    double phimin = potprefactor*pmpc;
-
-    if(withphimax){
-//       double phimax = potprefactor*pair_pmpc.first;
-      double rbarrier = 0.5*(pair_pmpc.first + pair_pmpc.second);
-      double phimax = 0.0;
-      if (rbarrier>0.0){
-        phimax = potprefactor*pmpcfunct(rbarrier);
-      }
-      eta = exp(-phimax/(Kboltz*temperature))
-          *(1.0+(phimax-phimin)/(Kboltz*temperature));
-    }
-    if(fullatt){
-      eta = 1.0 - phimin /(Kboltz*temperature);
-    }
-    if(!attcontact){
-      eta = exp(-phimin/(Kboltz*temperature));
-    }
-
-  //   std::cout << std::endl << r21 << "\t" << q21 << "\t" << potprefactor*pair_pmpc.first
-  //             << "\t" << phimin << "\t" << attcontact << "\t"
-  //             << fullatt << "\t" << eta;
-    return eta;
-  }
   
   // compute eta factor for a pair of particles
   inline
   double efactor_mpc(double r1, double r2,
                      double q1, double q2,
                      const double eps, const double temperature,
-                     const unsigned int j1max, const unsigned int j2max) {
+                     const unsigned int nterms) {
 
-    /* // compute always r2/r1 <= 1 */
-    /* if(r2>r1){ */
-    /*   double raux = r2; */
-    /*   r2 = r1; */
-    /*   r1 = raux; */
-    /*   double qaux = q2; */
-    /*   q2 = q1; */
-    /*   q1 = qaux; */
-    /* } */
-
-    /* double r21 = r2/r1; */
-    /* double q21 = q2/q1; */
-
-    /* // WARNING float comparison */
-    /* if(q1==0.0){ */
-    /*   // q1=0, permute particle 1 with 2 */
-    /*   double raux = r2; */
-    /*   r2 = r1; */
-    /*   r1 = raux; */
-    /*   double qaux = q2; */
-    /*   q2 = q1; */
-    /*   q1 = qaux; */
-    /*   r21 = r2/r1; */
-    /*   q21 = 0.0; */
-    /* }     */
-      
-    /* double max = 1000.0; */
-
-    if(r2>10.0*r1){
+    // for numerical stability, accuracy and fast convergence we want r21 < 1.0
+    if(r2>r1){
       double raux = r2;
       r2 = r1;
       r1 = raux;
@@ -685,11 +825,10 @@ namespace eint {
       q1 = qaux;
     }
 
-    
     double r21 = r2/r1;
-    double q21 = q2/q1;
 
     // WARNING float comparison
+    // avoid division by 0
     if(q1==0.0){
       // q1=0, permute particle 1 with 2
       double raux = r2;
@@ -699,21 +838,52 @@ namespace eint {
       q2 = q1;
       q1 = qaux;
       r21 = r2/r1;
-      q21 = 0.0;
     }
-    
+
+    double q21 = q2/q1;
+
+    // max rx
     double max = 1.0e-5/r1;
 
+    // scaled contact radii
     double rt = 1.0 + r21;
-
     double min = rt;
 
+    // Find scaled potential at contact and nterms
+    unsigned int curr_nterms = nterms;
+    unsigned int step_nterms = 10;
+    unsigned int iter = 0;
+    unsigned int max_iter = 20;
+
+    double pmpc_rt;
+    double pmpc_rt_prev = 0.0;
+    
+    while (true) {      
+      potential_mpc_funct pmpcfunct(r21, q21, eps,
+				    curr_nterms);
+
+      pmpc_rt = pmpcfunct(rt);
+
+      if ((iter>0) && (max_relative_error(pmpc_rt, pmpc_rt_prev)<PotRE)) {
+	std::cerr << "\n[II] Convergence achieved for N = " << curr_nterms;
+	break;
+      }
+      if (iter>max_iter) {
+	std::cerr << "\n[EE] Max iterations = " <<  iter;
+	std::cerr << "\n[EE] Number of terms = " << curr_nterms;
+	break;
+      }
+      
+      pmpc_rt_prev = pmpc_rt;
+      curr_nterms += step_nterms;
+      ++iter;
+    }
+    
+
+    // WARNING copy instance
     potential_mpc_funct pmpcfunct(r21, q21, eps,
-                                  j1max, j2max);
-
-    // Potential at contact
-    double pmpc_rt = pmpcfunct(rt);
-
+				  curr_nterms);
+    
     double potprefactor = q1*q1*eCharge*eCharge/r1;
 
     // Potential at contact
@@ -721,6 +891,7 @@ namespace eint {
 
     if(pmpc_rt>0){
       double eta = exp(-phi_rt/(Kboltz*temperature));
+      std::cerr << "\n[ii] Repulsive phi = " << phi_rt;
       /* if(phi_rt < 0){ */
       /* 	std::terminate(); */
       /* } */
@@ -729,8 +900,8 @@ namespace eint {
     else {// potential is negative (attractive) or zero at contact
 
       // force functor
-      force_mpc_funct forcempcfunct(r21, q21, eps,
-				    j1max, j2max);
+      force_mpc_funct forcempcfunct(r21, q21, eps, curr_nterms);
+      
       // Force at contact
       double forcempc_rt = forcempcfunct(rt);
       
@@ -739,6 +910,7 @@ namespace eint {
       
       // checks if force is monotonically decreasing [non bracketed]
       if(forcempc_rt*forcempc_max >= 0.0){
+	std::cerr << "\n[ii] Attractive phi = " << phi_rt;
 	double eta = 1.0 - phi_rt /(Kboltz*temperature);
 	/* if(phi_rt > 0){ */
 	/*   std::terminate(); */
@@ -746,13 +918,14 @@ namespace eint {
 	return eta;
       }
       else {// find maximum, zero of force is bracketed between rt and max
+	std::cerr << "\n[ii] Mixed phi_rt = " << phi_rt;
 	std::pair<double, double> pair_pmpc;
-	boost::uintmax_t max_iter = 1000;
+	boost::uintmax_t bmax_iter = 1000;
 	tools::eps_tolerance<double> tol(30);
 	try {
 	  //#pragma omp critical
 	  //{	  
-	  pair_pmpc = tools::toms748_solve(forcempcfunct, min, max, forcempc_rt, forcempc_max, tol, max_iter);
+	  pair_pmpc = tools::toms748_solve(forcempcfunct, min, max, forcempc_rt, forcempc_max, tol, bmax_iter);
 
 	  //pair_pmpc = tools::toms748_solve(forcempcfunct, rt, max, tol, max_iter);
 	
@@ -794,135 +967,6 @@ namespace eint {
       }
     }
     
-    /* // Force at r max */
-    /* double forcempc_max = forcempcfunct(max); */
-
-    /* double potprefactor = q1*q1*eCharge*eCharge/r1; */
-
-    /* // Potential at contact */
-    /* double phi_rt = potprefactor*pmpc_rt; */
-    
-    /* // checks if force is monotonically increasing or decreasing */
-    /* if((forcempc_rt*forcempc_max>=0.0)){ */
-    /*   if(forcempc_rt<0){ */
-    /* 	double eta = 1.0 - phi_rt /(Kboltz*temperature); */
-    /* 	if(phi_rt > 0){ */
-    /* 	  std::terminate(); */
-    /* 	} */
-    /* 	return eta; */
-    /*   } */
-    /*   else{ */
-    /* 	if(forcempc_rt>0){ */
-    /* 	  double eta = exp(-phi_rt/(Kboltz*temperature)); */
-    /* 	  if(phi_rt < 0){ */
-    /* 	    std::terminate(); */
-    /* 	  } */
-    /* 	  return eta; */
-    /* 	} */
-    /* 	else { */
-    /* 	  std::cerr << "\n ETA ZERO" << '\n'; */
-    /* 	  return 0.0; */
-    /* 	} */
-    /*   } */
-    /* } */
-    /* else { */
-    /*   std::pair<double, double> pair_pmpc; */
-    /*   bool failed = false; */
-    /*   try { */
-    /* 	pair_pmpc = tools::toms748_solve(forcempcfunct, rt, max, forcempc_rt, forcempc_max, tol, max_iter); */
-    /*   } */
-    /*   catch(const std::exception& exc) { */
-    /* 	failed = true; */
-    /* 	pair_pmpc.first = 0.0; */
-    /* 	pair_pmpc.second = 0.0; */
-    /* 	std::cerr << '\n' << exc.what() << '\n'; */
-
-    /* 	int nst = 50; */
-    /* 	double st = (max-rt)/(nst-1); */
-    /* 	for(int i=0; i<50; ++i){ */
-    /* 	  double rr = rt + st*i; */
-    /* 	  std::cerr << "\n" << rr << "\t" << pmpcfunct(rr) << "\t" << forcempcfunct(rr); */
-    /* 	} */
-    /* 	std::cerr << '\n';	 */
-    /* 	std::terminate(); */
-    /*   } */
-    /*   double rbarrier = 0.5*(pair_pmpc.first+pair_pmpc.second); */
-    /*   double phimax = pmpcfunct(rbarrier); */
-    /*   double eta = exp(-phimax/(Kboltz*temperature)) */
-    /*              *(1.0+(phimax-phi_rt)/(Kboltz*temperature)); */
-    /*   return eta; */
-    /* } */
-  
-      //std::cerr << "\n sign " << pmpc << "\t" << pmpcfunct(max) << "\n";
-      //std::terminate();
-      /* #pragma omp single */
-      /* { */
-      /* std::cerr << "\n sign " << pmpc << "\t" << pmpcfunct(max) << "\t from " << omp_get_thread_num() << '\n'; */
-
-      /* int nst = 50; */
-      /* double st = (max-min)/(nst-1); */
-      /* for(int i=0; i<50; ++i){ */
-      /* 	double rr = min + st*i; */
-      /* 	std::cerr << "\n" << rr << "\t" << pmpcfunct(rr) << "\t" << forcempcfunct(rr); */
-      /* } */
-      /* std::cerr << '\n'; */
-      /* std::terminate(); */
-      /* } */
-      
-      
-    //    std::cerr << "\n iter " << max_iter;// << '\t'
-/* #pragma omp single private(rt) */
-/* { */    
-/*   if(max_iter > 1990){ */
-/*     //std::cerr << "\n ERROR max iter " << max_iter << "\n\n"; */
-/* #pragma omp single private(rt) */
-/* {  */
-/*     /\* std::cerr << "\n sign " << pmpc << "\t" << pmpcfunct(max) << "\t from " << omp_get_thread_num() << '\n'; *\/ */
-
-/*     /\* int nst = 50; *\/ */
-/*     /\* double st = (max-min)/(nst-1); *\/ */
-/*     /\* for(int i=0; i<50; ++i){ *\/ */
-/*     /\* 	double rr = min + st*i; *\/ */
-/*     /\* 	std::cerr << "\n" << rr << "\t" << pmpcfunct(rr) << "\t" << forcempcfunct(rr); *\/ */
-/*     /\* } *\/ */
-/*     /\* std::cerr << '\n'; *\/ */
-/*     /\* std::terminate(); *\/ */
-/*     /\* } *\/ */
-/*     failed = true; */
-/*     pair_pmpc.first = 0.0; */
-/*     //std::terminate(); */
-/*     /\* #pragma omp single private(rt) *\/ */
-/*     /\* { *\/ */
-/*     double min = rt; */
-/*     double max = 500.0; */
-/*     if(forcempcfunct(min)*forcempcfunct(max)<0) { */
-
-/*       std::cerr << "\n max " << pair_pmpc.first << '\t' << rt << '\t' << pmpcfunct(min) << "\t" */
-/*    	        << pmpcfunct(max) << "\t from " << omp_get_thread_num() << '\n'; */
-/*       std::cerr << "\n max " << pair_pmpc.second << '\t' << rt << '\t' << forcempcfunct(min) << "\t" */
-/* 	        << forcempcfunct(max) << '\n'; */
-
-/*       int nst = 5000; */
-/*       double st = (max-min)/(nst-1); */
-/*       for(int i=0; i<nst; ++i){ */
-/*         double rr = min + st*i; */
-/*         std::cerr << "\n" << rr << "\t" << pmpcfunct(rr) << "\t" << forcempcfunct(rr); */
-/*        } */
-/*        std::cerr << '\n';   */
-/*        std::terminate(); */
-/*     } */
-/* } */
-/*   } */
-/*   else { */
-/* #pragma omp single private(rt) */
-/* {   */
-/*     std::cerr << "\n iter " << max_iter << '\t' << pair_pmpc.first << '\t' << rt << '\t' << forcempcfunct(min) << "\t" */
-/* 	      << forcempcfunct(pair_pmpc.first) << '\n'; */
-/* }    */
-/*   } */
-    //std::terminate();
-    //}// end pragma omp
-
     return 1.0;
   }
 
@@ -959,10 +1003,9 @@ namespace eint {
 
     // potential function
     potential_ipa_funct pipafunct(r21, q21, eps);
-    double pipa = pipafunct(rt);
+    //double pipa = pipafunct(rt);
 
-    potential_mpc_funct pmpcfunct(r21, q21, eps,
-                                  25, 25);
+    potential_mpc_funct pmpcfunct(r21, q21, eps, 25);
     double pmpc = pmpcfunct(rt);
 
     // force function
@@ -1029,29 +1072,8 @@ namespace eint {
   double efactor_ipa(double r1, double r2,
                      double q1, double q2,
                      const double eps, const double temperature,
-                     const unsigned int j1max=25,
-		     const unsigned int j2max=25) {
+                     const unsigned int nterms) {
 
-    /* // compute always r2/r1 <= 1 */
-    /* if(r2>r1){ */
-    /*   double raux = r2; */
-    /*   r2 = r1; */
-    /*   r1 = raux; */
-    /*   double qaux = q2; */
-    /*   q2 = q1; */
-    /*   q1 = qaux; */
-    /* } */
-
-   // compute always r1/r2 <= 1
-    /* if(r1>r2){ */
-    /*   double raux = r2; */
-    /*   r2 = r1; */
-    /*   r1 = raux; */
-    /*   double qaux = q2; */
-    /*   q2 = q1; */
-    /*   q1 = qaux; */
-    /* } */
-    
 
     if(r2>10.0*r1){
       double raux = r2;
@@ -1079,20 +1101,6 @@ namespace eint {
       q21 = 0.0;
     }
     
-    /* double r21 = r2/r1; */
-    /* double q21 = q2/q1; */
-    /* // check q1==0 */
-    /* if(fabs(q1)<1.e-200){ */
-    /*   // q1=0, permute particle 1 with 2 */
-    /*   double raux = r2; */
-    /*   r2 = r1; */
-    /*   r1 = raux; */
-    /*   double qaux = q2; */
-    /*   q2 = q1; */
-    /*   q1 = qaux; */
-    /*   r21 = r2/r1; */
-    /*   q21 = 0.0; */
-    /* } */
     
     double max = 1.0e-5/r1;
 
@@ -1107,8 +1115,7 @@ namespace eint {
     // double pipa_rt = pipafunct(rt)
 
     // mpc functor
-    potential_mpc_funct pmpcfunct(r21, q21, eps,
-                                  j1max, j2max);
+    potential_mpc_funct pmpcfunct(r21, q21, eps, nterms);
 
     // mpc at contact
     double pmpc_rt = pmpcfunct(rt);
