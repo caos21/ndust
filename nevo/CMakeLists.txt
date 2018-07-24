@@ -1,21 +1,47 @@
 
-cmake_minimum_required(VERSION 3.0)
+cmake_minimum_required(VERSION 2.8)
 
 project(nevo)
 
-# # defines variable SRCS to include cpp files
-# file(GLOB SRCS *.cpp)
-# file(GLOB INCSRCS RELATIVE "../include/" "*.cpp")
+add_definitions(-DBOOST_LOG_DYN_LINK)
+add_definitions(-DNDEBUG)
+add_definitions(-DBOOST_UBLAS_DNDEBUG)
+add_definitions(-DEIGEN_DONT_PARALLELIZE)
 
-set(CVODE_LIB sundials_cvode)
-set(NVECS_LIB sundials_nvecserial)
-set(EXTRA_LINK_LIBS m)
+# Specify path to SUNDIALS header files
+SET(SUNDIALS_INC_DIR
+  /home/bsantos/local/sundials3/include
+  CACHE STRING
+  "Location of SUNDIALS header files")
 
-set(SUNDIALS_LIBS ${CVODE_LIB} ${NVECS_LIB} ${EXTRA_LINK_LIBS})
+# Add path to SUNDIALS header files
+INCLUDE_DIRECTORIES(${SUNDIALS_INC_DIR})
+
+# Set search path for SUNDIALS libraries 
+SET(SUNDIALS_LIB_DIR /home/bsantos/local/sundials3/lib)
+
+# Find the SUNDIALS solvers library
+FIND_LIBRARY(SUNDIALS_SOLVER_LIB
+  sundials_cvode ${SUNDIALS_LIB_DIR}
+  DOC "CVODE library")
+
+# Find the NVECTOR library
+FIND_LIBRARY(SUNDIALS_NVEC_LIB
+  sundials_nvecserial ${SUNDIALS_LIB_DIR}
+  DOC "NVECTOR library")
+
+
+# Set additional libraries
+SET(SUNDIALS_EXTRA_LIB  -lm /cvmfs/soft.computecanada.ca/nix/var/nix/profiles/16.09/lib64/librt.so CACHE STRING "Additional libraries")
+
+# List of Sundials libraries shared across all examples
+SET(SUNDIALS_LIBS ${SUNDIALS_SOLVER_LIB} ${SUNDIALS_NVEC_LIB} ${SUNDIALS_EXTRA_LIB})
+
+set (CMAKE_CXX_FLAGS "-std=gnu++14 ${CMAKE_CXX_FLAGS}")
 
 include_directories("../include/")
 
-link_directories("../build/")
+#link_directories("../build/")
 
 add_library(GridModel STATIC ../include/GridModel.cpp)
 add_library(CRate STATIC ../include/CRate.cpp)
@@ -23,16 +49,34 @@ add_library(PlasmaModel STATIC ../include/PlasmaModel.cpp)
 add_library(NanoModel STATIC ../include/NanoModel.cpp)
 add_library(NEvo STATIC ../NEvo.cpp)
 
-# GSL
-set(LIBS "-lgsl -lgslcblas -lm -llapack -lumfpack -lboost_log -lboost_thread -lboost_system -lboost_log_setup -lhdf5_cpp -lhdf5 -lpthread -lz -ldl -lm")
 
-set(CMAKE_CXX_COMPILE_FLAGS "${CMAKE_CXX_COMPILE_FLAGS} -ftree-vectorizer-verbose=3 -std=gnu++14 -march=znver1 -O3 -ftree-vectorize -fstack-protector --param=ssp-buffer-size=4 -Wformat -Werror=format-security")
+# include local boost-numeric-bindings
+include_directories("~/local/include/boost-numeric-bindings/")
+# include GSL
+include_directories("/cvmfs/soft.computecanada.ca/easybuild/software/2017/sse3/Compiler/intel2016.4/gsl/2.3/include/")
+# include HDF5
+include_directories("/cvmfs/soft.computecanada.ca/easybuild/software/2017/sse3/Compiler/intel2016.4/hdf5/1.8.18/include/")
 
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -ftree-vectorizer-verbose=3 -std=gnu++14 -march=znver1 -O3 -ftree-vectorize -fopt-info-vec-missed=vec.miss -fstack-protector --param=ssp-buffer-size=4 -Wformat -Werror=format-security")
+#link_directories("/home/bsantos/local/lib/")
+# gsl
+link_directories("/cvmfs/soft.computecanada.ca/easybuild/software/2017/sse3/Compiler/intel2016.4/gsl/2.3/lib/")
+# HDF5
+link_directories("/cvmfs/soft.computecanada.ca/easybuild/software/2017/sse3/Compiler/intel2016.4/hdf5/1.8.18/lib/")
 
+
+set(CMAKE_CXX_COMPILE_FLAGS "${CMAKE_CXX_COMPILE_FLAGS} -Ofast -frecord-gcc-switches")
+
+set(CMAKE_CXX_LINK_FLAGS "${CMAKE_CXX_LINK_FLAGS} -Ofast -frecord-gcc-switches")
+
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -std=gnu++14 -mtune=native -O2 -frecord-gcc-switches")
+
+#
 # RELEASE ADD -DNDEBUG for boost performance
-add_definitions(-DBOOST_LOG_DYN_LINK -DNDEBUG -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE -D_DEFAULT_SOURCE)
+#
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DNDEBUG -fopenmp")
+#set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fopenmp")
 
+list(APPEND ${CMAKE_CXX_COMPILE_FLAGS} ${LIBS})
 
 # WARNING not working
 find_package(OpenMP)
@@ -43,6 +87,8 @@ if(OPENMP_FOUND)
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS} ")
   add_definitions(-DOPENMP)
 endif()
+
+
 
 find_package(HDF5)
 if(HDF5_VERSION VERSION_LESS "1.10.0")
@@ -60,18 +106,42 @@ add_executable(nevo main.cpp)
 target_link_libraries(NEvo
                       GridModel
                       NanoModel
-                      ${LIBS})
+		      boost_log
+		      hdf5
+		      hdf5_cpp
+		      boost_system
+		      boost_thread
+		      boost_atomic
+		      boost_chrono
+		      boost_regex
+		      boost_date_time
+		      boost_filesystem
+		      mkl
+		      ${LIBS}
+		      ${SUNDIALS_LIBS})
 
 target_link_libraries(nevo
                       NEvo
                       CRate
                       PlasmaModel
                       NanoModel
+		      boost_log
+		      hdf5
+		      hdf5_cpp
+		      boost_system
+		      boost_thread
+		      boost_atomic
+		      boost_chrono
+		      boost_regex
+		      boost_date_time
+		      boost_filesystem
+		      mkl		      
                       ${LIBS}
-                      ${SUNDIALS_LIBS})
+                      ${SUNDIALS_LIB})
 
 enable_testing()
 
 install(TARGETS nevo RUNTIME DESTINATION bin)
+
 
 

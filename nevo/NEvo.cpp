@@ -863,7 +863,7 @@ int NEvo::compute_coagulation() {
 
 #pragma omp parallel
 {
-#pragma omp for nowait schedule(auto) firstprivate(pdens)// Good
+#pragma omp for nowait schedule(auto) //firstprivate(pdens)// Good
   for (unsigned int i=0; i<cr.eta_factor_vector.size(); ++i) {
     //
     EtaCreationFactor *ieta;
@@ -876,7 +876,7 @@ int NEvo::compute_coagulation() {
 
   // iterate in death_factor list
 //   #pragma omp parallel for// schedule(auto)
-#pragma omp for nowait schedule(auto) firstprivate(pdens)// Good
+#pragma omp for nowait schedule(auto) //firstprivate(pdens)// Good
   for (unsigned int j=0; j<cr.death_factor_vector.size(); ++j) {
     //
     DeathFactor *idth;
