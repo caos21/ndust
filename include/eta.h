@@ -55,6 +55,28 @@ public:
                        const short r,
                        const double eta);
 
+  friend void get_eta(const EtaCreationFactor &ecf,
+		      unsigned int &id,
+		      short &l,
+		      short &q,
+		      short &m,
+		      short &p,
+		      short &n,
+		      short &r,
+		      double &eta);
+
+  inline
+  void get_eta2(unsigned int &id,
+	       short &l,
+	       short &q,
+	       short &m,
+	       short &p,
+	       short &n,
+	       short &r,
+	       double &eta) {
+    get_eta(*this, id, l, q, m, p, n, r, eta);
+  }
+  
   friend void etafactor_tostream(const EtaCreationFactor &ecf,
                                  std::fstream& etafactor_file);
 
@@ -62,15 +84,16 @@ public:
                                    std::istringstream &ss);
 };
 
-inline void fill_eta(EtaCreationFactor &ecf,
-                     const unsigned int id,
-                     const short l,
-                     const short q,
-                     const short m,
-                     const short p,
-                     const short n,
-                     const short r,
-                     const double eta) {
+inline
+void fill_eta(EtaCreationFactor &ecf,
+	      const unsigned int id,
+	      const short l,
+	      const short q,
+	      const short m,
+	      const short p,
+	      const short n,
+	      const short r,
+	      const double eta) {
   ecf.id_=id;
   ecf.l_=l;
   ecf.q_=q;
@@ -80,6 +103,27 @@ inline void fill_eta(EtaCreationFactor &ecf,
   ecf.r_=r;
   ecf.eta_=eta;
 }
+
+inline
+void get_eta(const EtaCreationFactor &ecf,
+	     unsigned int &id,
+	     short &l,
+	     short &q,
+	     short &m,
+	     short &p,
+	     short &n,
+	     short &r,
+	     double &eta) {
+  id=ecf.id_;
+  l=ecf.l_;
+  q=ecf.q_;
+  m=ecf.m_;
+  p=ecf.p_;
+  n=ecf.n_;
+  r=ecf.r_;
+  eta=ecf.eta_;
+}
+
 
 inline
 void etafactor_tostream(const EtaCreationFactor &ecf, std::fstream& etafactor_file) {
@@ -403,6 +447,25 @@ public:
 
   friend void deathfactor_fromstream(DeathFactor &df,
                                      std::istringstream &ss);
+
+  friend void get_death(const DeathFactor &dth,
+			unsigned int &id,
+			short &l,
+			short &q,
+			short &m,
+			short &p,
+			double &death);
+
+  inline
+  void get_death2(unsigned int &id,
+		  short &l,
+		  short &q,
+		  short &m,
+		  short &p,		  
+		  double &death) {
+    get_death(*this, id, l, q, m, p, death);
+  }
+
 };
 
 inline
@@ -419,6 +482,22 @@ void fill_death(DeathFactor &dth,
   dth.m_=m;
   dth.p_=p;
   dth.death_=death;
+}
+
+inline
+void get_death(const DeathFactor &dth,
+	       unsigned int &id,
+	       short &l,
+	       short &q,
+	       short &m,
+	       short &p,
+	       double &death) {
+  id=dth.id_;
+  l=dth.l_;
+  q=dth.q_;
+  m=dth.m_;
+  p=dth.p_;
+  death=dth.death_;
 }
 
 inline

@@ -10,13 +10,10 @@
 // logger
 #include "log.h"
 
-// class CRate
-// #include "CRate.h"
-
 #include "NEvo.h"
 
 int main(int argc, char **argv) {
-  // Prints header
+  // Print header
   print_header(std::cout);
 
   // Print help
@@ -83,10 +80,6 @@ int main(int argc, char **argv) {
   BOOST_LOG_SEV(lg, info) << "Grid file: " << grid_filename;
   
   BOOST_LOG_SEV(lg, info) << "Output directory: " << dirname;
-    // init logger
-//   blog::close();
-  // add /
-//   dirname += "/";
   
   // get num threads
   int num_threads = omp_get_num_threads();
@@ -121,7 +114,8 @@ int main(int argc, char **argv) {
   NEvo nevo(dirname, grid_filename, plasma_filename, nano_filename, lg);
   nevo.open();
   nevo.read();
-  nevo.evolve();
+  //nevo.evolve();
+  nevo.evolve_omp();
   nevo.write();
   nevo.close();
 

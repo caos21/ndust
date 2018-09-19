@@ -114,6 +114,12 @@ public:
   */
   int evolve();
 
+  //! Start calculations
+  /*! 
+   * Nanoparticle growth evolution openmp ready
+  */
+  int evolve_omp();
+  
   //! write h5 datafile
   /*! 
    * Write on file grid_filename.h5 in dirname
@@ -199,6 +205,12 @@ private:
   */
   int evolve_one_step(double ctime);
 
+  //! One step evolution
+  /*! 
+   * Nanoparticle growth one step openmp ready
+  */
+  int evolve_one_step_omp(double ctime);
+  
   //! Compute precompute
   /*! 
    * Compute constants parameters
@@ -229,9 +241,13 @@ private:
 
   int advance_nocharging(const double ctime);
 
+  int advance_nocharging_omp(const double ctime);
+  
   int compute_sgrowth();
 
   int compute_coagulation();
+
+  int compute_coagulation_omp();
 
   inline
   double particle_potenergy(double r, double Z) {
