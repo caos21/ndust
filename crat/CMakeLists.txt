@@ -78,6 +78,8 @@ add_executable(crat-merge "crat-merge.cpp" ${INCSRCS})
 
 add_executable(potentials "potentials.cpp" ${INCSRCS})
 
+add_executable(potential_b1 "potentials_b1.cpp" ${INCSRCS})
+
 target_link_libraries(CRate
                       GridModel
                       ${LIBS})
@@ -100,6 +102,7 @@ target_link_libraries(crat-merge
 
 target_link_libraries(potentials ${LIBS})
 
+target_link_libraries(potential_b1 ${LIBS})
 
 enable_testing()
 

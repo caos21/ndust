@@ -26,12 +26,12 @@ add_library(NEvo STATIC ../NEvo.cpp)
 # GSL
 set(LIBS "-lgsl -lgslcblas -lm -llapack -lumfpack -lboost_log -lboost_thread -lboost_system -lboost_log_setup -lhdf5_cpp -lhdf5 -lpthread -lz -ldl -lm")
 
-set(CMAKE_CXX_COMPILE_FLAGS "${CMAKE_CXX_COMPILE_FLAGS} -ftree-vectorizer-verbose=3 -std=gnu++14 -march=znver1 -O3 -ftree-vectorize -fstack-protector --param=ssp-buffer-size=4 -Wformat -Werror=format-security -ffast-math")
+set(CMAKE_CXX_COMPILE_FLAGS "${CMAKE_CXX_COMPILE_FLAGS} -ftree-vectorizer-verbose=3 -std=gnu++14 -march=znver1 -O3 -ftree-vectorize -fstack-protector --param=ssp-buffer-size=4 -Wformat -Werror=format-security")
 
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -ftree-vectorizer-verbose=3 -std=gnu++14 -march=znver1 -O3 -ftree-vectorize -fopt-info-vec-missed=vec.miss -fstack-protector --param=ssp-buffer-size=4 -Wformat -Werror=format-security")
 
 # RELEASE ADD -DNDEBUG for boost performance
-add_definitions(-DBOOST_LOG_DYN_LINK -DNDEBUG -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE -D_DEFAULT_SOURCE -DBOOST_DISABLE_ASSERTS)
+add_definitions(-DBOOST_LOG_DYN_LINK -DNDEBUG -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE -D_DEFAULT_SOURCE)
 
 
 # WARNING not working
