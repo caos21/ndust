@@ -81,6 +81,8 @@ struct einteraction {
   double dconstant;                 //!< Dielectric constant for nanoparticles
   unsigned int method;              //!< Method used to compute interaction
   unsigned int terms;               //!< Number of terms of MPC expansion
+  double hamaker;                   //!< Hamaker constant
+  double vdw_radius;                //!< Van der Waals radius or cutoff for potential
 };
 /**
   * class GridModel

@@ -90,8 +90,7 @@ namespace eint {
   */
   inline
   double potential_coulomb_fact(const double rt, const double r21,
-				const double q21) {
-
+				       const double q21) {
     return Kcoul*q21/rt;
   }
   
@@ -130,7 +129,6 @@ namespace eint {
           - A/(pow(rt, 3)*pow((rt*rt - r21*r21),2))
           - B/(pow(rt, 3)*pow(rt*rt - 1.0, 2));
   }
-
 
   /************/ 
   //! Series potential approximation.
@@ -651,13 +649,27 @@ namespace eint {
     double r21;
     double q21;
   };
-  
+
+  //! IPA functor.
+  /*!
+    Image Potential Approximation functor
+  */
   struct potential_ipa_funct
   {
+    //! IPA functor constructor.
+    /*!
+      \param r21 the ratio r2/r1.
+      \param q21 the ratio q2/q1.
+      \param eps the dielectric constant.
+    */    
     potential_ipa_funct(double r21_, double q21_, double eps_):
                         r21(r21_), q21(q21_), eps(eps_){
     }
 
+    //! Computes the IPA potential at rt.
+    /*!
+      \param rt separation
+    */
     double operator()(double const& rt) {
       return potential_ipa_fact(rt, r21, q21, eps);
     }
@@ -670,22 +682,62 @@ namespace eint {
   struct force_ipa_funct
   {
     force_ipa_funct(double r21_, double q21_, double eps_):
-                        r21(r21_), q21(q21_), eps(eps_){
-    }
-
+     r21(r21_), q21(q21_), eps(eps_){
+     }
+    
     double operator()(double const& rt) {
       return force_ipa_fact(rt, r21, q21, eps);
     }
-
+    
     double r21;
     double q21;
     double eps;
   };
 
 
+  //! IPA+VdW functor.
+  /*!
+    Image Potential Approximation + Van der Waals functor
+  */
+  struct potential_ipavdw_funct {
+    //! IPA+VdW functor constructor.
+    /*!
+      \param r21 the ratio r2/r1.
+      \param q21 the ratio q2/q1.
+      \param eps the dielectric constant.
+      \param hamaker the Hamaker constant.
+      \param vdw_radius the Van der Waals or cutoff radius.
+    */    
+    potential_ipavdw_funct(double r21_, double q21_, double eps_,
+			   double hamaker_, double vdw_radius_):
+    r21(r21_), q21(q21_), omega(1.0+r21_), eps(eps_), hamaker(hamaker_),
+    vdw_radius(vdw_radius_) {
+      
+    }
 
+    //! Computes the IPA+VdW potential at rt.
+    /*!
+      \param rt separation
+    */
+    double operator()(double const& rt) {
+      double pipa = potential_ipa_fact(rt, r21, q21, eps);
+      double rstar = rt/omega;
+      double pvdw = hamaker * potential_vdw_fact(rt, r21, q21, eps);
+      return pipa + pvdw;
+    }
+    
+    double r21;
+    double q21;
+    double omega;
+    double eps;
+    double hamaker;
+    double vdw_radius;
+  };
 
-  // multipolar coefficients potential functor
+  //! MPC functor.
+  /*!
+    Potential from multipolar coefficients functor
+  */
   struct potential_mpc_funct
   {
     potential_mpc_funct(double r21_,

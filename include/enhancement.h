@@ -1193,6 +1193,67 @@ namespace enhancement {
       BOOST_LOG_SEV(lg, info) << "Done computing MPC potential at contact.";
     }
 
+
+    inline
+    void compute_mpcvdwpotential_contact() {
+      BOOST_LOG_SEV(lg, info)
+	<< "Computing mpc+vdw potential at contact for n pairs : "
+	<< reduced_pairs.size();      
+
+#pragma omp parallel for// schedule(nonmonotonic:dynamic)
+      for (unsigned int i=0; i<reduced_pairs.size(); ++i) {
+
+	unsigned long id = reduced_pairs[i].id_;
+	double r21 = reduced_pairs[i].r21_;
+	double q21 = reduced_pairs[i].q21_;
+ 
+	double rt = 1.0 + r21;
+   
+	eint::potential_ipavdw_funct pipavdwfunct(r21, q21, eps);
+
+	// // ipa+vdw at contact 
+	double pipavdw_rt = pipavdwfunct(rt);
+
+	double pcomp = pipavdw_rt;
+	unsigned int initer=0;
+      
+	for(short n=nmin; n <= nmax; n+=nstep, ++initer){
+      
+	  // mpc+vdw functor
+	  eint::potential_mpcvdw_funct pmpcvdwfunct(r21, q21, eps, n);
+      
+	  // mpc+vdw at contact
+	  double pmpcvdw_rt = pmpcvdwfunct(rt);
+
+	  double error_comp = max_pct_error(pcomp, pmpcvdw_rt);
+
+	  if ((error_comp < MPC_ERROR) && (initer>0)){
+// #pragma omp critical
+// 	    {
+	    fill_contact_potential(contact_potentials[i], id, pmpcvdw_rt, n);
+	    
+	    n=nmax;
+
+	  }
+	  else {
+	    if (n>nmax-nstep){
+	      std::cerr << "\n[ww] Max iterations exceeded\n";
+	      fill_contact_potential(contact_potentials[i], i, pmpcvdw_rt, n);
+	    }
+	  }
+	  pcomp = pmpcvdw_rt;
+	}
+      }
+
+      //      outfile.close();
+
+      barrier_potentials.reserve(contact_potentials.size());
+      rbarrier_array.reserve(contact_potentials.size());
+
+      BOOST_LOG_SEV(lg, info) << "Error potentials size : " << error_potentials.size();
+      BOOST_LOG_SEV(lg, info) << "Done computing mpc+vdw potential at contact.";
+    }
+    
     inline
     double eta_attractive(double phimin){
       double kt = Kboltz*temperature;
@@ -1287,6 +1348,7 @@ namespace enhancement {
       BOOST_LOG_SEV(lg, info) << "Done computing mpc potential barrier.";
     }
 
+    // TODO to complete
     inline
     void compute_enhancement_factor() {
 

@@ -451,6 +451,46 @@ int CRate::compute_frompairs() {
       elapsed_seconds = end-start;
       BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
       break;
+    case 3:
+      BOOST_LOG_SEV(lg, info) << "Bounded Hybrid method : " << gm.einter.method;
+      BOOST_LOG_SEV(lg, info) << "Computing MPC potentials at contact...";
+      start = std::chrono::system_clock::now();
+      //
+      enh.compute_mpcpotential_contact();
+      //
+      end = std::chrono::system_clock::now();
+      elapsed_seconds = end-start;
+      BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
+      BOOST_LOG_SEV(lg, info) << "Computing IPA potentials barriers...";
+      start = std::chrono::system_clock::now();
+      //
+      enh.compute_ipapotential_barrier();
+      //
+      end = std::chrono::system_clock::now();
+      elapsed_seconds = end-start;
+      BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
+      break;
+    case 4:
+      BOOST_LOG_SEV(lg, info) << "Bounded method MPC+VdW : " << gm.einter.method;
+      // BOOST_LOG_SEV(lg, info) << "Computing MPC+VdW potentials at contact...";
+      // start = std::chrono::system_clock::now();
+      // //
+      // enh.compute_mpcvdwpotential_contact();
+      // //
+      // end = std::chrono::system_clock::now();
+      // elapsed_seconds = end-start;
+      // BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
+      // BOOST_LOG_SEV(lg, info) << "Computing MPC+VdW potentials barriers...";
+      // start = std::chrono::system_clock::now();
+      // //
+      // enh.compute_mpcvdwpotential_barrier();
+      // //
+      // end = std::chrono::system_clock::now();
+      // elapsed_seconds = end-start;
+      // BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
+      // break;
+      BOOST_LOG_SEV(lg, error) << "Not implemented";
+      std::terminate();
   default:
     BOOST_LOG_SEV(lg, error) << "Method " << gm.einter.method
   			     << " not known";
@@ -609,7 +649,28 @@ int CRate::compute() {
       end = std::chrono::system_clock::now();
       elapsed_seconds = end-start;
       BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
-      break;      
+      break;
+    case 4:
+      BOOST_LOG_SEV(lg, info) << "Bounded method MPC+VdW : " << gm.einter.method;
+      // BOOST_LOG_SEV(lg, info) << "Computing MPC+VdW potentials at contact...";
+      // start = std::chrono::system_clock::now();
+      // //
+      // enh.compute_mpcvdwpotential_contact();
+      // //
+      // end = std::chrono::system_clock::now();
+      // elapsed_seconds = end-start;
+      // BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
+      // BOOST_LOG_SEV(lg, info) << "Computing MPC+VdW potentials barriers...";
+      // start = std::chrono::system_clock::now();
+      // //
+      // enh.compute_mpcvdwpotential_barrier();
+      // //
+      // end = std::chrono::system_clock::now();
+      // elapsed_seconds = end-start;
+      // BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
+      // break;
+      BOOST_LOG_SEV(lg, error) << "Not implemented";
+      std::terminate();
   default:
     BOOST_LOG_SEV(lg, error) << "Method " << gm.einter.method
   			     << " not known";

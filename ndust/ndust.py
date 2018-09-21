@@ -59,6 +59,10 @@ class Window(QMainWindow, Ui_MainWindow):
     self.radiobutton_mpc = self.ui.radioButton_MPC
     self.radiobutton_mpc.toggled.connect(self.toggle_terms)
 
+    self.radiobutton_mpcvdw = self.ui.radioButton_MPCVdW
+    self.radiobutton_mpcvdw.toggled.connect(self.toggle_terms)
+    self.radiobutton_mpcvdw.toggled.connect(self.toggle_hamaker)
+    
     self.radiobutton_ipa = self.ui.radioButton_IPA
     self.radiobutton_ipa.toggled.connect(self.toggle_terms)
     
@@ -329,6 +333,8 @@ class Window(QMainWindow, Ui_MainWindow):
     multiplier = le2float(self.ui.lineEdit_mult)
     dconstant = le2float(self.ui.lineEdit_die)
     terms = self.ui.spinBox_terms.value()
+    hamaker = le2float(self.ui.lineEdit_hamaker)
+    vdwradius = le2float(self.ui.lineEdit_vdwradius)    
     #
     method = 0# MPC
     if self.ui.radioButton_IPA.isChecked():
@@ -337,9 +343,11 @@ class Window(QMainWindow, Ui_MainWindow):
       method = 2# Coulomb
     elif self.ui.radioButton_Hybrid.isChecked():
       method = 3# Hybrid
+    elif self.ui.radioButton_MPCVdW.isChecked():
+      method = 4# MPC + VdW
     #
     self.einteraction = mg.EInteraction(h5f, multiplier, dconstant, method,
-                                        terms)
+                                        terms, hamaker, vdwradius)
     self.einteraction.toHDF5()
     # close file
     h5f.close()
@@ -347,7 +355,7 @@ class Window(QMainWindow, Ui_MainWindow):
   def toggle_terms(self):
     """ Toggle spin box terms if MPC method is selected
     """
-    if self.radiobutton_mpc.isChecked() or self.radiobutton_ipa.isChecked():
+    if self.radiobutton_mpc.isChecked() or self.radiobutton_ipa.isChecked() or self.radiobutton_mpcvdw.isChecked():
       #print("MPC Checked")
       self.ui.label_terms.setEnabled(1)
       self.ui.spinBox_terms.setEnabled(1)
@@ -355,7 +363,21 @@ class Window(QMainWindow, Ui_MainWindow):
       #print("MPC UNChecked")
       self.ui.label_terms.setEnabled(0)
       self.ui.spinBox_terms.setEnabled(0)
-#
+      #
+  def toggle_hamaker(self):
+    """ Toggle hamaker and Van der Waals radius line edit if MPC+VdW method is selected
+    """
+    if self.radiobutton_mpcvdw.isChecked():
+      self.ui.label_hamaker.setEnabled(1)
+      self.ui.lineEdit_hamaker.setEnabled(1)
+      self.ui.label_vdwradius.setEnabled(1)
+      self.ui.lineEdit_vdwradius.setEnabled(1)
+    else:
+      self.ui.label_hamaker.setEnabled(0)
+      self.ui.lineEdit_hamaker.setEnabled(0)
+      self.ui.label_vdwradius.setEnabled(0)
+      self.ui.lineEdit_vdwradius.setEnabled(0)      
+    #
   def toggle_eaffinity(self):
     """ Toggle eaffinity box if tunnel is checked
     """

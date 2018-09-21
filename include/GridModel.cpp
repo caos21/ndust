@@ -177,13 +177,23 @@ int GridModel::read_einteraction() {
                          einter.dconstant);  
   BOOST_LOG_SEV(lg, info) << "--> Dielectric constant: "
                           << einter.dconstant;
-                          
+
+  err = read_attrib_hdf5<double>(h5obj, "/Electrostatic_interaction", "Hamaker_constant",
+                         einter.hamaker);
+  BOOST_LOG_SEV(lg, info) << "--> Hamaker constant: "
+                          << einter.hamaker;
+
+  err = read_attrib_hdf5<double>(h5obj, "/Electrostatic_interaction", "VdW_radius",
+                         einter.vdw_radius);
+  BOOST_LOG_SEV(lg, info) << "--> Van der Waals or cutoff radius: "
+                          << einter.vdw_radius;
+  
   err = read_attrib_hdf5<unsigned int>(h5obj, "/Electrostatic_interaction", "Method",
                          einter.method);
   BOOST_LOG_SEV(lg, info) << "--> Method: " << einter.method;
 
-  // terms make sense only for MPC and IPA, method 0 and 1
-  if((einter.method == 0) || (einter.method == 1)) {
+  // terms make sense only for MPC and IPA, method 0, 1, and 4
+  if((einter.method == 0) || (einter.method == 1) || (einter.method == 4)) {
     err = read_attrib_hdf5<unsigned int>(h5obj, "/Electrostatic_interaction", "Terms",
                           einter.terms);
     BOOST_LOG_SEV(lg, info) << "--> Terms for MPC: " << einter.terms;

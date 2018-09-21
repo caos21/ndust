@@ -297,7 +297,8 @@ class EInteraction(mh5u.H5Writable):
       nanoparticles
   """
 
-  def __init__(self, h5obj, multiplier, dconstant, method, terms=25):    
+  def __init__(self, h5obj, multiplier, dconstant, method, terms=25,
+               hamaker=20e-20, vdwradius=0.21):
     """ Initial values
     """
     self.h5obj = h5obj
@@ -314,8 +315,14 @@ class EInteraction(mh5u.H5Writable):
       terms = 0
     self.terms = mh5u.Attrib("Terms", terms)
     #
+    self.hamaker = mh5u.Attrib("Hamaker_constant", hamaker)
+    #
+    self.vdwradius = mh5u.Attrib("VdW_radius", vdwradius)
+    #
     self.writable_list = [self.multiplier,
                           self.dconstant,
                           self.method,
-                          self.terms]
+                          self.terms,
+                          self.hamaker,
+                          self.vdwradius]
 #
