@@ -223,8 +223,6 @@ class plot():
     self.gchgs = self.gridfile.get("Charge_sections")
 
     self.qpivots = np.array(self.gchgs.get("Charges"))
-    #self.qifaces = np.append()
-    #np.array(self.gchgs.get("qifaces"))
 
     self.width_vpivots = self.vifaces_diam[1:] - self.vifaces_diam[:-1]
     self.width_qpivots = np.ones_like(self.qpivots)
@@ -631,68 +629,83 @@ XMeshDiam = []
 YMeshChrgs = [] 
 
 class read_results():
-  def __init__(self, h5prefix = None, xc = None):
-    self.h5prefix = None
-    if h5prefix is None:
-      self.h5prefix = ''
+  def __init__(self, nanoh5prefix = None, gridh5prefix = None, plasmah5prefix = None, xc = None, defpath = r'/home/ben/git/ndust/data/'):
+    self.nanoh5prefix = None
+    self.gridh5prefix = None
+    self.plasmah5prefix = None
+
+    self.defpath = r'/home/ben/git/ndust/data/'
+
+    if (nanoh5prefix and gridh5prefix and plasmah5prefix) is None:
+      print("Error invalid prefix: nanoh5prefix: {}, gridh5prefix: {}, plasmah5prefix: {}".format(nanoh5prefix, gridh5prefix, plasmah5prefix))
+      return None
     else:
-      self.h5prefix = h5prefix + '-'
+      self.nanoh5prefix = nanoh5prefix
+      self.gridh5prefix = gridh5prefix
+      self.plasmah5prefix = plasmah5prefix
 
     self.xc = xc
     if xc is None:
       self.xc = xmlcfg()
 
-    self.defpath = r'/home/ben/PhD-INRS/inrs-sources/C++/duster/results/'
     #os.chdir(self.defpath)
-    self.h5prefix = self.defpath + self.h5prefix
-
-    # Read plasma file
-    self.plasmafname = self.h5prefix + 'plasma_curr.h5'
-
-    global PlasmaFile
-    PlasmaFile = h5py.File(self.plasmafname, 'r')
 
     # Read nano file
-    self.nanofname = self.h5prefix + 'nano_curr.h5'
-
+    self.nanofname = self.defpath + self.nanoh5prefix + '.h5'
     global NanoFile
-    NanoFile =  h5py.File(self.nanofname, 'r')
+    try:
+      NanoFile =  h5py.File(self.nanofname, 'r')
+    except:
+      print("Error in open nano file: {}".format(nanofname))
+
+    # Read plasma file
+    self.gridfname = self.defpath + self.gridh5prefix + '.h5'
+    global GridFile
+    try: 
+      GridFile = h5py.File(self.gridfname, 'r')
+    except:
+      print("Error in open grid file: {}".format(gridfname))
+    
+    # Read plasma file
+    self.plasmafname = self.defpath + self.plasmah5prefix + '.h5'
+    global PlasmaFile
+    try:
+      PlasmaFile = h5py.File(self.plasmafname, 'r')
+    except:
+      print("Error in open plasma file: {}".format(plasmafname))
 
     ## group volumes
-    self.gvols = NanoFile.get("volumes")
-    self.vifaces = np.array(self.gvols.get("vifaces"))
+    self.gvols = GridFile.get("Volume_sections")
+    self.vifaces = np.array(self.gvols.get("Interfaces"))
 
-    ## interfaces in diameters
+    ## interfaces in diameters in nanometers
     self.vifaces_diam = np.power(6.0*self.vifaces/np.pi, 1.0/3.0)*1E9
 
     ## WARNING diameter pivots in nanometres
-    self.vpivots = np.array(self.gvols.get("vpivots"))
+    self.vpivots = np.array(self.gvols.get("Volumes"))
 
     ## pivots in diameters
     global DPivots
-    DPivots = np.power(6.0*self.vpivots/np.pi, 1.0/3.0)*1E9
+    DPivots = np.array(self.gvols.get("Diameters"))*1E9
 
     ## group charges
-    self.gchgs = NanoFile.get("charges")
+    self.gchgs = GridFile.get("Charge_sections")
 
     global QPivots
-    QPivots = np.array(self.gchgs.get("qpivots"))
-
-    self.qifaces = np.array(self.gchgs.get("qifaces"))
+    QPivots = np.array(self.gchgs.get("Charges"))
 
     global WidthDPivots
     WidthDPivots = self.vifaces_diam[1:] - self.vifaces_diam[:-1]
 
     global WidthQPivots
-    WidthQPivots = self.qifaces[1:] - self.qifaces[:-1]
+    WidthQPivots = np.ones_like(QPivots)
 
     # make grid
     global XMeshDiam, YMeshChrgs
     XMeshDiam, YMeshChrgs = np.meshgrid(DPivots, QPivots)
 
-
     # density group
-    self.gdensity = NanoFile.get("density")
+    self.gdensity = NanoFile.get("Density")
 
     global ADensity
     ADensity = np.array(self.gdensity.get("density"))
@@ -756,6 +769,7 @@ def updateplot(i, profilelist):
 
     qdens = profilelist[1]
 
+    time = profilelist[2]
     # electric_field = profilelist[3]
 
     # potential = profilelist[4]
@@ -770,6 +784,8 @@ def updateplot(i, profilelist):
         box.set_height(dh)
 
     #SIZEDPLOT.set_data(DPivots, ddens[i])
+    #AX1.text(1e14, 30, 'time')# = %.1f' % pendulum.time_elapsed)
+    FIG.suptitle(r'slab \#{}, time {:.3}s'.format(i, time[i]))
 
     # Allow autoscale in all AXes
     AX1.relim()
@@ -816,7 +832,7 @@ def updateplot(i, profilelist):
 
 # --------------------------- Figure setup ----------------------------------
 #
-FIG = plt.figure('Densities', figsize=(9, 7))
+FIG = plt.figure('Densities', figsize=(14, 9))
 #FIG.suptitle('Profiles', size=20)
 
 AX1 = FIG.add_subplot(1, 2, 1)
@@ -826,26 +842,29 @@ plt.xlabel('Diameters (nm)')
 plt.ylabel('Density (1/m3)')
 plt.xscale('log')
 plt.yscale('log')
-plt.ylim([1.0e5, 1e16])
-plt.xlim([0.75, 120])
+plt.ylim([10, 1e16])
+#plt.ylim([10, 1e18])
+plt.xlim([0.75, 80])
+#plt.xlim([DPivots[0], DPivots[-1]])
 
 DBARS = []
 
 AX1.grid(True)
 
 #plt.plot(pos, eDensNew)
-SIZEDPLOT, = AX1.plot([], [], label='nIons')
+SIZEDPLOT, = AX1.plot([], [], label='size')
 
 AX2 = FIG.add_subplot(1, 2, 2)
 AX2.set_title('Charge distribution')
 AX2.grid(True)
 plt.xlabel(r'Charges ($e$)')
-plt.ylabel(r'Density ($1/m^3$)')
+#plt.ylabel(r'Density ($1/m^3$)')
 plt.yscale('log')
-plt.ylim([1.0e5, 1e16])
-plt.xlim([-42, 5])
+plt.ylim([10, 1e16])
+plt.xlim([-70, 5])
+#plt.ylim([QPivots[0], QPivots[-1]])
 
-CHARGDPLOT, = AX2.plot([], [], label='pIons')
+CHARGDPLOT, = AX2.plot([], [], label='charges')
 
 # ***** Eenergy
 #AX3 = FIG.add_subplot(2,2,3)
@@ -875,4 +894,4 @@ CHARGDPLOT, = AX2.plot([], [], label='pIons')
 
 ####PEVOLT, = AX4.plot([], [], label='PEFIELD')
 
-plt.tight_layout()
+#plt.tight_layout()

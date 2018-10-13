@@ -153,6 +153,18 @@ public:
   // auxiliar densities
   boost_array2d pdens;
   boost_array2d ndens;
+  boost_array2d pdens_aux;
+  boost_array2d ndens_aux;
+
+  // rate of coagulation surface growth charging nucleation
+  boost_array2d crate2d;
+  boost_array2d srate2d;
+  boost_array2d qrate2d;
+  boost_array2d nrate2d;
+
+  boost_array2d srate2d_aux;
+  boost_array2d nrate2d_aux;
+  boost_array2d zero2d;
 
   // Collision frequencies
   boost_array2d efreq;
@@ -242,6 +254,12 @@ private:
   int advance_nocharging(const double ctime);
 
   int advance_nocharging_omp(const double ctime);
+
+  int advance_nocharging_ompadp(const double ctime);
+  
+  int compute_split_sgnucleation();
+
+  int compute_sgrowth_adp();
   
   int compute_sgrowth();
 
@@ -343,6 +361,10 @@ struct qsystem{
 // //      NEvo n;
 // //      nano = n;
 //      }
+  qsystem(const qsystem& qsys): nano(qsys.nano), l(qsys.l), tun(qsys.tun) {
+    
+  }
+  
   qsystem(NEvo* nanoparent): nano(nanoparent) {
     tun = 0.0;
     if(nano->nm.nano.tunnel==1) {
