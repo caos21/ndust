@@ -444,7 +444,7 @@ class plot():
     self.plot_fcontours(self.log10res, r'Density',
                         savename="rescf.png")
 
-  def axis1d(self, data, pivots, axislabel, log=True):
+  def axis1d(self, data, pivots, axislabel, log=True, logy=True):
     plt.xlabel(axislabel[0], fontsize=self.xc.label_fontsize0)
     plt.ylabel(axislabel[1], fontsize=self.xc.label_fontsize1)
 
@@ -454,7 +454,8 @@ class plot():
     if (log):
       plt.xscale('log')
 
-    plt.yscale('log')
+    if (logy):
+      plt.yscale('log')
 
     plt.xlim((pivots[0], pivots[-1]))
     plt.ylim((1, data.max()))
@@ -462,14 +463,14 @@ class plot():
   def plot_bars(self, pivots, data, width, log=True, msg=u"Size distribution",
                 axislabel=[r'$Diameter (\text{nm)}$', r'$N(1/m^3)$'],
                 savename="dbars.png", color=current_palette[0], figname="ddiam",
-                ylim=None):
+                ylim=None, logy=True):
     """
     """
     # Create the figure
     fig = plt.figure(figname, figsize=(12, 9))
     fig.suptitle(msg, size=self.xc.title_fontsize)
 
-    self.axis1d(data, pivots, axislabel, log=log)
+    self.axis1d(data, pivots, axislabel, log=log, logy=logy)
     self.minorticks(fig)
 
     pbars = plt.bar(pivots, data, width, color=color,
@@ -499,14 +500,14 @@ class plot():
     plt.savefig(savename, bbox_inches='tight')
     plt.show()
 
-  def plot_diams(self, ylim=None):
-    self.plot_bars(self.dpivots, self.ddens, self.width_vpivots, ylim=ylim)
+  def plot_diams(self, ylim=None, logy=True):
+    self.plot_bars(self.dpivots, self.ddens, self.width_vpivots, ylim=ylim, logy=logy)
 
-  def plot_charges(self, ylim=None):
+  def plot_charges(self, ylim=None, logy=True):
     self.plot_bars(self.qpivots, self.cdens, self.width_qpivots, log=False,
                    msg=u"Charge distribution",
                    axislabel=[r'$q(e)$', r'$N(1/m^3)$'], savename="cbars.png",
-                   color=current_palette[1], figname="qbar", ylim=ylim)
+                   color=current_palette[1], figname="qbar", ylim=ylim, logy=logy)
 
 
   def plot_charges_at_volume(self, sect_indexes, zorders, colors, fills,
@@ -842,9 +843,10 @@ plt.xlabel('Diameters (nm)')
 plt.ylabel('Density (1/m3)')
 plt.xscale('log')
 plt.yscale('log')
-plt.ylim([10, 1e16])
+plt.ylim([10, 5e16])
 #plt.ylim([10, 1e18])
-plt.xlim([0.75, 80])
+#plt.xlim([0.75, 80])
+plt.xlim([0.75, 100])
 #plt.xlim([DPivots[0], DPivots[-1]])
 
 DBARS = []
@@ -860,8 +862,10 @@ AX2.grid(True)
 plt.xlabel(r'Charges ($e$)')
 #plt.ylabel(r'Density ($1/m^3$)')
 plt.yscale('log')
-plt.ylim([10, 1e16])
-plt.xlim([-70, 5])
+plt.ylim([10, 5e16])
+plt.xlim([-190, 5])
+#plt.xlim([-110, 5])
+#plt.xlim([-70, 5])
 #plt.ylim([QPivots[0], QPivots[-1]])
 
 CHARGDPLOT, = AX2.plot([], [], label='charges')

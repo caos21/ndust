@@ -21,6 +21,7 @@
 #include <iostream>
 #include <fstream>
 #include <string>
+#include <algorithm>
 #include <functional>
 
 // hdf5 c++ bindings
@@ -47,14 +48,25 @@
 #include "../include/PlasmaModel.h"
 #include "../include/NanoModel.h"
 
+
 typedef double value_type;
 typedef std::vector<double> state_type;
 namespace odeint = boost::numeric::odeint;
 typedef odeint::runge_kutta_cash_karp54< state_type > error_stepper_type;
 typedef odeint::controlled_runge_kutta< odeint::runge_kutta_cash_karp54< state_type > > stepper_type;
 
+extern "C" {
+#include "common.h"
+#include "lsoda.h"
+#include "lsoda_internal.h"
+#include "blas.h" 
+}
+
+
 // forward declaration of qsystem
 struct qsystem;
+
+struct ls_qsystem;
 
 class Solver;
 
@@ -201,6 +213,8 @@ public:
 //   friend struct qsystem;
   qsystem* qsys;
 
+  ls_qsystem* ls_qsys;
+  
   friend class Solver;
 
   Solver* sol;
@@ -517,6 +531,58 @@ int function(realtype t, N_Vector x, N_Vector dxdt, void *user_data) {
   return(0);
 }
 
+// ------------------------------ lsoda solver
+
+inline
+int ls_qsystemf(double t, double *n, double *dndt, void *data);
+
+struct ls_qsystem{
+  ls_qsystem() {}
+
+  ls_qsystem(const qsystem& qsys): nano(qsys.nano), l(qsys.l), tun(qsys.tun) {}
+  
+  ls_qsystem(NEvo* nanoparent): nano(nanoparent) {
+    tun = 0.0;
+    if(nano->nm.nano.tunnel==1) {
+      tun = 1.0;
+    }
+  }
+
+  friend int ls_qsystemf(double t, double *n, double *dndt, void *data);
+
+  NEvo* nano;
+  unsigned int l;
+  double tun;
+};
+
+int ls_qsystemf(double t, double *n, double *dndt, void *data) {
+
+  const ls_qsystem* qsys = static_cast< ls_qsystem* >(data);
+
+  unsigned int nchrgs = qsys->nano->cr.gm.chrgs.nsections;
+  unsigned int l = qsys->l;
+  
+  for (unsigned int q = 1; q < nchrgs-1; ++q) {
+
+    dndt[q] = (qsys->nano->ifreq[l][q-1]+qsys->tun*qsys->nano->tfreq[l][q-1])*n[q-1]
+      + qsys->nano->efreq[l][q+1]*n[q+1]
+      - n[q] *((qsys->nano->ifreq[l][q]+qsys->tun*qsys->nano->tfreq[l][q]) + qsys->nano->efreq[l][q]);
+
+  }
+  unsigned int q = 0;
+  dndt[q] = qsys->nano->efreq[l][q+1]*n[q+1]
+    - n[q] * ((qsys->nano->ifreq[l][q]+qsys->tun*qsys->nano->tfreq[l][q])); 
+
+  q = nchrgs-1;
+  dndt[q] = (qsys->nano->ifreq[l][q-1]+qsys->tun*qsys->nano->tfreq[l][q-1])*n[q-1]
+    - n[q] * qsys->nano->efreq[l][q];
+
+  return 0;
+}
+
+// ------------------------------ lsoda solver
+
+
 inline
 double gaussian_distribution(double x, double mu, double sigma){
   // mu -> mean
@@ -525,4 +591,5 @@ double gaussian_distribution(double x, double mu, double sigma){
   double arg = -0.5*pow((x-mu)/sigma, 2);
   return prefac*exp(arg);
 }
+
 #endif // NEVO_H
