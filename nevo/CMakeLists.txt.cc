@@ -3,6 +3,21 @@ cmake_minimum_required(VERSION 2.8)
 
 project(nevo)
 
+# ============= LSODA
+get_filename_component(PARENT_DIR ${CMAKE_CURRENT_SOURCE_DIR} DIRECTORY)
+set(LSODA_DIR "${PARENT_DIR}/modules/liblsoda/")
+include(ExternalProject)
+ExternalProject_Add(liblsoda
+    SOURCE_DIR ${LSODA_DIR}
+    CONFIGURE_COMMAND ""
+    STEP_TARGETS build
+    BUILD_COMMAND make
+    BUILD_IN_SOURCE 1
+    INSTALL_COMMAND "")
+include_directories("${LSODA_DIR}/src/")
+link_directories("${LSODA_DIR}/src/")
+# ============
+
 add_definitions(-DBOOST_LOG_DYN_LINK)
 add_definitions(-DNDEBUG)
 add_definitions(-DBOOST_UBLAS_DNDEBUG)
