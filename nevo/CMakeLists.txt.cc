@@ -132,6 +132,7 @@ target_link_libraries(NEvo
 		      boost_date_time
 		      boost_filesystem
 		      mkl
+		      lsoda
 		      ${LIBS}
 		      ${SUNDIALS_LIBS})
 
@@ -150,7 +151,8 @@ target_link_libraries(nevo
 		      boost_regex
 		      boost_date_time
 		      boost_filesystem
-		      mkl		      
+		      mkl
+		      lsoda		      
                       ${LIBS}
                       ${SUNDIALS_LIB})
 

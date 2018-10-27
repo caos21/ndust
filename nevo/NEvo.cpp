@@ -268,7 +268,7 @@ int NEvo::evolve_omp() {
   clock_t begin_sim = std::clock();
   ctime = 0.0;
   err = -1;
-#pragma omp parallel shared(ctime, nm, err)
+#pragma omp parallel //shared(ctime, nm, err)
   {//begin parallel omp
 #pragma omp master
     {// begin master omp, controls the iterations in t (time)
@@ -290,7 +290,7 @@ int NEvo::evolve_omp() {
 	double one_step_begin = omp_get_wtime();
 
 	//BOOST_LOG_SEV(lg, info) << "Number threads " << omp_get_num_threads();
-#pragma omp parallel /*num_threads(num_threads)*/ shared(ctime)
+#pragma omp parallel /*num_threads(num_threads) shared(ctime)*/
 	{
 	  evolve_one_step_omp(ctime);
 	}
@@ -935,7 +935,7 @@ int NEvo::evolve_one_step_omp(double ctime) {
       ls_qsystem qsysy(*ls_qsys);
       double wtime = omp_get_wtime();
       double min_dtq = 1.0;
-#pragma omp parallel firstprivate(qsysy) shared(min_dtq, ctime, ndens, pdens, qrate2d)//, ctime, qsys)
+#pragma omp parallel firstprivate(qsysy)// shared(min_dtq, ctime, ndens, pdens, qrate2d)//, ctime, qsys)
       {
 #pragma omp for nowait schedule(dynamic)// ordered schedule(static, 1)// nowait
 	for(unsigned int l=0; l<cr.gm.vols.nsections; ++l) {
