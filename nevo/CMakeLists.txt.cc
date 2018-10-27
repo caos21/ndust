@@ -83,7 +83,7 @@ set(CMAKE_CXX_COMPILE_FLAGS "${CMAKE_CXX_COMPILE_FLAGS} -Ofast -frecord-gcc-swit
 
 set(CMAKE_CXX_LINK_FLAGS "${CMAKE_CXX_LINK_FLAGS} -Ofast -frecord-gcc-switches")
 
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -std=gnu++14 -mtune=native -O2 -frecord-gcc-switches")
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -std=gnu++14 -Og")
 
 #
 # RELEASE ADD -DNDEBUG for boost performance
@@ -131,8 +131,8 @@ target_link_libraries(NEvo
 		      boost_regex
 		      boost_date_time
 		      boost_filesystem
-		      mkl
 		      lsoda
+		      mkl
 		      ${LIBS}
 		      ${SUNDIALS_LIBS})
 
@@ -151,8 +151,8 @@ target_link_libraries(nevo
 		      boost_regex
 		      boost_date_time
 		      boost_filesystem
+		      lsoda
 		      mkl
-		      lsoda		      
                       ${LIBS}
                       ${SUNDIALS_LIB})
 
