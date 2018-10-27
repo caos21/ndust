@@ -168,10 +168,9 @@ int NEvo::evolve() {
   err = compute_precompute();
 
   qsys = new qsystem(this);
-
+  
   auto stepper = odeint::make_controlled( 1.0e-6, 1.0e-6,
                                           odeint::runge_kutta_dopri5< state_type >() );
-
 
 
   clock_t begin_sim = std::clock();
@@ -192,7 +191,7 @@ int NEvo::evolve() {
       err=write_partial_results(ctime);
       clock_t one_step_end = std::clock();
       double elapsed_secs_onestep  = double(one_step_end - one_step_begin) / CLOCKS_PER_SEC;
-      BOOST_LOG_SEV(lg, info) << "One step elapsed secs = "  << elapsed_secs_onestep << "]";      
+      BOOST_LOG_SEV(lg, info) << "One step elapsed secs = "  << elapsed_secs_onestep;
       npcount=0;
     }
 
@@ -259,6 +258,9 @@ int NEvo::evolve_omp() {
   auto stepper = odeint::make_controlled( 1.0e-6, 1.0e-6,
                                           odeint::runge_kutta_dopri5< state_type >() );
 
+  
+  // lsoda
+  ls_qsys = new ls_qsystem(this);
 
   // IMPORTANT set nested parallelism
   omp_set_nested(true);
@@ -266,7 +268,7 @@ int NEvo::evolve_omp() {
   clock_t begin_sim = std::clock();
   ctime = 0.0;
   err = -1;
-#pragma omp parallel shared(ctime, nm, err)
+#pragma omp parallel //shared(ctime, nm, err)
   {//begin parallel omp
 #pragma omp master
     {// begin master omp, controls the iterations in t (time)
@@ -279,13 +281,16 @@ int NEvo::evolve_omp() {
       // get num_threads
       int num_threads = omp_get_num_threads();
       // execute loop in master thread
+      double writing_step_begin = 0.0;
       for(unsigned int t=0; err<0; ++t, ++npcount) {
 	// update time
 	ctime += nm.tm.ndeltat;
 
-	clock_t one_step_begin = std::clock();
+	//clock_t one_step_begin = std::clock();
+	double one_step_begin = omp_get_wtime();
+
 	//BOOST_LOG_SEV(lg, info) << "Number threads " << omp_get_num_threads();
-#pragma omp parallel /*num_threads(num_threads)*/ shared(ctime)
+#pragma omp parallel /*num_threads(num_threads) shared(ctime)*/
 	{
 	  evolve_one_step_omp(ctime);
 	}
@@ -297,9 +302,18 @@ int NEvo::evolve_omp() {
 				  << ctime << " [elapsed secs = " 
 				  << elapsed_secs << "]";
 	  int err_ = write_partial_results(ctime);
-	  clock_t one_step_end = std::clock();
-	  double elapsed_secs_onestep  = double(one_step_end - one_step_begin) / CLOCKS_PER_SEC;
-	  BOOST_LOG_SEV(lg, info) << "One step elapsed secs = "  << elapsed_secs_onestep << "]";      
+	  //clock_t one_step_end = std::clock();
+	  double one_step_end = omp_get_wtime();
+	  //double elapsed_secs_onestep  = double(one_step_end - one_step_begin) / CLOCKS_PER_SEC;
+	  double elapsed_secs_onestep = one_step_end - one_step_begin;
+	  BOOST_LOG_SEV(lg, info) << "One step elapsed secs = "  << elapsed_secs_onestep;
+
+	  double writing_step_end = omp_get_wtime();
+	  double elapsed_secs_writing = writing_step_end - writing_step_begin;
+	  BOOST_LOG_SEV(lg, info) << "Writing time/Delta elapsed sec = " << ctime 
+				  << "\t" << elapsed_secs_writing;    
+	  // reset clock
+	  writing_step_begin = omp_get_wtime();
 	  npcount=0;
 	}
 
@@ -909,101 +923,201 @@ int NEvo::evolve_one_step(double ctime) {
 
 // ------------------ openmp version ------------------
 
+// ==================== LSODA
+
 int NEvo::evolve_one_step_omp(double ctime) {
 
   int err;
+
 #pragma omp master
   {
-    //state_type nqdens(cr.gm.chrgs.nsections);
-    double wtime = omp_get_wtime();
-    double sdt=0.0;
     if(nm.rs.wch == 1) {
-      //clock_t begin_tcharge = std::clock();
-      //BOOST_LOG_SEV(lg, info) << "Computing charges";
-#pragma omp parallel default(none) shared(ctime, ndens, pdens, qsys, qrate2d)//, ctime, qsys)
+      ls_qsystem qsysy(*ls_qsys);
+      double wtime = omp_get_wtime();
+      double min_dtq = 1.0;
+#pragma omp parallel firstprivate(qsysy)// shared(min_dtq, ctime, ndens, pdens, qrate2d)//, ctime, qsys)
       {
-	//std::cout << "\n[ii] number of threads in the team " << omp_get_thread_num();
-	// dynamic scheduling because the load is unbalanced
-	// the odeint solver is fast for density = 0 but takes time when
-	// density != 0
-#pragma omp for nowait schedule(dynamic, 1)// ordered schedule(static, 1)// nowait
+#pragma omp for nowait schedule(dynamic)// ordered schedule(static, 1)// nowait
 	for(unsigned int l=0; l<cr.gm.vols.nsections; ++l) {
-	  //       auto stepper = odeint::make_controlled( 1.0e-3, 1.0e-3,
-	  //                                           odeint::runge_kutta_dopri5< state_type >() );
-	  auto stepper = odeint::make_controlled( 1.0e-3, 1.0e-3,
-						  odeint::runge_kutta_cash_karp54< state_type >() );
-	  //auto stepper = odeint::make_controlled( 1.0e-3, 1.0e-3,
-	  //					odeint::runge_kutta_fehlberg78< state_type >() );
-	  //runge_kutta_fehlberg78
-	  //qsys->l = l;
-	  
-	  // make a copy of qsys for each thread
-	  qsystem qsysy(*qsys);
 	  // work with section l
 	  qsysy.l = l;
 	  // each thread owns a density vector (fixed l)
 	  state_type nqdens(cr.gm.chrgs.nsections);
-	  
-	  //double sum1 = 0;
+	  // tolerances for lsoda
+	  double atol[cr.gm.chrgs.nsections], rtol[cr.gm.chrgs.nsections];
+	  // set the target density
 	  for(unsigned int q=0; q<cr.gm.chrgs.nsections; ++q) {
 	    nqdens[q] = pdens[l][q];
+	    atol[q] = 1.0e-4;
+	    rtol[q] = 1.0e-2;
 	    //sum1 += pdens[l][q];
 	  }
-	  //std::cout << "\n[ii] thread number " << omp_get_thread_num() << " l :  " << qsys->l << " sum1 " << sum1;
-	  
-	  //       bool success = false;
+	  // get time
 	  double ldtq = nm.tm.qdeltat;
 	  double ldtn = nm.tm.ndeltat;
-	  double ttime = ctime;
-	  
-	  odeint::integrate_adaptive(stepper_type(), qsysy, nqdens, ttime,
-	  			     ttime+ldtn, ldtq);
-	  //odeint::integrate_const( odeint::runge_kutta4< state_type >() ,qsysy, nqdens, ttime,
-	  //			  ttime+ldtn, ldtq);
-	  
-	  //double sum = 0;
-	  for(unsigned int q=0; q<cr.gm.chrgs.nsections; ++q) {
-	    ndens[l][q] = nqdens[q];
-	    //sum += nqdens[q];
-	    //std::cout << "\n[ii] thread number " << omp_get_thread_num() << " l, q " << qsys->l << ", " << q;
-	    qrate2d[l][q] = (ndens[l][q]-pdens[l][q])/ldtn;
+	  double ttime = ctime;	  
+	  // INTEGRATE LSODA begins
+	  // set options
+	  struct lsoda_opt_t opt = {0};
+	  //opt.h0 = ldtq;                // initial time step
+	  opt.ixpr = 0;                 // additional printing
+	  opt.rtol = rtol;              // relative tolerance
+	  opt.atol = atol;              // absolute tolerance
+	  opt.itask = 1;                // normal integration
+	  opt.mxstep = 1000000000;      // max steps
+	  // set lsoda context
+	  struct lsoda_context_t ctx = {
+					.function = ls_qsystemf,
+					.data = &qsysy,
+					.neq = static_cast<int>(cr.gm.chrgs.nsections),
+					.state = 1,
+	  };
+	  lsoda_prepare(&ctx, &opt);
+	  // time for lsoda
+	  double tin = ttime;
+	  double tout = ttime+ldtn;
+	  // integrate
+	  lsoda(&ctx, nqdens.data(), &tin, tout);
+	  min_dtq = std::min(min_dtq, ctx.common->hu);
+	  if (ctx.state <= 0) {
+	    std::cerr << "\nerror istate = " << ctx.state;
+	    //std::terminate();
 	  }
-	  //std::cout << "\n[ii] thread number " << omp_get_thread_num() << " l :  " << qsysy.l << " sum " << sum;
-	  //std::cout << "\n[ii] thread number " << omp_get_thread_num() << " TIME " << ttime << "\t" << ctime;
-	  //wtime = omp_get_wtime() - wtime;
-	  //std::cout << "\n[ii] thread number " << omp_get_thread_num() << " elapsed time " << wtime;
-      }//for l in sections
-    }// parallel region
-    //#pragma omp flush
-    pdens = ndens;
-    //clock_t end_tcharge = std::clock();
-    //double elapsed_secs = double(end_tcharge - begin_tcharge) / CLOCKS_PER_SEC;
-    //BOOST_LOG_SEV(lg, info) << "Charging elapsed secs = " << elapsed_secs;
-  }//charging block
-  
-  wtime = omp_get_wtime() - wtime;
-  BOOST_LOG_SEV(lg, info) << "Charging elapsed secs = " << wtime;
+	  // free context
+	  lsoda_free(&ctx);
+	  
+	  for(unsigned int q=0; q<cr.gm.chrgs.nsections; ++q) {
+	    ndens[l][q] = (nqdens[q]>0? nqdens[q]: 0.0);
+	    qrate2d[l][q] = (ndens[l][q]-pdens[l][q])/ldtn;
+	  }	  
+	}//for l in sections
+      }// parallel region
+      //#pragma omp flush
+      pdens = ndens;
 
-  // growth clock
-  wtime = omp_get_wtime() - wtime;
-  clock_t begin_tgrowth = std::clock();
-  
-//#pragma omp parallel num_threads(10)
-//    {
-    err = advance_nocharging_ompadp(ctime);
-    //BOOST_LOG_SEV(lg, info) << "No charging thread " << omp_get_thread_num();
-    //    }
+      wtime = omp_get_wtime() - wtime;
+      BOOST_LOG_SEV(lg, info) << "Charging elapsed secs = " << wtime;
+      BOOST_LOG_SEV(lg, info) << "Min dtq " << min_dtq;
+    }//charging block    
     
-    clock_t end_tgrowth = std::clock();
-    double elapsed_secs = double(end_tgrowth - begin_tgrowth) / CLOCKS_PER_SEC;
-    BOOST_LOG_SEV(lg, info) << "Growth elapsed secs = " << elapsed_secs;
-    wtime = omp_get_wtime() - wtime;
-    BOOST_LOG_SEV(lg, info) << "Thread number " << omp_get_thread_num()
-			    << " growth elapsed time " << wtime << " at time = " << ctime;    
-
+    // growth clock
+    double begin_tgrowth = omp_get_wtime();    
+    err = advance_nocharging_ompadp(ctime);    
+    double end_tgrowth = omp_get_wtime();
+    double elapsed_secs = end_tgrowth - begin_tgrowth;
+    BOOST_LOG_SEV(lg, info)
+      << "Growth (coagulation+sgrowth+nucleation) elapsed secs = "
+      << elapsed_secs;    
+    
   }//omp master
   return err;
 }
+
+
+// ++++++++++++++++++++ BOOST working version
+
+// int NEvo::evolve_one_step_omp(double ctime) {
+
+//   int err;
+
+// #pragma omp master
+//   {
+//     //state_type nqdens(cr.gm.chrgs.nsections);
+//     double wtime = omp_get_wtime();
+//     double sdt=0.0;
+//     if(nm.rs.wch == 1) {
+//       //clock_t begin_tcharge = std::clock();
+//       //BOOST_LOG_SEV(lg, info) << "Computing charges";
+//       #pragma omp parallel default(none) shared(ctime, ndens, pdens, qsys, qrate2d)//, ctime, qsys)
+//       {
+// 	//std::cout << "\n[ii] number of threads in the team " << omp_get_thread_num();
+// 	// dynamic scheduling because the load is unbalanced
+// 	// the odeint solver is fast for density = 0 but takes time when
+// 	// density != 0
+// 	#pragma omp for nowait schedule(dynamic)// ordered schedule(static, 1)// nowait
+// 	for(unsigned int l=0; l<cr.gm.vols.nsections; ++l) {
+// 	  //       auto stepper = odeint::make_controlled( 1.0e-3, 1.0e-3,
+// 	  //                                           odeint::runge_kutta_dopri5< state_type >() );
+// 	  auto stepper = odeint::make_controlled( 1.0e-3, 1.0e-3,
+// 						  odeint::runge_kutta_cash_karp54< state_type >() );
+// 	  //auto stepper = odeint::make_controlled( 1.0e-3, 1.0e-3,
+// 	  //					odeint::runge_kutta_fehlberg78< state_type >() );
+// 	  //runge_kutta_fehlberg78
+// 	  //qsys->l = l;
+
+// 	  //wtime = omp_get_wtime();
+// 	  // make a copy of qsys for each thread
+// 	  qsystem qsysy(*qsys);
+// 	  // work with section l
+// 	  qsysy.l = l;
+// 	  // each thread owns a density vector (fixed l)
+// 	  state_type nqdens(cr.gm.chrgs.nsections);
+// 	  // wtime = omp_get_wtime() - wtime;
+// 	  // BOOST_LOG_SEV(lg, info) << "Copy elapsed secs = " << wtime;
+// 	  // wtime = omp_get_wtime();
+
+// 	  //double sum1 = 0;
+// 	  for(unsigned int q=0; q<cr.gm.chrgs.nsections; ++q) {
+// 	    nqdens[q] = pdens[l][q];
+// 	    //sum1 += pdens[l][q];
+// 	  }
+// 	  //std::cout << "\n[ii] thread number " << omp_get_thread_num() << " l :  " << qsys->l << " sum1 " << sum1;
+	  
+// 	  //       bool success = false;
+// 	  double ldtq = nm.tm.qdeltat;
+// 	  double ldtn = nm.tm.ndeltat;
+// 	  double ttime = ctime;
+	  
+// 	  odeint::integrate_adaptive(stepper_type(), qsysy, nqdens, ttime,
+// 	  			     ttime+ldtn, ldtq);
+// 	  // wtime = omp_get_wtime() - wtime;
+// 	  // BOOST_LOG_SEV(lg, info) << "Solver elapsed secs = " << wtime;
+// 	  //odeint::integrate_const( odeint::runge_kutta4< state_type >() ,qsysy, nqdens, ttime,
+// 	  //			  ttime+ldtn, ldtq);
+	  
+// 	  //double sum = 0;
+// 	  for(unsigned int q=0; q<cr.gm.chrgs.nsections; ++q) {
+// 	    ndens[l][q] = nqdens[q];
+// 	    //sum += nqdens[q];
+// 	    //std::cout << "\n[ii] thread number " << omp_get_thread_num() << " l, q " << qsys->l << ", " << q;
+// 	    qrate2d[l][q] = (ndens[l][q]-pdens[l][q])/ldtn;
+// 	  }
+// 	  //std::cout << "\n[ii] thread number " << omp_get_thread_num() << " l :  " << qsysy.l << " sum " << sum;
+// 	  //std::cout << "\n[ii] thread number " << omp_get_thread_num() << " TIME " << ttime << "\t" << ctime;
+// 	  //wtime = omp_get_wtime() - wtime;
+// 	  //std::cout << "\n[ii] thread number " << omp_get_thread_num() << " elapsed time " << wtime;
+//       }//for l in sections
+//     }// parallel region
+//     //#pragma omp flush
+//     pdens = ndens;
+//     //clock_t end_tcharge = std::clock();
+//     //double elapsed_secs = double(end_tcharge - begin_tcharge) / CLOCKS_PER_SEC;
+//     //BOOST_LOG_SEV(lg, info) << "Charging elapsed secs = " << elapsed_secs;
+//   }//charging block
+  
+//   wtime = omp_get_wtime() - wtime;
+//   BOOST_LOG_SEV(lg, info) << "Charging elapsed secs = " << wtime;
+
+//   // growth clock
+//   wtime = omp_get_wtime() - wtime;
+//   clock_t begin_tgrowth = std::clock();
+  
+// //#pragma omp parallel num_threads(10)
+// //    {
+//     err = advance_nocharging_ompadp(ctime);
+//     //BOOST_LOG_SEV(lg, info) << "No charging thread " << omp_get_thread_num();
+//     //    }
+    
+//     clock_t end_tgrowth = std::clock();
+//     double elapsed_secs = double(end_tgrowth - begin_tgrowth) / CLOCKS_PER_SEC;
+//     BOOST_LOG_SEV(lg, info) << "Growth elapsed secs = " << elapsed_secs;
+//     wtime = omp_get_wtime() - wtime;
+//     BOOST_LOG_SEV(lg, info) << "Thread number " << omp_get_thread_num()
+// 			    << " growth elapsed time " << wtime << " at time = " << ctime;    
+
+//   }//omp master
+//   return err;
+// }
 
 // ------------------ openmp version ------------------
 
@@ -1306,25 +1420,25 @@ int NEvo::advance_nocharging_ompadp(const double ctime) {
   int err;
 //   double dtf = 100.0;// time factor multplier
   // with surface growth
-  //double wsg = static_cast<double>(nm.rs.wsg);
+  double wsg = static_cast<double>(nm.rs.wsg);
 //   // with nucleation
-  //double wnu = static_cast<double>(nm.rs.wnu);
+  double wnu = static_cast<double>(nm.rs.wnu);
 //   jnucleation[0][chrgs.ineutral] = jnuconst;
 
 //   jnucleation[0][cr.gm.chrgs.maxnegative] = nm.rs.nucleation_rate;
 
-//   // BIMODAL
-//   jnucleation[0][cr.gm.chrgs.maxnegative] = nm.rs.nucleation_rate*1E-3;
-//   // Warthesen after 10ms no more nucleation, DANGER time splitting and implic
-//   if(ctime<1e-2) {
-// //  if(tarea<1.8e-2) {
-//     wsg = 0.0;
-//     wnu = 1.0;//1.0
-//     jnucleation[0][cr.gm.chrgs.maxnegative] = nm.rs.nucleation_rate;
-//   }
-//   // END BIMODAL
+  // BIMODAL
+  jnucleation[0][cr.gm.chrgs.maxnegative] = nm.rs.nucleation_rate*1E-3;
+  // Warthesen after 10ms no more nucleation, DANGER time splitting and implic
+  if(ctime<1e-2) {
+//  if(tarea<1.8e-2) {
+    wsg = 0.0;
+    wnu = 1.0;//1.0
+    jnucleation[0][cr.gm.chrgs.maxnegative] = nm.rs.nucleation_rate;
+  }
+  // END BIMODAL
 
-  jnucleation[0][cr.gm.chrgs.maxnegative] = nm.rs.nucleation_rate;
+  //jnucleation[0][cr.gm.chrgs.maxnegative] = nm.rs.nucleation_rate;
 
   // with coagulation
   double wco = static_cast<double>(nm.rs.wco);
@@ -1332,12 +1446,13 @@ int NEvo::advance_nocharging_ompadp(const double ctime) {
   //#pragma omp single
   //{
   // TODO refactor
-  if((nm.rs.wnu == 1) || (nm.rs.wsg == 1)) {
+  // if((nm.rs.wnu == 1) || (nm.rs.wsg == 1)) {
+  if((wnu == 1) || (wsg == 1)) {
     compute_split_sgnucleation();
   }
 
   //}
-  clock_t begin_tcoagulation = std::clock();
+  double begin_tcoagulation = omp_get_wtime();
     
   if(nm.rs.wco == 1) {
     // explicit
@@ -1373,7 +1488,7 @@ int NEvo::advance_nocharging_ompadp(const double ctime) {
 	  // }
 	  if (ndens[l][q]<-1.0e-1) {
 	    BOOST_LOG_SEV(lg, info) << "Negative nanoparticle ndensity (coagulation)";
-	    nm.tm.ndeltat *= 0.75;
+	    nm.tm.ndeltat *= 0.9;
 	    BOOST_LOG_SEV(lg, info) << "New dt = " << nm.tm.ndeltat;
 	    if (nm.tm.ndeltat < nm.tm.qdeltat) {
 	      std::terminate();
@@ -1396,9 +1511,8 @@ int NEvo::advance_nocharging_ompadp(const double ctime) {
     //}
   }
 
-
-  clock_t end_tcoagulation = std::clock();
-  double elapsed_secs = double(end_tcoagulation - begin_tcoagulation) / CLOCKS_PER_SEC;
+  double end_tcoagulation = omp_get_wtime();
+  double elapsed_secs = end_tcoagulation - begin_tcoagulation;
   BOOST_LOG_SEV(lg, info) << "Coagulation elapsed secs = " << elapsed_secs;
 
   //#pragma omp single

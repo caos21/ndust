@@ -1,0 +1,3 @@
+[submodule "modules/liblsoda"]
+	path = modules/liblsoda
+	url = https://github.com/caos21/liblsoda.git

@@ -3,6 +3,21 @@ cmake_minimum_required(VERSION 3.0)
 
 project(nevo)
 
+# ============= LSODA
+get_filename_component(PARENT_DIR ${CMAKE_CURRENT_SOURCE_DIR} DIRECTORY)
+set(LSODA_DIR "${PARENT_DIR}/modules/liblsoda/")
+include(ExternalProject)
+ExternalProject_Add(liblsoda
+    SOURCE_DIR ${LSODA_DIR}
+    CONFIGURE_COMMAND ""
+    STEP_TARGETS build
+    BUILD_COMMAND make
+    BUILD_IN_SOURCE 1
+    INSTALL_COMMAND "")
+include_directories("${LSODA_DIR}/src/")
+link_directories("${LSODA_DIR}/src/")
+# ============
+
 # # defines variable SRCS to include cpp files
 # file(GLOB SRCS *.cpp)
 # file(GLOB INCSRCS RELATIVE "../include/" "*.cpp")
@@ -26,12 +41,12 @@ add_library(NEvo STATIC ../NEvo.cpp)
 # GSL
 set(LIBS "-lgsl -lgslcblas -lm -llapack -lumfpack -lboost_log -lboost_thread -lboost_system -lboost_log_setup -lhdf5_cpp -lhdf5 -lpthread -lz -ldl -lm")
 
-set(CMAKE_CXX_COMPILE_FLAGS "${CMAKE_CXX_COMPILE_FLAGS} -ftree-vectorizer-verbose=3 -std=gnu++14 -march=znver1 -O3 -ftree-vectorize -fstack-protector --param=ssp-buffer-size=4 -Wformat -Werror=format-security")
+set(CMAKE_CXX_COMPILE_FLAGS "${CMAKE_CXX_COMPILE_FLAGS} -ftree-vectorizer-verbose=3 -std=gnu++14 -march=znver1 -Ofast -ftree-vectorize -fstack-protector --param=ssp-buffer-size=4 -Wformat -Werror=format-security -ffast-math")
 
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -ftree-vectorizer-verbose=3 -std=gnu++14 -march=znver1 -O3 -ftree-vectorize -fopt-info-vec-missed=vec.miss -fstack-protector --param=ssp-buffer-size=4 -Wformat -Werror=format-security")
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -ftree-vectorizer-verbose=3 -std=gnu++14 -march=znver1 -Ofast -ftree-vectorize -fopt-info-vec-missed=vec.miss -fstack-protector --param=ssp-buffer-size=4 -Wformat -Werror=format-security")
 
 # RELEASE ADD -DNDEBUG for boost performance
-add_definitions(-DBOOST_LOG_DYN_LINK -DNDEBUG -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE -D_DEFAULT_SOURCE)
+add_definitions(-DBOOST_LOG_DYN_LINK -DNDEBUG -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE -D_DEFAULT_SOURCE -DBOOST_DISABLE_ASSERTS)
 
 
 # WARNING not working
@@ -60,6 +75,7 @@ add_executable(nevo main.cpp)
 target_link_libraries(NEvo
                       GridModel
                       NanoModel
+		      lsoda
                       ${LIBS})
 
 target_link_libraries(nevo
