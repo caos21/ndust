@@ -77,6 +77,9 @@ class Window(QMainWindow, Ui_MainWindow):
     self.checkbox_wch = self.ui.checkBox_wch
     self.checkbox_wch.toggled.connect(self.toggle_charging)
 
+    self.checkbox_sih4coupled = self.ui.checkBox_sih4coupled
+    self.checkbox_sih4coupled.toggled.connect(self.toggle_sih4coupled)
+    
     # plasma tab
     plasma_save_btn = self.ui.buttonBox_plasma_save.button(QtWidgets.QDialogButtonBox.Save)
     plasma_save_btn.clicked.connect(self.plasma_save)
@@ -404,7 +407,22 @@ class Window(QMainWindow, Ui_MainWindow):
     else:
       self.ui.label_wch.setEnabled(0)
 #
-
+  def toggle_sih4coupled(self):
+    """ Toggle sih4 coupled
+    """
+    if self.checkbox_sih4coupled.isChecked():
+      self.ui.label_sih4ratio.setEnabled(1)
+      self.ui.lineEdit_sih4ratio.setEnabled(1)
+      #
+      self.ui.label_sih4nmol.setEnabled(1)
+      self.ui.spinBox_sih4nmol.setEnabled(1)
+    else:
+      self.ui.label_sih4ratio.setEnabled(0)
+      self.ui.lineEdit_sih4ratio.setEnabled(0)
+      #
+      self.ui.label_sih4nmol.setEnabled(0)
+      self.ui.spinBox_sih4nmol.setEnabled(0)
+#
   def plasma_save(self):
     """ Save plasma file
     """      
@@ -531,14 +549,20 @@ class Window(QMainWindow, Ui_MainWindow):
     # with charging
     wch = self.ui.checkBox_wch.isChecked()
 
+    #coupled SiH4
+    wsih4 = self.ui.checkBox_sih4coupled.isChecked()
+    # SiH4 to gas ratio (1/ gas to SiH4 ratio)
+    sih4ratio = 1.0/le2float(self.ui.lineEdit_sih4ratio)
+    #
+    sih4nmol = self.ui.spinBox_sih4nmol.value()
+    #
     # instantiate the group Nanoparticles
     self.rates = mn.Rates(h5f, wnu, nucleation_rate,
                           wsg, sgrowth_rate,
-                          wco, wch)
-
+                          wco, wch, wsih4, sih4ratio, sih4nmol)
     # write group
     self.rates.toHDF5()
-
+    
   # Time
     # nanoparticle growth delta time
     ndeltat = le2float(self.ui.lineEdit_ndeltat)

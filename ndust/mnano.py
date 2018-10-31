@@ -56,7 +56,7 @@ class Rates(mh5u.H5Writable):
   """ Represents the rates nucleation, surface growth, coagulation
       and charging.
   """
-  def __init__(self, h5obj, wnu, nucleation_rate, wsg, sgrowth_rate, wco, wch):
+  def __init__(self, h5obj, wnu, nucleation_rate, wsg, sgrowth_rate, wco, wch, wsih4, sih4ratio, sih4nmol):
     """ Initial values
     """
     # hdf5 file object
@@ -86,13 +86,22 @@ class Rates(mh5u.H5Writable):
     #
     # With charging
     self.wch = mh5u.Attrib("wch", int(wch))
+    # With SiH4
+    self.wsih4 = mh5u.Attrib("wsih4", int(wsih4))
+    # SiH4 : gas ratio
+    self.sih4ratio = mh5u.Attrib("sih4ratio", sih4ratio)
+    # Number of SiH4 per nucleated particle
+    self.sih4nmol = mh5u.Attrib("sih4nmol", sih4nmol)
     #
     self.writable_list = [self.wnu,
                           self.nucleation_rate,
                           self.wsg,
                           self.sgrowth_rate,
                           self.wco,
-                          self.wch]
+                          self.wch,
+                          self.wsih4,
+                          self.sih4ratio,
+                          self.sih4nmol]
 #
 # ------ Time class ------
 class Time(mh5u.H5Writable):
