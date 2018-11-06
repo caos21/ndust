@@ -3,6 +3,25 @@ cmake_minimum_required(VERSION 2.8)
 
 project(nevo)
 
+set(CMAKE_MODULE_RELPATH "${CMAKE_CURRENT_SOURCE_DIR}/../cmake")
+
+message("oo cmake module relative path : ${CMAKE_MODULE_RELPATH}")
+#list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_MODULE_RELPATH}")
+
+include(GetGitRevisionDescription)
+
+get_git_head_revision(NDUST_BRANCH NDUST_HASH)
+message("oo Hash : ${NDUST_HASH}")
+message("oo Origin : ${NDUST_BRANCH}")
+
+git_local_changes(NDUST_STATE)
+message("oo State : ${NDUST_STATE}")
+
+git_describe(NDUST_VERSION "--long")
+message("oo Version ${NDUST_VERSION}")
+
+
 # ============= LSODA
 get_filename_component(PARENT_DIR ${CMAKE_CURRENT_SOURCE_DIR} DIRECTORY)
 set(LSODA_DIR "${PARENT_DIR}/modules/liblsoda/")
@@ -64,6 +83,9 @@ add_library(PlasmaModel STATIC ../include/PlasmaModel.cpp)
 add_library(NanoModel STATIC ../include/NanoModel.cpp)
 add_library(NEvo STATIC ../NEvo.cpp)
 
+# Configure ndust version
+configure_file("${CMAKE_CURRENT_SOURCE_DIR}/../include/ndust_version.cpp.in" "${CMAKE_CURRENT_SOURCE_DIR}/../include/ndust_version.cpp" @ONLY)
+add_library(ndust_version STATIC ../include/ndust_version.cpp)
 
 # include local boost-numeric-bindings
 include_directories("~/local/include/boost-numeric-bindings/")
@@ -142,6 +164,7 @@ target_link_libraries(nevo
                       PlasmaModel
                       NanoModel
 		      boost_log
+		      ndust_version
 		      hdf5
 		      hdf5_cpp
 		      boost_system

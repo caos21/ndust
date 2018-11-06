@@ -3,6 +3,25 @@ cmake_minimum_required(VERSION 2.8)
 
 project(crat)
 
+set(CMAKE_MODULE_RELPATH "${CMAKE_CURRENT_SOURCE_DIR}/../cmake")
+
+message("oo cmake module relative path : ${CMAKE_MODULE_RELPATH}")
+#list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_MODULE_RELPATH}")
+
+include(GetGitRevisionDescription)
+
+get_git_head_revision(NDUST_BRANCH NDUST_HASH)
+message("oo Hash : ${NDUST_HASH}")
+message("oo Origin : ${NDUST_BRANCH}")
+
+git_local_changes(NDUST_STATE)
+message("oo State : ${NDUST_STATE}")
+
+git_describe(NDUST_VERSION "--long")
+message("oo Version ${NDUST_VERSION}")
+
+
 include_directories(SYSTEM "/usr/include/eigen3")
 
 add_definitions(-DBOOST_LOG_DYN_LINK)
@@ -77,6 +96,11 @@ endif()
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Ofast -frecord-gcc-switches")
 
+# Configure ndust version
+configure_file("${CMAKE_CURRENT_SOURCE_DIR}/../include/ndust_version.cpp.in" "${CMAKE_CURRENT_SOURCE_DIR}/../include/ndust_version.cpp" @ONLY)
+
+add_library(ndust_version STATIC ../include/ndust_version.cpp)
+
 add_executable(crat "main.cpp" ${INCSRCS})
 
 add_executable(crat-writer "crat-writer.cpp" ${INCSRCS})
@@ -87,7 +111,7 @@ add_executable(crat-merge "crat-merge.cpp" ${INCSRCS})
 
 # target libraries
 #list(APPEND TLIBS "boost_log hdf5 hdf5_cpp boost_system boost_thread boost_atomic boost_chrono boost_regex boost_date_time boost_filesystem mkl")
-    
+
 target_link_libraries(CRate
   GridModel
   boost_log
@@ -105,6 +129,7 @@ target_link_libraries(CRate
 target_link_libraries(crat
   CRate
   boost_log
+  ndust_version
   hdf5
   hdf5_cpp
   boost_system
@@ -119,6 +144,7 @@ target_link_libraries(crat
 target_link_libraries(crat-writer
   CRate
   boost_log
+  ndust_version
   hdf5
   hdf5_cpp
   boost_system
@@ -133,6 +159,7 @@ target_link_libraries(crat-writer
 target_link_libraries(crat-reader
   CRate
   boost_log
+  ndust_version
   hdf5
   hdf5_cpp
   boost_system
@@ -147,6 +174,7 @@ target_link_libraries(crat-reader
 target_link_libraries(crat-merge
   CRate
   boost_log
+  ndust_version
   hdf5
   hdf5_cpp
   boost_system

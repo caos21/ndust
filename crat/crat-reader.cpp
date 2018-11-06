@@ -10,6 +10,12 @@
 // logger
 #include "../include/log.h"
 
+// version
+#include "ndversion.h"
+
+// sysinfo
+#include "sysinfo.h"
+
 // class CRate
 #include "../include/CRate.h"
 
@@ -58,8 +64,14 @@ int main(int argc, char **argv) {
   logging::add_common_attributes();
 
   src::severity_logger< severity_level > lg;
-  BOOST_LOG_SEV(lg, info) << "Logging started for CRat";
+  BOOST_LOG_SEV(lg, info) << "Logging started for CRat reader";
 
+  ndversion::NDVersion ndv(lg);
+  ndv.log();
+  
+  sysinfo::SysInfo sinfo(lg);
+  sinfo.log();
+  
   BOOST_LOG_SEV(lg, info) << "Prefix for output files: " << prefix_filename;
 
   BOOST_LOG_SEV(lg, info) << "Output directory: " << dirname;

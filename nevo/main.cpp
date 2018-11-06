@@ -10,6 +10,13 @@
 // logger
 #include "log.h"
 
+// version
+#include "ndversion.h"
+
+// sysinfo
+#include "sysinfo.h"
+
+// class NEvo
 #include "NEvo.h"
 
 int main(int argc, char **argv) {
@@ -76,6 +83,12 @@ int main(int argc, char **argv) {
 
   src::severity_logger< severity_level > lg;
   BOOST_LOG_SEV(lg, info) << "Logging started for NEvo";
+
+  ndversion::NDVersion ndv(lg);
+  ndv.log();
+  
+  sysinfo::SysInfo sinfo(lg);
+  sinfo.log();
   
   BOOST_LOG_SEV(lg, info) << "Grid file: " << grid_filename;
   

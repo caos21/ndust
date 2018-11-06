@@ -1,46 +1,84 @@
 
-cmake_minimum_required(VERSION 3.0)
+cmake_minimum_required(VERSION 2.8)
 
 project(crat)
 
-# defines variable SRCS to include cpp files
-file(GLOB SRCS *.cpp)
-file(GLOB INCSRCS RELATIVE "../include/" "*.cpp")
+set(CMAKE_MODULE_RELPATH "${CMAKE_CURRENT_SOURCE_DIR}/../cmake")
 
-include_directories("../include/")
+message("oo cmake module relative path : ${CMAKE_MODULE_RELPATH}")
+#list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_MODULE_RELPATH}")
+
+include(GetGitRevisionDescription)
+
+get_git_head_revision(NDUST_BRANCH NDUST_HASH)
+message("oo Hash : ${NDUST_HASH}")
+message("oo Origin : ${NDUST_BRANCH}")
+
+git_local_changes(NDUST_STATE)
+message("oo State : ${NDUST_STATE}")
+
+git_describe(NDUST_VERSION "--long")
+message("oo Version ${NDUST_VERSION}")
+
+
 include_directories(SYSTEM "/usr/include/eigen3")
 
-add_definitions(-DH5_USE_18_API)
 add_definitions(-DBOOST_LOG_DYN_LINK)
 add_definitions(-DNDEBUG)
 add_definitions(-DBOOST_UBLAS_DNDEBUG)
 add_definitions(-DUSING_EIGEN)
 add_definitions(-DEIGEN_DONT_PARALLELIZE)
 
+
+set (CMAKE_CXX_FLAGS "-std=gnu++14 ${CMAKE_CXX_FLAGS}")
+
+find_package(Boost COMPONENTS thread system atomic chrono date_time REQUIRED)
+
+# defines variable SRCS to include cpp files
+file(GLOB SRCS *.cpp)
+file(GLOB INCSRCS RELATIVE "../include/" "*.cpp")
+
+# project includes
+include_directories("../include/")
+# include local boost-numeric-bindings
+include_directories("~/local/include/boost-numeric-bindings/")
+# include  boost
+#include_directories("~/lib/boost/include/")
+# include lapack blas cblas
+#include_directories("/home/bsantos/local/include")
+# include GSL
+include_directories("/cvmfs/soft.computecanada.ca/easybuild/software/2017/sse3/Compiler/intel2016.4/gsl/2.3/include/")
+# include HDF5
+include_directories("/cvmfs/soft.computecanada.ca/easybuild/software/2017/sse3/Compiler/intel2016.4/hdf5/1.8.18/include/")
+
+# local boost
+#link_directories("~/lib/boost/lib/")
+# lapack blas cblas
+#link_directories("/home/bsantos/local/lib/")
+# gsl
+link_directories("/cvmfs/soft.computecanada.ca/easybuild/software/2017/sse3/Compiler/intel2016.4/gsl/2.3/lib/")
+# HDF5
+link_directories("/cvmfs/soft.computecanada.ca/easybuild/software/2017/sse3/Compiler/intel2016.4/hdf5/1.8.18/lib/")
+
+
 add_library(GridModel STATIC ../include/GridModel.cpp)
 add_library(CRate STATIC ../include/CRate.cpp)
 
-# GSL
-set(LIBS "-lgsl -lgslcblas -lm -llapack -lumfpack -lboost_log -lboost_thread -lboost_system -lboost_log_setup")
-
-# HDF5
-set (LIBS "${LIBS} -I/usr/include/hdf5/ -lhdf5_cpp -lhdf5")
-set (LIBS "${LIBS} -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE -D_BSD_SOURCE -D_FORTIFY_SOURCE=2 -fstack-protector --param=ssp-buffer-size=4 -Wformat -Werror=format-security -lpthread -lz -ldl -lm")
 
 # include_directories(${INC_DIR})
 
-# -frecord-gcc-switches
-# records flags passed to gcc
-# can be retrieved by $readelf -p .GCC.command.line crat
-set(CMAKE_CXX_COMPILE_FLAGS "${CMAKE_CXX_COMPILE_FLAGS} -Ofast -frecord-gcc-switches -march=znver1")
 
-set(CMAKE_CXX_LINK_FLAGS "${CMAKE_CXX_LINK_FLAGS} -Ofast -frecord-gcc-switches -march=znver1")
+set(CMAKE_CXX_COMPILE_FLAGS "${CMAKE_CXX_COMPILE_FLAGS} -Ofast -frecord-gcc-switches")
 
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -std=gnu++14 -march=znver1 -O3 -ftree-vectorize -fopt-info-vec-missed=vec.miss -frecord-gcc-switches")
+set(CMAKE_CXX_LINK_FLAGS "${CMAKE_CXX_LINK_FLAGS} -Ofast -frecord-gcc-switches")
+
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -std=gnu++14 -mtune=native -O2 -frecord-gcc-switches")
+
 #
 # RELEASE ADD -DNDEBUG for boost performance
 #
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DNDEBUG -fopenmp -DBOOST_LOG_DYN_LINK")
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DNDEBUG -fopenmp")
 #set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fopenmp")
 
 list(APPEND ${CMAKE_CXX_COMPILE_FLAGS} ${LIBS})
@@ -56,17 +94,12 @@ if(OPENMP_FOUND)
 endif()
 
 
-find_package(HDF5)
-if(HDF5_VERSION VERSION_LESS "1.10.0")
-  # use old api 1.8
-  message("HDF5 version 1.10 < ${HDF5_VERSION}")
-else()
-  # use new api
-  message("HDF5 version ${HDF5_VERSION} > 1.10.0")
-  add_definitions("-DH5API110")
-endif()
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Ofast -frecord-gcc-switches")
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Ofast -frecord-gcc-switches -march=znver1")
+# Configure ndust version
+configure_file("${CMAKE_CURRENT_SOURCE_DIR}/../include/ndust_version.cpp.in" "${CMAKE_CURRENT_SOURCE_DIR}/../include/ndust_version.cpp" @ONLY)
+
+add_library(ndust_version STATIC ../include/ndust_version.cpp)
 
 add_executable(crat "main.cpp" ${INCSRCS})
 
@@ -76,33 +109,83 @@ add_executable(crat-reader "crat-reader.cpp" ${INCSRCS})
 
 add_executable(crat-merge "crat-merge.cpp" ${INCSRCS})
 
-add_executable(potentials "potentials.cpp" ${INCSRCS})
-
-add_executable(potential_b1 "potentials_b1.cpp" ${INCSRCS})
+# target libraries
+#list(APPEND TLIBS "boost_log hdf5 hdf5_cpp boost_system boost_thread boost_atomic boost_chrono boost_regex boost_date_time boost_filesystem mkl")
 
 target_link_libraries(CRate
-                      GridModel
-                      ${LIBS})
+  GridModel
+  boost_log
+  hdf5
+  hdf5_cpp
+  boost_system
+  boost_thread
+  boost_atomic
+  boost_chrono
+  boost_regex
+  boost_date_time
+  boost_filesystem
+  mkl)
 
 target_link_libraries(crat
-                      CRate
-                      ${LIBS})
+  CRate
+  boost_log
+  ndust_version
+  hdf5
+  hdf5_cpp
+  boost_system
+  boost_thread
+  boost_atomic
+  boost_chrono
+  boost_regex
+  boost_date_time
+  boost_filesystem
+  mkl)
 
 target_link_libraries(crat-writer
-                      CRate
-                      ${LIBS})
+  CRate
+  boost_log
+  ndust_version
+  hdf5
+  hdf5_cpp
+  boost_system
+  boost_thread
+  boost_atomic
+  boost_chrono
+  boost_regex
+  boost_date_time
+  boost_filesystem
+  mkl)
 
 target_link_libraries(crat-reader
-                      CRate
-                      ${LIBS})
+  CRate
+  boost_log
+  ndust_version
+  hdf5
+  hdf5_cpp
+  boost_system
+  boost_thread
+  boost_atomic
+  boost_chrono
+  boost_regex
+  boost_date_time
+  boost_filesystem
+  mkl)
 
 target_link_libraries(crat-merge
-                      CRate
-                      ${LIBS})
-
-target_link_libraries(potentials ${LIBS})
-
-target_link_libraries(potential_b1 ${LIBS})
+  CRate
+  boost_log
+  ndust_version
+  hdf5
+  hdf5_cpp
+  boost_system
+  boost_thread
+  boost_atomic
+  boost_chrono
+  boost_regex
+  boost_date_time
+  boost_filesystem
+  mkl)
+  
 
 enable_testing()
 
