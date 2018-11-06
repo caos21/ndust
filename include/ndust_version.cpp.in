@@ -1,0 +1,14 @@
+//from https://stackoverflow.com/questions/1435953/how-can-i-pass-git-sha1-to-compiler-as-definition-using-cmake/4318642#4318642
+#include "ndust_version.h"
+
+#define NDUST_VERSION "@NDUST_VERSION@"
+const char g_NDUST_VERSION[] = NDUST_VERSION;
+
+#define NDUST_BRANCH "@NDUST_BRANCH@"
+const char g_NDUST_BRANCH[] = NDUST_BRANCH;
+
+#define NDUST_STATE "@NDUST_STATE@"
+const char g_NDUST_STATE[] = NDUST_STATE;
+
+#define NDUST_HASH "@NDUST_HASH@"
+const char g_NDUST_HASH[] = NDUST_HASH;

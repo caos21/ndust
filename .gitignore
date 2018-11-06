@@ -10,3 +10,8 @@
 *.ipynb
 *.npz
 *.pdf
+*.out
+*.err
+*.old
+*.list
+/include/ndust_version.cpp 

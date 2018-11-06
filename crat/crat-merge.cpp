@@ -11,6 +11,9 @@
 // logger
 #include "../include/log.h"
 
+// sysinfo
+#include "sysinfo.h"
+
 // class CRate
 #include "../include/CRate.h"
 
@@ -80,6 +83,9 @@ int main(int argc, char **argv) {
   src::severity_logger< severity_level > lg;
   BOOST_LOG_SEV(lg, info) << "Logging started for CRat merge";
 
+  sysinfo::SysInfo sinfo(lg);
+  sinfo.log();
+  
   BOOST_LOG_SEV(lg, info) << "Input file list: " << input_filename;
 
   BOOST_LOG_SEV(lg, info) << "Prefix for output files: " << prefix_filename;
