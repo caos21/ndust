@@ -5,21 +5,21 @@ project(crat)
 
 set(CMAKE_MODULE_RELPATH "${CMAKE_CURRENT_SOURCE_DIR}/../cmake")
 
-message("${CMAKE_MODULE_RELPATH}")
+message("oo cmake module relative path : ${CMAKE_MODULE_RELPATH}")
 #list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_MODULE_RELPATH}")
 
 include(GetGitRevisionDescription)
 
 get_git_head_revision(NDUST_BRANCH NDUST_HASH)
-message(${NDUST_HASH})
-message(${NDUST_BRANCH})
+message("oo Hash : ${NDUST_HASH}")
+message("oo Origin : ${NDUST_BRANCH}")
 
 git_local_changes(NDUST_STATE)
-message(${NDUST_STATE})
+message("oo State : ${NDUST_STATE}")
 
 git_describe(NDUST_VERSION "--long")
-message(${NDUST_VERSION})
+message("oo Version ${NDUST_VERSION}")
 
 
 include_directories(SYSTEM "/usr/include/eigen3")
@@ -115,7 +115,6 @@ add_executable(crat-merge "crat-merge.cpp" ${INCSRCS})
 target_link_libraries(CRate
   GridModel
   boost_log
-  ndust_version
   hdf5
   hdf5_cpp
   boost_system
@@ -130,6 +129,7 @@ target_link_libraries(CRate
 target_link_libraries(crat
   CRate
   boost_log
+  ndust_version
   hdf5
   hdf5_cpp
   boost_system
@@ -144,6 +144,7 @@ target_link_libraries(crat
 target_link_libraries(crat-writer
   CRate
   boost_log
+  ndust_version
   hdf5
   hdf5_cpp
   boost_system
@@ -158,6 +159,7 @@ target_link_libraries(crat-writer
 target_link_libraries(crat-reader
   CRate
   boost_log
+  ndust_version
   hdf5
   hdf5_cpp
   boost_system
@@ -172,6 +174,7 @@ target_link_libraries(crat-reader
 target_link_libraries(crat-merge
   CRate
   boost_log
+  ndust_version
   hdf5
   hdf5_cpp
   boost_system

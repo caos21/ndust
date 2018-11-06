@@ -10,11 +10,11 @@
 // logger
 #include "../include/log.h"
 
-// sysinfo
-#include "sysinfo.h"
-
 // version
 #include "ndversion.h"
+
+// sysinfo
+#include "sysinfo.h"
 
 // class CRate
 #include "../include/CRate.h"
