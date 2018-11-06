@@ -139,6 +139,27 @@ int NanoModel::read_rates() {
   BOOST_LOG_SEV(lg, info) << "--> Surface growth: "
                           << (rs.wsg==1 ? "yes" : "no");
 
+  err = read_attrib_hdf5<int>(h5obj, "/Rates", "wsih4",
+                              rs.wsih4);
+
+  BOOST_LOG_SEV(lg, info) << "--> SiH4 coupling: "
+                          << (rs.wsih4==1 ? "yes" : "no");
+
+  err = read_attrib_hdf5<double>(h5obj, "/Rates", "sih4ratio",
+                                 rs.sih4ratio);
+
+  BOOST_LOG_SEV(lg, info) << "--> SiH4 to gas ratio: " << rs.sih4ratio;
+  
+  err = read_attrib_hdf5<int>(h5obj, "/Rates", "sih4nmol",
+                              rs.sih4nmol);
+
+  BOOST_LOG_SEV(lg, info) << "--> SiH4 molecules per nucleated nanoparticle: "
+                          << rs.sih4nmol;
+
+  err = read_attrib_hdf5<double>(h5obj, "/Rates", "sih4mass",
+				 rs.sih4mass);
+
+  BOOST_LOG_SEV(lg, info) << "--> SiH4 mass: " << rs.sih4mass;
   return 0;
 }
 

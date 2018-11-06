@@ -80,7 +80,7 @@ class NEvo {
 public:
 // Constructors/Destructors
 //
-  NEvo() {}
+  NEvo(): moments_file(NULL), qsys(NULL), ls_qsys(NULL), sol(NULL), sih4_file(NULL) {}
   //! Constructor for NEvo
   /*!
     @param  dirname_ Directory for output files.
@@ -93,10 +93,11 @@ public:
        std::string nano_filename_,
         src::severity_logger< severity_level > lg_)
         : dirname(dirname_),
-        grid_filename(grid_filename_),
-        plasma_filename(plasma_filename_),
-        nano_filename(nano_filename_),
-        lg(lg_) {
+	  grid_filename(grid_filename_),
+	  plasma_filename(plasma_filename_),
+	  nano_filename(nano_filename_),
+	  lg(lg_), moments_file(NULL), qsys(NULL),
+	  ls_qsys(NULL), sol(NULL), sih4_file(NULL) {
 //     BOOST_LOG_SEV(lg, debug) << "NEvo instantiation";
   }
 
@@ -194,6 +195,7 @@ public:
   darray adim_srate;// surface rate 1/s
 
   darray surface_rate;// surface rate growth in m3/s
+  darray surface_area;// area of nanoparticles
 
   boost_array2d gsurfacegrowth;
   boost_array2d kcoagulation;
@@ -206,7 +208,7 @@ public:
   boost_array2d death_vector;
 
   std::fstream* moments_file;
-
+  
   darray moments;
 
 //   state_type nqdens;
@@ -220,6 +222,19 @@ public:
   Solver* sol;
 
   int check;
+
+  // ==================== SiH4 ====================
+  double nsih4_ini;
+  double nsih4;// SiH4 density
+  double nsih4_aux;
+  double sih4rate;
+  double vsih4;// SiH4 thermal velocity
+  double sih4_vol;// SiH4 volume
+  double sgrowth_rate_sih4;
+  double sgrowth_effective; // effective surface growth coefficient
+  double sgrowth_total_rate;
+  
+  std::fstream* sih4_file;
 //
 private:
 // Private methods
@@ -243,6 +258,12 @@ private:
   */
   int compute_precompute();
 
+  //! Compute precompute
+  /*! 
+   * Compute constants parameters SiH4 rates
+  */
+  int compute_precompute_sih4();
+  
   //! Compute nanoparticles potential
   /*! 
    * Compute nanoparticle potential
@@ -270,12 +291,20 @@ private:
   int advance_nocharging_omp(const double ctime);
 
   int advance_nocharging_ompadp(const double ctime);
+
+  int advance_nocharging_ompadpsih4(const double ctime);
   
   int compute_split_sgnucleation();
 
+  int compute_split_sgnucleationsih4();
+  
   int compute_sgrowth_adp();
   
   int compute_sgrowth();
+
+  int compute_sih4();
+  
+  int compute_sgnuc_sih4();
 
   int compute_coagulation();
 

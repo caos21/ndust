@@ -55,6 +55,10 @@ struct rates {
   int wco;                          //!< Coagulation switch
   int wnu;                          //!< Nucleation switch
   int wsg;                          //!< Surface growth switch
+  int wsih4;                        //!< SiH4 coupled rates switch
+  double sih4ratio;                 //!< SiH4 to ratio
+  int sih4nmol;                     //!< Number of SiH4 per nucleated particle
+  double sih4mass;                  //!< SiH4 mass
 };
 
 /**

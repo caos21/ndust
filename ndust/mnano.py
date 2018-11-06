@@ -92,6 +92,9 @@ class Rates(mh5u.H5Writable):
     self.sih4ratio = mh5u.Attrib("sih4ratio", sih4ratio)
     # Number of SiH4 per nucleated particle
     self.sih4nmol = mh5u.Attrib("sih4nmol", sih4nmol)
+    # mass of SiH4
+    sih4mass = 1.67e-27*(28.+4.)
+    self.sih4mass = mh5u.Attrib("sih4mass", sih4mass)
     #
     self.writable_list = [self.wnu,
                           self.nucleation_rate,
@@ -101,7 +104,8 @@ class Rates(mh5u.H5Writable):
                           self.wch,
                           self.wsih4,
                           self.sih4ratio,
-                          self.sih4nmol]
+                          self.sih4nmol,
+                          self.sih4mass]
 #
 # ------ Time class ------
 class Time(mh5u.H5Writable):
