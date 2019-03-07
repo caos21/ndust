@@ -135,7 +135,8 @@ class Time(mh5u.H5Writable):
 class Density(mh5u.H5Writable):
   """ Represents the nanoparticle density parameters
   """
-  def __init__(self, h5obj, indens, qtol, distribution, peakpos, width):
+  def __init__(self, h5obj, indens, qtol, distribution, peakpos, width,
+               withchargewidth, chargewidth):
     """ Initial values
     """
     # hdf5 file object
@@ -156,12 +157,20 @@ class Density(mh5u.H5Writable):
     #
     # Set width (in terms of section number)
     self.width = mh5u.Attrib("width", width)
+    #
+    # Set chargewidth
+    self.chargewidth = mh5u.Attrib("chargewidth", int(withchargewidth))
+    self.chargenegwidth = mh5u.Attrib("chargenegwidth", chargewidth["negative"])
+    self.chargeposwidth = mh5u.Attrib("chargeposwidth", chargewidth["positive"])
 
     self.writable_list = [self.indens,
                           self.qtol,
                           self.distribution,
                           self.peakpos,
-                          self.width]
+                          self.width,
+                          self.chargewidth,
+                          self.chargenegwidth,
+                          self.chargeposwidth]
 #
 # ------ Description class ------
 class Description(mh5u.H5Writable):

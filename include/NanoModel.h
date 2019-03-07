@@ -87,6 +87,11 @@ struct density {
   unsigned int peakpos;            /*!< Number section for peak of initial
                                         Nanoparticle distribution*/
   unsigned int width;              //!< Number section for peak of initial
+
+  bool chargewidth;               //!< Charge width for distribution
+  int chargenegwidth;             //!< Max negative charge
+  int chargeposwidth;             //!< Max positive charge
+  
 };
 
 

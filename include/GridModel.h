@@ -36,6 +36,7 @@
   *
   */
 struct gridsystem {
+  bool charge_pivot;                //!< Charge pivoting
   double temperature;               //!< Nanoparticle temperature
   double nmdensity;                 //!< Nanoparticle mass density
 };

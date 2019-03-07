@@ -55,8 +55,18 @@ cpp_int Factorial(int number) {
 namespace utils {
 
   template <typename T>
-    T relative_error(T a, T b){
-    return fabs((a-b)/a);
+  T kron_delta(const T i, const T j) {
+    return (i == j ? T(1) : T(0));
+  }
+
+  template <typename T>
+    T absolute_error(T true_value, T expected_value){
+    return expected_value - true_value;
+  }
+  
+  template <typename T>
+    T relative_error(T true_value, T expected_value){
+    return fabs((expected_value - true_value)/true_value);
   }
 
   template <typename T>

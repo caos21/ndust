@@ -428,8 +428,8 @@ class plot():
     CS = plt.contour(self.X, self.Y, data, levels=self.levelsf, origin='lower',
                      colors='k', linewidths=1.5, extent=self.extents_linear)
 
-    plt.clabel(CS, self.levelsf, inline=1, fmt='%d', fontsize=self.xc.tick_fontsize,
-              colors='k')
+    # plt.clabel(CS, self.levelsf, inline=1, fmt='%d', fontsize=self.xc.tick_fontsize,
+    #           colors='k')
 
     # Color bar
     CB = plt.colorbar(CSF)
@@ -863,7 +863,7 @@ plt.xlabel(r'Charges ($e$)')
 #plt.ylabel(r'Density ($1/m^3$)')
 plt.yscale('log')
 plt.ylim([10, 5e16])
-plt.xlim([-190, 5])
+plt.xlim([-50, 5])
 #plt.xlim([-110, 5])
 #plt.xlim([-70, 5])
 #plt.ylim([QPivots[0], QPivots[-1]])

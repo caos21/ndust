@@ -41,7 +41,7 @@ def crad(v):
 class GridSystem(mh5u.H5Writable):
   """ Represents the system global parameters
   """
-  def __init__(self, h5obj, temperature, nmdensity):
+  def __init__(self, h5obj, qpivot, temperature, nmdensity):
     """
     """
     # WARNING FIXME TODO input validation
@@ -49,12 +49,14 @@ class GridSystem(mh5u.H5Writable):
     self.h5obj = h5obj
     # hdf5 path
     self.h5path = self.h5obj.create_group("Grid_system")
+    # pivot in charges
+    self.qpivot = mh5u.Attrib("Charge_pivot", int(qpivot))
     # nanoparticle temperature
     self.temperature = mh5u.Attrib("Temperature", temperature)
     # nanoparticle mass density
     self.nmdensity = mh5u.Attrib("Mass_density", nmdensity)
     #
-    self.writable_list = [self.temperature, self.nmdensity]
+    self.writable_list = [self.qpivot, self.temperature, self.nmdensity]
 #
 #
 def compute_sections(nsections, rmin, base, power, grid_type):
@@ -123,10 +125,11 @@ def compute_sections(nsections, rmin, base, power, grid_type):
     return minvoliface, ifaces, vols, rads, diams
   #
   vmin = cvol(rmin)
+  print("radii is {}".format(rmin))
   # the minimum volume interface that gives vmin = (v0+v1)/2
-  minvoliface = 2.0*vmin/(1.0+base) #vmin = (vo+v1)/2 = vo+base*vo/2
+  minvoliface = 2.0*vmin/(1.0+base**power) #vmin = (vo+v1)/2 = vo+base*vo/2
   # Create sections
-  ifaces = minvoliface*np.power(base, np.arange(0, nsections+1))
+  ifaces = minvoliface*np.power(base, power*np.arange(0, nsections+1))
   #
   vols = 0.5*(ifaces[1:]+ifaces[:-1])
   rads = crad(vols)

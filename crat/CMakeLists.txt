@@ -3,6 +3,24 @@ cmake_minimum_required(VERSION 3.0)
 
 project(crat)
 
+set(CMAKE_MODULE_RELPATH "${CMAKE_CURRENT_SOURCE_DIR}/../cmake")
+
+message("oo cmake module relative path : ${CMAKE_MODULE_RELPATH}")
+#list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_MODULE_RELPATH}")
+
+include(GetGitRevisionDescription)
+
+get_git_head_revision(NDUST_BRANCH NDUST_HASH)
+message("oo Hash : ${NDUST_HASH}")
+message("oo Origin : ${NDUST_BRANCH}")
+
+git_local_changes(NDUST_STATE)
+message("oo State : ${NDUST_STATE}")
+
+git_describe(NDUST_VERSION "--long")
+message("oo Version ${NDUST_VERSION}")
+
 # defines variable SRCS to include cpp files
 file(GLOB SRCS *.cpp)
 file(GLOB INCSRCS RELATIVE "../include/" "*.cpp")
@@ -19,6 +37,10 @@ add_definitions(-DEIGEN_DONT_PARALLELIZE)
 
 add_library(GridModel STATIC ../include/GridModel.cpp)
 add_library(CRate STATIC ../include/CRate.cpp)
+
+# Configure ndust version
+configure_file("${CMAKE_CURRENT_SOURCE_DIR}/../include/ndust_version.cpp.in" "${CMAKE_CURRENT_SOURCE_DIR}/../include/ndust_version.cpp" @ONLY)
+add_library(ndust_version STATIC ../include/ndust_version.cpp)
 
 # GSL
 set(LIBS "-lgsl -lgslcblas -lm -llapack -lumfpack -lboost_log -lboost_thread -lboost_system -lboost_log_setup")
@@ -86,18 +108,22 @@ target_link_libraries(CRate
 
 target_link_libraries(crat
                       CRate
+		      ndust_version
                       ${LIBS})
 
 target_link_libraries(crat-writer
                       CRate
+		      ndust_version
                       ${LIBS})
 
 target_link_libraries(crat-reader
                       CRate
+		      ndust_version
                       ${LIBS})
 
 target_link_libraries(crat-merge
                       CRate
+		      ndust_version
                       ${LIBS})
 
 target_link_libraries(potentials ${LIBS})

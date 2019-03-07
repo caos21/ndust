@@ -194,7 +194,7 @@
            <item row="10" column="2">
             <widget class="QLineEdit" name="lineEdit_base">
              <property name="text">
-              <string>1.5</string>
+              <string>10.0</string>
              </property>
              <property name="alignment">
               <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
@@ -234,7 +234,7 @@
            <item row="11" column="2">
             <widget class="QLineEdit" name="lineEdit_power">
              <property name="text">
-              <string>1</string>
+              <string>0.0825257</string>
              </property>
              <property name="alignment">
               <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
@@ -379,17 +379,22 @@
            </rect>
           </property>
           <layout class="QGridLayout" name="gridLayout_5">
-           <item row="0" column="0">
-            <widget class="QLabel" name="label_maxneg">
-             <property name="text">
-              <string>Maximum negative</string>
+           <item row="0" column="2">
+            <widget class="QSpinBox" name="spinBox_maxneg">
+             <property name="alignment">
+              <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
              </property>
-            </widget>
-           </item>
-           <item row="1" column="0">
-            <widget class="QLabel" name="label_maxpos">
-             <property name="text">
-              <string>Maximum positive   </string>
+             <property name="minimum">
+              <number>4</number>
+             </property>
+             <property name="maximum">
+              <number>500</number>
+             </property>
+             <property name="singleStep">
+              <number>2</number>
+             </property>
+             <property name="value">
+              <number>30</number>
              </property>
             </widget>
            </item>
@@ -397,16 +402,6 @@
             <widget class="QLabel" name="label_qsecs">
              <property name="text">
               <string>Number of sections</string>
-             </property>
-            </widget>
-           </item>
-           <item row="2" column="2">
-            <widget class="QLineEdit" name="lineEdit_qsecs">
-             <property name="alignment">
-              <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-             </property>
-             <property name="readOnly">
-              <bool>true</bool>
              </property>
             </widget>
            </item>
@@ -423,13 +418,13 @@
              </property>
             </spacer>
            </item>
-           <item row="0" column="2">
-            <widget class="QSpinBox" name="spinBox_maxneg">
+           <item row="1" column="2">
+            <widget class="QSpinBox" name="spinBox_maxpos">
              <property name="alignment">
               <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
              </property>
              <property name="minimum">
-              <number>10</number>
+              <number>4</number>
              </property>
              <property name="maximum">
               <number>500</number>
@@ -438,26 +433,31 @@
               <number>2</number>
              </property>
              <property name="value">
-              <number>30</number>
+              <number>5</number>
              </property>
             </widget>
            </item>
-           <item row="1" column="2">
-            <widget class="QSpinBox" name="spinBox_maxpos">
+           <item row="2" column="2">
+            <widget class="QLineEdit" name="lineEdit_qsecs">
              <property name="alignment">
               <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
              </property>
-             <property name="minimum">
-              <number>1</number>
+             <property name="readOnly">
+              <bool>true</bool>
              </property>
-             <property name="maximum">
-              <number>50</number>
+            </widget>
+           </item>
+           <item row="0" column="0">
+            <widget class="QLabel" name="label_maxneg">
+             <property name="text">
+              <string>Maximum negative</string>
              </property>
-             <property name="singleStep">
-              <number>1</number>
-             </property>
-             <property name="value">
-              <number>5</number>
+            </widget>
+           </item>
+           <item row="1" column="0">
+            <widget class="QLabel" name="label_maxpos">
+             <property name="text">
+              <string>Maximum positive   </string>
              </property>
             </widget>
            </item>
@@ -593,13 +593,39 @@
           </property>
           <layout class="QGridLayout" name="gridLayout_9">
            <item row="1" column="0">
-            <widget class="QLabel" name="label_ndens">
+            <widget class="QLabel" name="label_temp">
              <property name="text">
-              <string>Nanoparticle density</string>
+              <string>Temperature</string>
              </property>
             </widget>
            </item>
-           <item row="0" column="2">
+           <item row="2" column="1">
+            <spacer name="horizontalSpacer_9">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>20</width>
+               <height>20</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+           <item row="2" column="2">
+            <widget class="QLineEdit" name="lineEdit_nmdens">
+             <property name="toolTip">
+              <string>Nanoparticle mass density</string>
+             </property>
+             <property name="text">
+              <string>2329.0</string>
+             </property>
+             <property name="alignment">
+              <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+             </property>
+            </widget>
+           </item>
+           <item row="1" column="2">
             <widget class="QLineEdit" name="lineEdit_temp">
              <property name="toolTip">
               <string>Nanoparticle temperature</string>
@@ -621,38 +647,29 @@
              </property>
             </widget>
            </item>
+           <item row="2" column="0">
+            <widget class="QLabel" name="label_ndens">
+             <property name="text">
+              <string>Nanoparticle density</string>
+             </property>
+            </widget>
+           </item>
            <item row="0" column="0">
-            <widget class="QLabel" name="label_temp">
+            <widget class="QLabel" name="label_qpivot">
              <property name="text">
-              <string>Temperature</string>
+              <string>Pivot in charges</string>
              </property>
             </widget>
            </item>
-           <item row="1" column="2">
-            <widget class="QLineEdit" name="lineEdit_nmdens">
-             <property name="toolTip">
-              <string>Nanoparticle mass density</string>
+           <item row="0" column="2">
+            <widget class="QCheckBox" name="checkBox_qpivot">
+             <property name="layoutDirection">
+              <enum>Qt::RightToLeft</enum>
              </property>
              <property name="text">
-              <string>2329.0</string>
-             </property>
-             <property name="alignment">
-              <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+              <string/>
              </property>
             </widget>
-           </item>
-           <item row="1" column="1">
-            <spacer name="horizontalSpacer_9">
-             <property name="orientation">
-              <enum>Qt::Horizontal</enum>
-             </property>
-             <property name="sizeHint" stdset="0">
-              <size>
-               <width>20</width>
-               <height>20</height>
-              </size>
-             </property>
-            </spacer>
            </item>
           </layout>
          </widget>
@@ -809,7 +826,7 @@
                 <enum>Qt::RightToLeft</enum>
                </property>
                <property name="text">
-                <string>Co&amp;ulomb</string>
+                <string>Coulomb</string>
                </property>
               </widget>
              </item>
@@ -820,6 +837,16 @@
                </property>
                <property name="text">
                 <string>H&amp;ybrid</string>
+               </property>
+              </widget>
+             </item>
+             <item row="4" column="0">
+              <widget class="QRadioButton" name="radioButton_free">
+               <property name="layoutDirection">
+                <enum>Qt::RightToLeft</enum>
+               </property>
+               <property name="text">
+                <string>Free</string>
                </property>
               </widget>
              </item>
@@ -2141,6 +2168,13 @@
            </rect>
           </property>
           <layout class="QGridLayout" name="gridLayout_7">
+           <item row="0" column="0">
+            <widget class="QLabel" name="label_indens">
+             <property name="text">
+              <string>Initial nanoparticle density</string>
+             </property>
+            </widget>
+           </item>
            <item row="3" column="0">
             <widget class="QLabel" name="label_radius">
              <property name="toolTip">
@@ -2167,6 +2201,19 @@
              </property>
             </widget>
            </item>
+           <item row="0" column="1">
+            <spacer name="horizontalSpacer_7">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>40</width>
+               <height>20</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
            <item row="4" column="2">
             <widget class="QSpinBox" name="spinBox_width">
              <property name="alignment">
@@ -2186,6 +2233,23 @@
              </property>
             </widget>
            </item>
+           <item row="0" column="2">
+            <widget class="QLineEdit" name="lineEdit_indens">
+             <property name="text">
+              <string>1.0E15</string>
+             </property>
+             <property name="alignment">
+              <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+             </property>
+            </widget>
+           </item>
+           <item row="2" column="0">
+            <widget class="QLabel" name="label_peakpos">
+             <property name="text">
+              <string>Peak in section</string>
+             </property>
+            </widget>
+           </item>
            <item row="2" column="2">
             <widget class="QSpinBox" name="spinBox_peakpos">
              <property name="alignment">
@@ -2202,67 +2266,6 @@
              </property>
              <property name="value">
               <number>0</number>
-             </property>
-            </widget>
-           </item>
-           <item row="5" column="0">
-            <widget class="QLabel" name="label_qtol">
-             <property name="text">
-              <string>%Rel. error total part charge</string>
-             </property>
-            </widget>
-           </item>
-           <item row="0" column="0">
-            <widget class="QLabel" name="label_indens">
-             <property name="text">
-              <string>Initial nanoparticle density</string>
-             </property>
-            </widget>
-           </item>
-           <item row="5" column="2">
-            <widget class="QLineEdit" name="lineEdit_qtol">
-             <property name="text">
-              <string>0.01</string>
-             </property>
-             <property name="alignment">
-              <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-             </property>
-            </widget>
-           </item>
-           <item row="0" column="2">
-            <widget class="QLineEdit" name="lineEdit_indens">
-             <property name="text">
-              <string>1.0E15</string>
-             </property>
-             <property name="alignment">
-              <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-             </property>
-            </widget>
-           </item>
-           <item row="0" column="1">
-            <spacer name="horizontalSpacer_7">
-             <property name="orientation">
-              <enum>Qt::Horizontal</enum>
-             </property>
-             <property name="sizeHint" stdset="0">
-              <size>
-               <width>40</width>
-               <height>20</height>
-              </size>
-             </property>
-            </spacer>
-           </item>
-           <item row="1" column="0">
-            <widget class="QLabel" name="label_distribution">
-             <property name="text">
-              <string>Distribution type</string>
-             </property>
-            </widget>
-           </item>
-           <item row="4" column="0">
-            <widget class="QLabel" name="label_width">
-             <property name="text">
-              <string>Width</string>
              </property>
             </widget>
            </item>
@@ -2303,12 +2306,101 @@
              </item>
             </layout>
            </item>
-           <item row="2" column="0">
-            <widget class="QLabel" name="label_peakpos">
+           <item row="5" column="1">
+            <widget class="QCheckBox" name="checkBox_chargewidth">
+             <property name="layoutDirection">
+              <enum>Qt::LeftToRight</enum>
+             </property>
              <property name="text">
-              <string>Peak in section</string>
+              <string/>
              </property>
             </widget>
+           </item>
+           <item row="6" column="2">
+            <widget class="QLineEdit" name="lineEdit_qtol">
+             <property name="text">
+              <string>0.01</string>
+             </property>
+             <property name="alignment">
+              <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+             </property>
+            </widget>
+           </item>
+           <item row="1" column="0">
+            <widget class="QLabel" name="label_distribution">
+             <property name="text">
+              <string>Distribution type</string>
+             </property>
+            </widget>
+           </item>
+           <item row="5" column="0">
+            <widget class="QLabel" name="label_chargewidth">
+             <property name="text">
+              <string>Charge width</string>
+             </property>
+            </widget>
+           </item>
+           <item row="4" column="0">
+            <widget class="QLabel" name="label_width">
+             <property name="text">
+              <string>Width</string>
+             </property>
+            </widget>
+           </item>
+           <item row="6" column="0">
+            <widget class="QLabel" name="label_qtol">
+             <property name="text">
+              <string>%Rel. error total part charge</string>
+             </property>
+            </widget>
+           </item>
+           <item row="5" column="2">
+            <layout class="QHBoxLayout" name="horizontalLayout">
+             <item>
+              <widget class="QSpinBox" name="spinBox_chargenegwidth">
+               <property name="enabled">
+                <bool>false</bool>
+               </property>
+               <property name="layoutDirection">
+                <enum>Qt::LeftToRight</enum>
+               </property>
+               <property name="alignment">
+                <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+               </property>
+               <property name="minimum">
+                <number>-500</number>
+               </property>
+               <property name="maximum">
+                <number>0</number>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QSpinBox" name="spinBox_chargeposwidth">
+               <property name="enabled">
+                <bool>false</bool>
+               </property>
+               <property name="layoutDirection">
+                <enum>Qt::LeftToRight</enum>
+               </property>
+               <property name="alignment">
+                <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+               </property>
+               <property name="minimum">
+                <number>0</number>
+               </property>
+               <property name="maximum">
+                <number>500</number>
+               </property>
+               <property name="value">
+                <number>0</number>
+               </property>
+               <property name="displayIntegerBase">
+                <number>10</number>
+               </property>
+              </widget>
+             </item>
+            </layout>
            </item>
           </layout>
          </widget>

@@ -128,7 +128,8 @@ int main(int argc, char **argv) {
   nevo.open();
   nevo.read();
   //nevo.evolve();
-  nevo.evolve_omp(); 
+  nevo.evolve_omp();
+  //nevo.evolve_radapt();
   nevo.write();
   nevo.close();
 

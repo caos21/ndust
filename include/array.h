@@ -109,7 +109,21 @@ darray linear(Type start_in, Type end_in, unsigned int num_in) {
   return linear;
 }
 
-inline double mean(const darray array) {
+inline
+int find_index(const darray array, double value) {
+  int index = std::distance(std::begin(array),
+			    std::find(std::begin(array),
+				      std::end(array), value));
+  if (index == array.size()) {
+    return -1;
+  }
+  else {
+    return index;
+  }
+}
+
+inline
+double mean(const darray array) {
   return array.sum()/static_cast<double>(array.size());
 }
 
@@ -406,8 +420,19 @@ inline Type vabs(Type elem) {
 inline
 bool almost_equal(double a, double b, double tol=1e-5) {
 //   if(abs(a-b) < std::min(abs(a), abs(b)) * 0.01) return true;
-  if(abs(a-b) < 1e-5) return true;
+  if(abs(a-b) < tol) return true;
   else return false;
+}
+
+
+inline
+bool is_close(double a, double b, double rel_tol=1e-9, double abs_tol=0.0) {
+  if (std::abs(a-b) <= std::max(rel_tol * std::max(std::abs(a), std::abs(b)), abs_tol)) {
+    return true;
+  }
+  else {
+    return false;
+  }	    
 }
 
 #endif// ARRAY_H

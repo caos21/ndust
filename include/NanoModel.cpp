@@ -199,6 +199,23 @@ int NanoModel::read_density() {
     BOOST_LOG_SEV(lg, info) << "--> Distribution width: " << ds.width;
   }
 
+  unsigned int wchargewidth = 0;
+  err = read_attrib_hdf5<unsigned int>(h5obj, sgroup, "chargewidth", wchargewidth);
+  if (wchargewidth>0) {
+    ds.chargewidth = true;
+    BOOST_LOG_SEV(lg, info) << "--> Distribution charge width: " << ds.chargewidth;
+    err = read_attrib_hdf5<int>(h5obj, sgroup, "chargenegwidth", ds.chargenegwidth);
+    BOOST_LOG_SEV(lg, info) << "    + Maximum negative charge width: " << ds.chargenegwidth;
+    err = read_attrib_hdf5<int>(h5obj, sgroup, "chargeposwidth", ds.chargeposwidth);
+    BOOST_LOG_SEV(lg, info) << "    + Maximum positive charge width: " << ds.chargeposwidth;
+  }
+  else {
+    ds.chargewidth = false;
+    ds.chargenegwidth = 0;
+    ds.chargeposwidth = 0;
+    BOOST_LOG_SEV(lg, info) << "--> Distribution charge width: " << ds.chargewidth;
+  }  
+
   return 0;
 }
 

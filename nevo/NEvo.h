@@ -31,14 +31,14 @@
 #include <boost/numeric/odeint.hpp>
 #include <boost/multiprecision/cpp_dec_float.hpp>
 
-#include <cvode/cvode.h>
-// error, check version
-//#include <cvode/cvode_dense.h>
-#include <cvode/cvode_direct.h>
-#include <cvode/cvode_diag.h>
-#include <nvector/nvector_serial.h>
-#include <sundials/sundials_types.h>
-#include <sundials/sundials_math.h>
+// #include <cvode/cvode.h>
+// // error, check version
+// //#include <cvode/cvode_dense.h>
+// #include <cvode/cvode_direct.h>
+// #include <cvode/cvode_diag.h>
+// #include <nvector/nvector_serial.h>
+// #include <sundials/sundials_types.h>
+// #include <sundials/sundials_math.h>
 
 #include "../include/log.h"
 #include "../include/h5plasma.h"
@@ -68,7 +68,7 @@ struct qsystem;
 
 struct ls_qsystem;
 
-class Solver;
+// class Solver;
 
 /**
   * class NEvo
@@ -80,13 +80,25 @@ class NEvo {
 public:
 // Constructors/Destructors
 //
-  NEvo(): moments_file(NULL), qsys(NULL), ls_qsys(NULL), sol(NULL), sih4_file(NULL) {}
+  //NEvo(): moments_file(NULL), qsys(NULL), ls_qsys(NULL), sol(NULL), sih4_file(NULL) {}
+  NEvo(): moments_file(NULL), qsys(NULL), ls_qsys(NULL), sih4_file(NULL) {}
   //! Constructor for NEvo
   /*!
     @param  dirname_ Directory for output files.
     @param  grid_filename_ Prefix for output files.
     @param  lg_ Logger instance.
   */
+  // NEvo(std::string dirname_,
+  //      std::string grid_filename_,
+  //      std::string plasma_filename_,
+  //      std::string nano_filename_,
+  //       src::severity_logger< severity_level > lg_)
+  //       : dirname(dirname_),
+  // 	  grid_filename(grid_filename_),
+  // 	  plasma_filename(plasma_filename_),
+  // 	  nano_filename(nano_filename_),
+  // 	  lg(lg_), moments_file(NULL), qsys(NULL),
+  // 	  ls_qsys(NULL), sol(NULL), sih4_file(NULL) {
   NEvo(std::string dirname_,
        std::string grid_filename_,
        std::string plasma_filename_,
@@ -97,7 +109,7 @@ public:
 	  plasma_filename(plasma_filename_),
 	  nano_filename(nano_filename_),
 	  lg(lg_), moments_file(NULL), qsys(NULL),
-	  ls_qsys(NULL), sol(NULL), sih4_file(NULL) {
+	  ls_qsys(NULL), sih4_file(NULL) {
 //     BOOST_LOG_SEV(lg, debug) << "NEvo instantiation";
   }
 
@@ -132,6 +144,12 @@ public:
    * Nanoparticle growth evolution openmp ready
   */
   int evolve_omp();
+
+  //! Start calculations
+  /*! 
+   * Nanoparticle growth evolution openmp ready
+  */
+  int evolve_radapt();
   
   //! write h5 datafile
   /*! 
@@ -169,6 +187,10 @@ public:
   boost_array2d pdens_aux;
   boost_array2d ndens_aux;
 
+  // total rate
+  boost_array2d trate2d;
+  boost_array2d dt2d;
+  
   // rate of coagulation surface growth charging nucleation
   boost_array2d crate2d;
   boost_array2d srate2d;
@@ -217,11 +239,14 @@ public:
 
   ls_qsystem* ls_qsys;
   
-  friend class Solver;
+  //friend class Solver;
 
-  Solver* sol;
+  //Solver* sol;
 
   int check;
+
+  // original nano delta time
+  double orig_dtn;  
 
   // ==================== SiH4 ====================
   double nsih4_ini;
@@ -251,6 +276,18 @@ private:
    * Nanoparticle growth one step openmp ready
   */
   int evolve_one_step_omp(double ctime);
+
+  //! One step evolution
+  /*! 
+   * Nanoparticle growth one step openmp ready
+  */
+  int evolve_one_step_adapt(double ctime);
+  
+  //! Compute initial density
+  /*!
+   * Compute the initial density
+   */
+  int compute_initialdensity();
   
   //! Compute precompute
   /*! 
@@ -278,12 +315,18 @@ private:
 
   int write_collisionfreq();
 
+  int compute_moments(boost_array2d dens, darray &moments);
+  
   int compute_moments(boost_array2d dens);
-
+  
   int write_moments(double ctime);
 
   int write_partial_results(double ctime);
 
+  int write_one_step(double ctime,
+		     double begin_sim,
+		     double one_step_begin);
+  
   int compute_explicit_charging(double dt);
 
   int advance_nocharging(const double ctime);
@@ -293,10 +336,20 @@ private:
   int advance_nocharging_ompadp(const double ctime);
 
   int advance_nocharging_ompadpsih4(const double ctime);
+
+  int advance_nosplit_ompadpsih4(const double ctime);
+
+  // fully adatptive in sections
+  int advance_nosplit_sih4_adapt(const double ctime);
+
+  // fully adatptive in sections
+  int advance_nocharging_adapt(const double ctime);
   
   int compute_split_sgnucleation();
 
   int compute_split_sgnucleationsih4();
+
+  int compute_nosplit_sgnucleationsih4();
   
   int compute_sgrowth_adp();
   
@@ -349,6 +402,15 @@ double rt_affinity(double R, double Z){
                    * cr.gm.gsys.temperature/eCharge)*(0.5/R);
     double rt = rt_affinity(R, Z);
     return prefac1*tunnel(rt, R, Z);
+  }
+
+  inline
+  int omp_info() {
+    BOOST_LOG_SEV(lg, info) << "Set number of threads = " << omp_get_num_threads();
+    BOOST_LOG_SEV(lg, info) << "Nested = " << omp_get_nested();
+    BOOST_LOG_SEV(lg, info) << "Dynamic = " << omp_get_dynamic();
+    BOOST_LOG_SEV(lg, info) << "Max active levels " << omp_get_max_active_levels();
+    return 0;
   }
 //
 // Private attributes
@@ -439,126 +501,126 @@ struct qsystem{
   double tun;
 };
 
-inline
-int function(realtype t, N_Vector x, N_Vector dxdt, void *user_data);
+// inline
+// int function(realtype t, N_Vector x, N_Vector dxdt, void *user_data);
 
-class Solver{
-public:
-  Solver(){ }
+// class Solver{
+// public:
+//   Solver(){ }
 
-  Solver(NEvo* nanoparent,
-         N_Vector xini_,
-         realtype ti_,
-         realtype a_=-101.,
-         realtype b_=-100.,
-         realtype reltol_=1.e-6,
-         realtype abstol_=1.e-6) :
-         nano(nanoparent),
-         xini(xini_),
-         ti(ti_),
-         a(a_),
-         b(b_),
-         reltol(reltol_),
-         abstol(abstol_) {
+//   Solver(NEvo* nanoparent,
+//          N_Vector xini_,
+//          realtype ti_,
+//          realtype a_=-101.,
+//          realtype b_=-100.,
+//          realtype reltol_=1.e-6,
+//          realtype abstol_=1.e-6) :
+//          nano(nanoparent),
+//          xini(xini_),
+//          ti(ti_),
+//          a(a_),
+//          b(b_),
+//          reltol(reltol_),
+//          abstol(abstol_) {
 
-    std::cerr << "\n Initial condition : "
-              << NV_Ith_S(xini,0) << '\t' << NV_Ith_S(xini,1) << '\n' << NV_LENGTH_S(xini) << "\n"; 
-
-    std::cerr << "\n Check : " << nano->check << "\n"; 
 //     std::cerr << "\n Initial condition : "
-//               << NV_Ith_S(xini,0) << '\t' << NV_Ith_S(xini,1) << '\n'; 
-    cvode_mem = CVodeCreate(CV_BDF, CV_NEWTON);    
-    flag = CVodeInit(cvode_mem, function, ti, xini);
-    std::cerr << "\n[ii] flag : " << flag << "\n";
-    flag = CVodeSStolerances(cvode_mem, reltol, abstol);
-    std::cerr << "\n[ii] flag : " << flag << "\n";
-    flag = CVodeSetUserData(cvode_mem, static_cast< void* >(this));
-    std::cerr << "\n[ii] flag : " << flag << "\n";
+//               << NV_Ith_S(xini,0) << '\t' << NV_Ith_S(xini,1) << '\n' << NV_LENGTH_S(xini) << "\n"; 
 
-    // ERROR WARNING check version
-    //flag = CVDense(cvode_mem, 2);
-    //std::cerr << "\n[ii] flag : " << flag << "\n";
-    //flag = CVDlsSetDenseJacFn(cvode_mem, NULL);
-//     flag = CVDiag(cvode_mem);
-    //std::cerr << "\n[ii] flag : " << flag << "\n";
-    //------------------
-    // Alternative to previous error FIXME
-    flag = CVDlsSetJacFn(cvode_mem, NULL);
-    std::cerr << "\n[ii] flag : " << flag << "\n";
-    //------------------
+//     std::cerr << "\n Check : " << nano->check << "\n"; 
+// //     std::cerr << "\n Initial condition : "
+// //               << NV_Ith_S(xini,0) << '\t' << NV_Ith_S(xini,1) << '\n'; 
+//     cvode_mem = CVodeCreate(CV_BDF, CV_NEWTON);    
+//     flag = CVodeInit(cvode_mem, function, ti, xini);
+//     std::cerr << "\n[ii] flag : " << flag << "\n";
+//     flag = CVodeSStolerances(cvode_mem, reltol, abstol);
+//     std::cerr << "\n[ii] flag : " << flag << "\n";
+//     flag = CVodeSetUserData(cvode_mem, static_cast< void* >(this));
+//     std::cerr << "\n[ii] flag : " << flag << "\n";
+
+//     // ERROR WARNING check version
+//     //flag = CVDense(cvode_mem, 2);
+//     //std::cerr << "\n[ii] flag : " << flag << "\n";
+//     //flag = CVDlsSetDenseJacFn(cvode_mem, NULL);
+// //     flag = CVDiag(cvode_mem);
+//     //std::cerr << "\n[ii] flag : " << flag << "\n";
+//     //------------------
+//     // Alternative to previous error FIXME
+//     flag = CVDlsSetJacFn(cvode_mem, NULL);
+//     std::cerr << "\n[ii] flag : " << flag << "\n";
+//     //------------------
     
     
-    std::cerr << "\n[ii] nsecs : " << nano->cr.gm.vols.nsections << "\n";
-    // allocate vector for output
-    y = NULL;
-    y = N_VNew_Serial(2);
-  }
+//     std::cerr << "\n[ii] nsecs : " << nano->cr.gm.vols.nsections << "\n";
+//     // allocate vector for output
+//     y = NULL;
+//     y = N_VNew_Serial(2);
+//   }
 
-  ~Solver() {
-    N_VDestroy_Serial(y);
-    CVodeFree(&cvode_mem);
-  }
-  void print() {
-    std::cerr << "\n Check : " << nano->check << "\n"; 
-  }
-  // declaring friend function grants access to a and b from class
-  friend int function(realtype t, N_Vector x, N_Vector dxdt, void *user_data);  
+//   ~Solver() {
+//     N_VDestroy_Serial(y);
+//     CVodeFree(&cvode_mem);
+//   }
+//   void print() {
+//     std::cerr << "\n Check : " << nano->check << "\n"; 
+//   }
+//   // declaring friend function grants access to a and b from class
+//   friend int function(realtype t, N_Vector x, N_Vector dxdt, void *user_data);  
 
-  realtype a;
-  realtype b;
-  realtype reltol;
-  realtype abstol;
-  realtype ti;
-  N_Vector xini;
-  N_Vector y;
+//   realtype a;
+//   realtype b;
+//   realtype reltol;
+//   realtype abstol;
+//   realtype ti;
+//   N_Vector xini;
+//   N_Vector y;
 
-  void compute(realtype tf, realtype dt) {
-    realtype t, tout;
-    for(iout=1, tout=ti+dt; tout <= tf; iout++, tout += dt) {
-      flag = CVode(cvode_mem, tout, y, &t, CV_NORMAL);
-      std::cout << tout << '\t' << NV_Ith_S(y,0) << '\t'
-                << NV_Ith_S(y,1) << '\t' << SUNRabs(NV_Ith_S(y,1)) << '\n'; 
-      if (flag != CV_SUCCESS) {
-        std::cerr << "\n[ee] Terminate. Flag : " << flag << "\n";
-        std::terminate();
-      }
-    }
+//   void compute(realtype tf, realtype dt) {
+//     realtype t, tout;
+//     for(iout=1, tout=ti+dt; tout <= tf; iout++, tout += dt) {
+//       flag = CVode(cvode_mem, tout, y, &t, CV_NORMAL);
+//       std::cout << tout << '\t' << NV_Ith_S(y,0) << '\t'
+//                 << NV_Ith_S(y,1) << '\t' << SUNRabs(NV_Ith_S(y,1)) << '\n'; 
+//       if (flag != CV_SUCCESS) {
+//         std::cerr << "\n[ee] Terminate. Flag : " << flag << "\n";
+//         std::terminate();
+//       }
+//     }
 
-  }
+//   }
 
-  void compute_step(realtype ts, realtype dt) {
-    flag = CVode(cvode_mem, ts+dt, y, &t, CV_NORMAL);
-    std::cerr << t << '\t' << NV_Ith_S(y,0) << '\t' << NV_Ith_S(y,1) << '\n'; 
-    if (flag != CV_SUCCESS) {
-      std::cerr << "\n[ee] Terminate. Flag : " << flag << "\n";
-      std::terminate();
-    }
-  }
+//   void compute_step(realtype ts, realtype dt) {
+//     flag = CVode(cvode_mem, ts+dt, y, &t, CV_NORMAL);
+//     std::cerr << t << '\t' << NV_Ith_S(y,0) << '\t' << NV_Ith_S(y,1) << '\n'; 
+//     if (flag != CV_SUCCESS) {
+//       std::cerr << "\n[ee] Terminate. Flag : " << flag << "\n";
+//       std::terminate();
+//     }
+//   }
 
-private:
-  void *cvode_mem = NULL;
-  int flag;
-  realtype t;
-  int iout;
-  NEvo *nano;
-};
+// private:
+//   void *cvode_mem = NULL;
+//   int flag;
+//   realtype t;
+//   int iout;
+//   NEvo *nano;
+// };
 
-// function to integrate
-int function(realtype t, N_Vector x, N_Vector dxdt, void *user_data) {
+// // function to integrate
+// int function(realtype t, N_Vector x, N_Vector dxdt, void *user_data) {
 
-  // static_cast user_data to class Solver 
-  Solver* s = static_cast< Solver* >(user_data); 
+//   // static_cast user_data to class Solver 
+//   Solver* s = static_cast< Solver* >(user_data); 
 
-  realtype x0, x1;
+//   realtype x0, x1;
 
-  x0 = NV_Ith_S(x, 0);
-  x1 = NV_Ith_S(x, 1);
+//   x0 = NV_Ith_S(x, 0);
+//   x1 = NV_Ith_S(x, 1);
 
-  NV_Ith_S(dxdt, 0) = s->a*x0 + s->b*x1; // in boost dxdt[ 0 ] = -101.0 * x[ 0 ] - 100.0 * x[ 1 ];
-  NV_Ith_S(dxdt, 1) = x0; // in boost dxdt[ 1 ] = x[ 0 ];
+//   NV_Ith_S(dxdt, 0) = s->a*x0 + s->b*x1; // in boost dxdt[ 0 ] = -101.0 * x[ 0 ] - 100.0 * x[ 1 ];
+//   NV_Ith_S(dxdt, 1) = x0; // in boost dxdt[ 1 ] = x[ 0 ];
 
-  return(0);
-}
+//   return(0);
+// }
 
 // ------------------------------ lsoda solver
 
