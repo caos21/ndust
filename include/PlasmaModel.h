@@ -39,7 +39,7 @@
 struct parameters {
   double length;                    //!< Reactor length
   double neutral_density;           //!< Neutral gas density
-  bool pfixed;                      //!< Plasma fixed conditions
+  int pfixed;                       //!< Plasma fixed conditions
   double pressure;                  //!< Reactor pressure
   double temperature;               //!< Reactor temperature
 };

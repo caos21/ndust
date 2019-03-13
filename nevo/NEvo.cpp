@@ -53,7 +53,7 @@ int NEvo::open() {
 }
 
 int NEvo::close() {
-  delete(qsys);
+  //delete(qsys);
   
   delete(ls_qsys);
   
@@ -94,6 +94,12 @@ int NEvo::close() {
   delete(sih4_file);
   BOOST_LOG_SEV(lg, info) << "Closed file sih4";
   
+  if(plasma_file != nullptr) {
+    plasma_file->close();  
+    delete(plasma_file);
+    BOOST_LOG_SEV(lg, info) << "Closed file plasma";
+  } 
+
   return 0;
 }
 
@@ -394,49 +400,14 @@ int NEvo::evolve_omp() {
     }// end parallel omp    
   }
   else {
-    // check = 2;
-    // // initial conditions, in boost vector_type x( 2 , 1.0 );
-    // N_Vector xini = NULL;
-    // xini = N_VNew_Serial(cr.gm.chrgs.nsections);
-    // NV_Ith_S(xini, 0) = RCONST(2.0);
-    // NV_Ith_S(xini, 1) = RCONST(1.0);
-
-    // std::cerr << "\n Initial condition : "
-    //           << NV_Ith_S(xini,0) << '\t' << NV_Ith_S(xini,1) << '\n' << NV_LENGTH_S(xini) << "\n"; 
-
-    // // Instantiate the solver
-    // sol = new Solver(this, xini, 0.0);
-    // //  Solver sol(xini, 0.0);
-    // check = 3;
-    // sol->print();
-    // // final time
-    // realtype tf = RCONST(50.0);
-    // // delta time
-    // realtype dt = RCONST(0.01);
-    // //   sol->compute(tf, dt);
-    // //   sol.compute(tf, dt);
-
-
-    // // or solve one step
-    // //   sol.compute_step(0.0, dt);
-
-    // // free memory for xini
-    // N_VDestroy_Serial(xini);
-
     err = compute_precompute();
-
     qsys = new qsystem(this);
-
     auto stepper = odeint::make_controlled( 1.0e-6, 1.0e-6,
 					    odeint::runge_kutta_dopri5< state_type >() );
-
   
     // lsoda
     ls_qsys = new ls_qsystem(this);
-
-    // IMPORTANT set nested parallelism
-    omp_set_nested(true);
-  
+ 
     clock_t begin_sim = std::clock();
     ctime = 0.0;
     err = -1;
@@ -444,11 +415,9 @@ int NEvo::evolve_omp() {
     {//begin parallel omp
 #pragma omp master
       {// begin master omp, controls the iterations in t (time)
+	BOOST_LOG_SEV(lg, info) << "Master thread";
+	omp_info();
 
-	BOOST_LOG_SEV(lg, info) << "Set number of threads = " << omp_get_num_threads();
-	BOOST_LOG_SEV(lg, info) << "Nested = " << omp_get_nested();
-	BOOST_LOG_SEV(lg, info) << "Dynamic = " << omp_get_dynamic();
-	BOOST_LOG_SEV(lg, info) << "Max active levels " << omp_get_max_active_levels();
 	unsigned int npcount = 0;
 	// get num_threads
 	int num_threads = omp_get_num_threads();
@@ -510,6 +479,116 @@ int NEvo::evolve_omp() {
   return err;
 }
 // -------------------- evolve openmp --------------------
+
+// -------------------- evolve selfconsistent --------------------
+
+int NEvo::evolve_selfconsistent() {
+
+  int err;
+
+  // store the original nano delta time
+  double orig_dtn = nm.tm.ndeltat;
+ 
+  if(nm.rs.wsih4==1) {
+    BOOST_LOG_SEV(lg, info) << "With SiH4 rates";
+    err = compute_precompute_sih4();
+  }
+  else {
+    BOOST_LOG_SEV(lg, info) << "Without SiH4 rates";
+    err = compute_precompute();
+  }
+  
+  // HACK refactor WARNING
+  if(pm.pars.pfixed==0) {
+    BOOST_LOG_SEV(lg, info) << "Initialize plasma parameters";
+    auto e = init_plasma();
+    plasma.mean_energy.first = pm.es.emean;
+    BOOST_LOG_SEV(lg, info) << "--> Mean electron energy: " << plasma.mean_energy.first;
+    plasma.e_dens.first = pm.es.ne;
+    plasma.e_dens.second = pm.es.ne;
+    BOOST_LOG_SEV(lg, info) << "--> Electron density: " << plasma.e_dens.first;
+    plasma.ion_dens.first = pm.is.ni;
+    plasma.ion_dens.second = pm.is.ni;
+    BOOST_LOG_SEV(lg, info) << "--> Ion density: " << plasma.ion_dens.first;
+    plasma.meta_dens.first = pm.ms.nm;
+    plasma.meta_dens.second = pm.ms.nm;
+    BOOST_LOG_SEV(lg, info) << "--> Metastable density: " << plasma.meta_dens.first;
+    plasma_file = new std::fstream(dirname + nano_filename + "-plasma.dat",
+                                   std::fstream::out);
+  }
+  // BOOST remove DELETE WARNING
+  qsys = new qsystem(this);
+
+  // lsoda
+  ls_qsys = new ls_qsystem(this);
+
+  // IMPORTANT set nested parallelism
+  omp_set_nested(true);
+  
+  clock_t begin_sim = std::clock();
+  ctime = 0.0;
+  err = -1;
+  int err_onestep = 0;
+#pragma omp parallel //shared(ctime, nm, err)
+  {//begin parallel omp
+#pragma omp master
+    {// begin master omp, controls the iterations in t (time)
+      BOOST_LOG_SEV(lg, info) << "Master thread";
+      omp_info();
+    
+      unsigned int npcount = 0;
+      // get num_threads
+      int num_threads = omp_get_num_threads();
+      // execute loop in master thread
+
+      for(unsigned int t=0; err<0; ++t, ++npcount) {
+
+        //clock_t one_step_begin = std::clock();
+        double one_step_begin = omp_get_wtime();
+// fork
+#pragma omp parallel /*num_threads(num_threads) shared(ctime)*/
+        {
+          err_onestep = evolve_onestepselfconsistent(ctime);
+        }
+        if(npcount>static_cast<unsigned int>((0.01*nm.tm.tstop)/orig_dtn)) {
+          write_one_step(ctime, begin_sim, one_step_begin);
+          npcount=0;
+        }
+        if(ctime>nm.tm.tstop-nm.tm.ndeltat) {
+          BOOST_LOG_SEV(lg, info) << "Done!, time = " << ctime;
+          clock_t end_sim = std::clock();
+          double elapsed_secs = double(end_sim - begin_sim) / CLOCKS_PER_SEC;
+          BOOST_LOG_SEV(lg, info) << "Nanoparticle module elapsed time "
+                << elapsed_secs;
+          int err_ = write_partial_results(ctime);
+          err_ = write_dataset2d_hdf5(h5obj_nano, "Density", "density", ndens,
+              cr.gm.vols.nsections, cr.gm.chrgs.nsections);
+#pragma omp critical
+          {
+            err = 0;
+          }
+	      //break;
+	      }
+	      if (err_onestep == 0) {
+          // update time
+          ctime += nm.tm.ndeltat;
+          // update density
+          pdens = ndens;
+          // WARNING reset dtn
+          //nm.tm.ndeltat = orig_dtn;
+          //BOOST_LOG_SEV(lg, info) << "Reset to original dtn = " << nm.tm.ndeltat;	    
+        }
+	    }
+    }// end master omp
+  }// end parallel omp    
+  
+  return err;
+}
+// -------------------- evolve selfconsistent --------------------
+
+
+
+
 
 // // -------------------- evolve openmp --------------------
 
@@ -1687,6 +1766,176 @@ int NEvo::evolve_one_step_omp(double ctime) {
   return reterr;
 }
 
+
+// ==================== LSODA
+
+int NEvo::evolve_onestepselfconsistent(double ctime) {
+
+  int err, reterr = 0;
+
+  darray new_mom(0.0, 3);
+  darray old_mom(0.0, 3);
+  //mom.resize(3);
+
+#pragma omp master
+  {
+    if(nm.rs.wch == 1) {
+    INIT:
+      // compute_moments(pdens, new_mom);
+	
+      ls_qsystem qsysy(*ls_qsys);
+      double wtime = omp_get_wtime();
+      double min_dtq = 1.0;
+#pragma omp parallel firstprivate(qsysy)// shared(min_dtq, ctime, ndens, pdens, qrate2d)//, ctime, qsys)
+      {
+#pragma omp for nowait schedule(dynamic)// ordered schedule(static, 1)// nowait
+	for(unsigned int l=0; l<cr.gm.vols.nsections; ++l) {
+	  // work with section l
+	  qsysy.l = l;
+	  // each thread owns a density vector (fixed l)
+	  state_type nqdens(cr.gm.chrgs.nsections);
+	  // tolerances for lsoda
+	  double atol[cr.gm.chrgs.nsections], rtol[cr.gm.chrgs.nsections];
+	  // set the target density
+	  for(unsigned int q=0; q<cr.gm.chrgs.nsections; ++q) {
+	    nqdens[q] = pdens[l][q];
+	    atol[q] = 1.0e-4;
+	    rtol[q] = 1.0e-2;
+	    //sum1 += pdens[l][q];
+	  }
+	  // get time
+	  double ldtq = nm.tm.qdeltat;
+	  double ldtn = nm.tm.ndeltat;
+	  double ttime = ctime;	  
+	  // INTEGRATE LSODA begins
+	  // set options
+	  struct lsoda_opt_t opt = {0};
+	  //opt.h0 = ldtq;                // initial time step
+	  opt.ixpr = 0;                 // additional printing
+	  opt.rtol = rtol;              // relative tolerance
+	  opt.atol = atol;              // absolute tolerance
+	  opt.itask = 1;                // normal integration
+	  opt.mxstep = 1000000000;      // max steps
+	  // set lsoda context
+	  struct lsoda_context_t ctx = {
+					.function = ls_qsystemf,
+					.data = &qsysy,
+					.neq = static_cast<int>(cr.gm.chrgs.nsections),
+					.state = 1,
+	  };
+	  lsoda_prepare(&ctx, &opt);
+	  // time for lsoda
+	  double tin = ttime;
+	  double tout = ttime+ldtn;
+	  // integrate
+	  lsoda(&ctx, nqdens.data(), &tin, tout);
+	  min_dtq = std::min(min_dtq, ctx.common->hu);
+	  if (ctx.state <= 0) {
+	    std::cerr << "\nerror istate = " << ctx.state;
+	    //std::terminate();
+	  }
+	  // free context
+	  lsoda_free(&ctx);
+	  
+	  for(unsigned int q=0; q<cr.gm.chrgs.nsections; ++q) {
+	    ndens[l][q] = (nqdens[q]>0? nqdens[q]: 0.0);
+	    qrate2d[l][q] = (ndens[l][q]-pdens[l][q])/ldtn;
+	  }	  
+	}//for l in sections
+      }// parallel region
+      //#pragma omp flush
+
+      // compute moments after charging
+      // compute_moments(ndens, old_mom);
+      // BOOST_LOG_SEV(lg, info) << "number rel error " << ctime << '\t' << relative_error<double>(old_mom[0], new_mom[0]);
+      // BOOST_LOG_SEV(lg, info) << "number abs error " << ctime << '\t' << absolute_error<double>(old_mom[0], new_mom[0]);
+      // BOOST_LOG_SEV(lg, info) << "volume rel error " << ctime << '\t' << relative_error<double>(old_mom[1], new_mom[1]);
+      // BOOST_LOG_SEV(lg, info) << "volume abs error " << ctime << '\t' << absolute_error<double>(old_mom[1], new_mom[1]);
+     
+      
+      // if((is_close(new_mom[0], old_mom[0])==false) ||
+      // 	 (is_close(new_mom[1], old_mom[1])==false)) {
+      // 	BOOST_LOG_SEV(lg, info) << "Error in charging, moments differ";
+      // 	BOOST_LOG_SEV(lg, info) << "pdens N = " << old_mom[0];
+      // 	BOOST_LOG_SEV(lg, info) << "ndens N = " << new_mom[0];
+      // 	BOOST_LOG_SEV(lg, info) << "cn0 " << abs(new_mom[0]-old_mom[0]);
+      //   BOOST_LOG_SEV(lg, info) << "pdens V = " << old_mom[1];
+      //   BOOST_LOG_SEV(lg, info) << "ndens V = " << new_mom[1];
+      // 	BOOST_LOG_SEV(lg, info) << "mv0 " << abs(new_mom[1]-old_mom[1]);
+      // 	//std::terminate();
+      // }
+      
+      pdens = ndens;
+
+      // wtime = omp_get_wtime() - wtime;
+      // BOOST_LOG_SEV(lg, info) << "Charging elapsed secs = " << wtime;
+      // BOOST_LOG_SEV(lg, info) << "Min dtq " << min_dtq;
+    }//charging block    
+    
+    // growth clock
+    double begin_tgrowth = omp_get_wtime();
+    if(nm.rs.wsih4==1) {
+      //err = advance_nocharging_ompadpsih4(ctime);
+      err = advance_nosplit_ompadpsih4(ctime);
+      if(err == -1) {
+	reterr = -1;
+	nm.tm.ndeltat *= 0.95;
+	BOOST_LOG_SEV(lg, info) << "t, New dt = " << ctime << '\t' << nm.tm.ndeltat;
+	goto INIT;
+      }
+      else {
+	reterr = 0;
+      }
+    }
+    else {
+      err = advance_nocharging_ompadp(ctime);
+    }
+    double end_tgrowth = omp_get_wtime();
+    double elapsed_secs = end_tgrowth - begin_tgrowth;
+    BOOST_LOG_SEV(lg, info)
+      << "Growth (coagulation+sgrowth+nucleation) elapsed secs = "
+      << elapsed_secs;
+    if (pm.pars.pfixed==0) {
+      BOOST_LOG_SEV(lg, info) << "Plasma evolution";
+	    double ti = ctime;
+	    double tf = ctime + nm.tm.ndeltat;
+	    size_t N = 500;
+	    double tstep = (tf-ti) / (N-1);
+
+      boost::uintmax_t bmax_iter = EPS_MAXITER;
+	    tools::eps_tolerance<double> tol = EPS_TOL;
+
+	    const int digits = std::numeric_limits<double>::digits;
+      int get_digits = static_cast<int>(digits * 0.6);
+
+	    double t = ti;
+
+	    
+	    for (size_t i=0; i<N; ++i) {
+        plasma.mean_energy.second = 
+                    tools::newton_raphson_iterate(plasma,
+                                                  plasma.mean_energy.first,
+		                                              0.1, 50.0, get_digits,
+                                                  bmax_iter);
+		    plasma.meta_evolution(tstep);
+		    plasma.meta_dens.first = plasma.meta_dens.second;
+		    plasma.mean_energy.first = plasma.mean_energy.second;
+
+		    t += tstep;
+	    }
+      *plasma_file << std::endl;
+      *plasma_file << t;
+      *plasma_file << '\t' << plasma.mean_energy.second;
+		  *plasma_file << '\t' << plasma.e_dens.first;
+		  *plasma_file << '\t' << plasma.ion_dens.first;
+		  *plasma_file << '\t' << plasma.meta_dens.first;
+    }
+  }//omp master
+  return reterr;
+}
+
+
+
 // full adaptive lsoda
 
 // ==================== LSODA
@@ -2752,15 +3001,15 @@ int NEvo::advance_nosplit_ompadpsih4(const double ctime) {
     for (unsigned int l = 0; l < cr.gm.vols.nsections; ++l) {
       //#pragma omp parallel for
       for (unsigned int q = 0; q < cr.gm.chrgs.nsections; ++q) {
-        ndens[l][q] = pdens[l][q]
-  	  + nm.tm.ndeltat
-  	  * (wco*kcoagulation[l][q]+wsg*gsurfacegrowth[l][q]+wnu*jnucleation[l][q]);
-
-	// // semi implicit
-	// ndens[l][q] = (pdens[l][q]
+        // ndens[l][q] = pdens[l][q]
   	//   + nm.tm.ndeltat
-	// 	       * (wco*birth_vector[l][q]+wsg*gsurfacegrowth[l][q]+wnu*jnucleation[l][q]))
-	//   /(1.0+nm.tm.ndeltat*death_vector[l][q]);
+  	//   * (wco*kcoagulation[l][q]+wsg*gsurfacegrowth[l][q]+wnu*jnucleation[l][q]);
+
+	// semi implicit
+	ndens[l][q] = (pdens[l][q]
+  	  + nm.tm.ndeltat
+		       * (wco*birth_vector[l][q]+wsg*gsurfacegrowth[l][q]+wnu*jnucleation[l][q]))
+	  /(1.0+nm.tm.ndeltat*death_vector[l][q]);
 
   	crate2d[l][q] = wco * kcoagulation[l][q];
         //DANGER WARNING
@@ -3507,5 +3756,129 @@ int NEvo::compute_coagulation_omp() {
 //       }
 //     }
   }
+  return 0;
+}
+
+int NEvo::init_plasma() {
+  std::map<std::string, std::array<double, 3> > rates;
+
+  rates["ionization"]            = {4.25e13, 371860.0, 0.60};
+  rates["excitation"]            = {7.04e15, 286662.0, 0.00};
+  rates["stepwise_ionization"]   = {7.52e16, 124191.0, 0.00};
+  rates["superelastic_colision"] = {2.60e14,      0.0, 0.74};
+  rates["metastable_pooling"]    = {3.70e14,      0.0, 0.00};	
+
+  // convert to MKSA
+  for (auto &m : rates) {
+    std::tie(m.second[0], m.second[1]) = arrhenius_values(m.second[0], m.second[1]);
+  }
+
+  // in m3/s
+  rates["quenching_toresonant"] = {2.0e-13, 0.0, 0.0};
+  rates["twobody_quenching"]    = {3.0e-21, 0.0, 0.0};
+  rates["threebody_quenching"]  = {1.1e-43, 0.0, 0.0};
+
+  std::stringstream ss;
+
+  ss << std::setw(24) << "Rate";
+  ss << std::setw(24) << "Constants";
+  BOOST_LOG_SEV(lg, info) << ss.str();
+  BOOST_LOG_SEV(lg, info) << "---------------------------------"
+                             "---------------------------------";  
+  for (auto m : rates) {
+    ss.str("");
+    ss << std::setw(24);
+    ss << m.first;
+    //ss << std::endl << m.first;
+    for (auto v: m.second) {
+      ss << std::setw(12);
+      ss << v;
+    }
+    BOOST_LOG_SEV(lg, info) << ss.str();
+  }
+
+	ratemap rates_map;
+
+	for (auto m : rates) {
+		std::shared_ptr<Rate> r(new Rate(m.first, m.second[1], m.second[0], m.second[2]));
+		rates_map[m.first] = r;
+	}
+	
+	double epsi = 0.1;
+	double epsf = 25.0;
+	size_t N = 100;
+	double step = (epsf-epsi) / (N-1);
+
+	std::fstream *rate_file = 
+                  new std::fstream(dirname + nano_filename + "-rates.dat",
+                                   std::fstream::out);
+
+	double eps = epsi;
+	for (size_t i=0; i<N; ++i) {
+		*rate_file << eps;
+		for (auto mr : rates_map) {
+			Rate &r = *mr.second;
+			*rate_file << '\t' << r(eps);
+		}
+		*rate_file << std::endl;
+		eps += step;
+	}
+	
+	rate_file-> close();
+	delete(rate_file);
+
+	plasma = Plasma(rates_map);
+
+  return 0;
+}
+
+int NEvo::test_plasma() {
+	double ti = 0.0;
+	double tf = 5e-4;
+	size_t N = 500;
+	double tstep = (tf-ti) / (N-1);
+
+  boost::uintmax_t bmax_iter = EPS_MAXITER;
+	tools::eps_tolerance<double> tol = EPS_TOL;
+
+	const int digits = std::numeric_limits<double>::digits;
+  int get_digits = static_cast<int>(digits * 0.6);
+
+	std::fstream* plasma_file = 
+                  new std::fstream(dirname + nano_filename + "-plasmatest.dat",
+                                   std::fstream::out);
+
+	double t = ti;
+
+	plasma.mean_energy.first = 8.0;
+	for (size_t i=0; i<N; ++i) {
+		*plasma_file << t;
+
+		plasma.mean_energy.second = 
+                    tools::newton_raphson_iterate(plasma,
+                                                  plasma.mean_energy.first,
+		                                              0.1, 50.0, get_digits,
+                                                  bmax_iter);
+		*plasma_file << '\t' << plasma.mean_energy.second;
+		*plasma_file << '\t' << plasma.e_dens.first;
+		*plasma_file << '\t' << plasma.ion_dens.first;
+		*plasma_file << '\t' << plasma.meta_dens.first;
+		*plasma_file << std::endl;
+
+		plasma.meta_evolution(tstep);
+		plasma.meta_dens.first = plasma.meta_dens.second;
+		plasma.mean_energy.first = plasma.mean_energy.second;
+
+		t += tstep;
+	}
+
+	plasma_file->close();
+	delete(plasma_file);
+
+  return 0;
+}
+
+int NEvo::evolve_plasma(double ctime) {
+
   return 0;
 }

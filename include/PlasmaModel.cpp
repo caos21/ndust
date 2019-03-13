@@ -91,6 +91,11 @@ int PlasmaModel::read_parameters() {
   
   BOOST_LOG_SEV(lg, info) << "--> Neutral density: " << pars.neutral_density;
 
+  err = read_attrib_hdf5<int>(h5obj, "/Parameters", "pfixed",
+                              pars.pfixed);
+
+  BOOST_LOG_SEV(lg, info) << "--> Fixed plasma parameters: "
+                          << (pars.pfixed==1 ? "yes" : "no");
 
   err = read_attrib_hdf5<double>(h5obj, "/Parameters", "pressure",
                                 pars.pressure);

@@ -21,8 +21,13 @@
 #include <iostream>
 #include <fstream>
 #include <string>
+#include <sstream>
 #include <algorithm>
 #include <functional>
+#include <cmath>
+#include <tuple>
+#include <array>
+#include <map>
 
 // hdf5 c++ bindings
 #include <H5Cpp.h>
@@ -30,6 +35,9 @@
 // BOOST odeint
 #include <boost/numeric/odeint.hpp>
 #include <boost/multiprecision/cpp_dec_float.hpp>
+
+// BOOST Math toolkit
+#include <boost/math/tools/roots.hpp>
 
 // #include <cvode/cvode.h>
 // // error, check version
@@ -48,6 +56,7 @@
 #include "../include/PlasmaModel.h"
 #include "../include/NanoModel.h"
 
+#include "../include/Plasma.h"
 
 typedef double value_type;
 typedef std::vector<double> state_type;
@@ -148,9 +157,42 @@ public:
   //! Start calculations
   /*! 
    * Nanoparticle growth evolution openmp ready
+   * with plasma TESTING
+  */
+  int evolve_selfconsistent();
+
+  //! Start calculations
+  /*! 
+   * Nanoparticle growth evolution openmp ready
+   * with plasma TESTING
+  */
+  int evolve_onestepselfconsistent(double ctime);
+
+  //! Start calculations
+  /*! 
+   * Nanoparticle growth evolution openmp ready
   */
   int evolve_radapt();
+
+  //! Plasma init
+  /*! 
+   * Plasma init reactions
+  */
+  int init_plasma();
+
+  //! Plasma test
+  /*! 
+   * Plasma test
+  */
+  int test_plasma();
+
+  //! Plasma evolution only
+  /*! 
+   * Plasma evolution
+  */
+  int evolve_plasma(double ctime);
   
+
   //! write h5 datafile
   /*! 
    * Write on file grid_filename.h5 in dirname
@@ -176,6 +218,8 @@ public:
   PlasmaModel pm;                     //!< Plasma model for calculations.
 
   NanoModel nm;                       //!< Nano model for calculations.
+
+  Plasma plasma;                      //!< Plasma module.
 
   double ctime;                       //!< Current time of simulation.
 
@@ -229,8 +273,12 @@ public:
   // vector of death of particles in section
   boost_array2d death_vector;
 
+  // stream for plain dat moments file
   std::fstream* moments_file;
   
+  // stream for plain dat plasma file
+  std::fstream* plasma_file;
+
   darray moments;
 
 //   state_type nqdens;
