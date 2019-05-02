@@ -515,6 +515,13 @@ int NEvo::evolve_selfconsistent() {
     BOOST_LOG_SEV(lg, info) << "--> Metastable density: " << plasma.meta_dens.first;
     plasma_file = new std::fstream(dirname + nano_filename + "-plasma.dat",
                                    std::fstream::out);
+    *plasma_file << "#t";
+    *plasma_file << '\t' << "energy";
+		*plasma_file << '\t' << "ne";
+    *plasma_file << '\t' << "ni";
+    *plasma_file << '\t' << "nm";
+    *plasma_file << '\t' << "N";
+    *plasma_file << std::endl;
   }
   // BOOST remove DELETE WARNING
   qsys = new qsystem(this);
@@ -563,6 +570,7 @@ int NEvo::evolve_selfconsistent() {
           int err_ = write_partial_results(ctime);
           err_ = write_dataset2d_hdf5(h5obj_nano, "Density", "density", ndens,
               cr.gm.vols.nsections, cr.gm.chrgs.nsections);
+          plasma_file->flush();
 #pragma omp critical
           {
             err = 0;
@@ -1150,17 +1158,12 @@ int NEvo::compute_nanoparticle_potential() {
 }
 
 int NEvo::compute_collisionfreq() {
-  double max_efreq = 0.0;
-  double max_ifreq = 0.0;
-  double min_efreq = 1.0e15;
-  double min_ifreq = 1.0e15;
-
   // From 1.Allen, J. E. Probe theory - the orbital motion approach. Phys. Scr. 45, 497 (1992).
 
   // FIXME optimization use a vector of areas instead of M_PI radii2[l]
   double kte = (2.0/3.0)*pm.es.emean*eCharge;
   //double kte = 3.0*pm.es.emean*eCharge;
-  efreqfactor = 4.0 * M_PI * pm.es.ne * eCharge * sqrt(kte/(2.0*M_PI*eMass));
+  efreqfactor = 4.0 * M_PI * pm.es.ne /** eCharge*/ * sqrt(kte/(2.0*M_PI*eMass));
 
   BOOST_LOG_SEV(lg, info) << "Electron frequency prefactor: "
                           << efreqfactor;
@@ -1173,12 +1176,23 @@ int NEvo::compute_collisionfreq() {
   double kti = (2.0/3.0)*ion_energy;
 
   // ifreq factor
-  ifreqfactor = 4.0 * M_PI * pm.is.ni * eCharge * sqrt(kti/(2.0*M_PI*pm.is.imass));
+  ifreqfactor = 4.0 * M_PI * pm.is.ni /** eCharge*/ * sqrt(kti/(2.0*M_PI*pm.is.imass));
 
   BOOST_LOG_SEV(lg, info) << "Ion frequency prefactor: "
                           << ifreqfactor;
 
-  darray radii2 = cr.gm.chrgs.charges*cr.gm.chrgs.charges;
+  darray radii2 //= cr.gm.chrgs.charges*cr.gm.chrgs.charges;
+                = cr.gm.vols.radii * cr.gm.vols.radii;
+
+  // for (auto r: radii2) {
+  //   std::cerr << std::endl << r;
+  // }
+  // std::terminate();
+
+  double max_efreq = efreq[0][0];
+  double max_ifreq = ifreq[0][0];
+  double min_efreq = efreq[0][0];
+  double min_ifreq = ifreq[0][0];
 
 //   std::cerr << "\n[ii] ifreqfactor" << ifreqfactor;
 // #pragma omp parallel for collapse(2)
@@ -1220,8 +1234,8 @@ int NEvo::compute_collisionfreq() {
 
   }
 
-  double max_tfreq = 0.0;
-  double min_tfreq = 1.0e20;
+  double max_tfreq = tfreq[0][0];
+  double min_tfreq = tfreq[0][0];
 
   if(nm.nano.tunnel == 1) {
     for (unsigned int l = 0; l < cr.gm.vols.nsections; ++l) {
@@ -1698,7 +1712,7 @@ int NEvo::evolve_one_step_omp(double ctime) {
 	  min_dtq = std::min(min_dtq, ctx.common->hu);
 	  if (ctx.state <= 0) {
 	    std::cerr << "\nerror istate = " << ctx.state;
-	    //std::terminate();
+	    std::terminate();
 	  }
 	  // free context
 	  lsoda_free(&ctx);
@@ -1779,12 +1793,23 @@ int NEvo::evolve_onestepselfconsistent(double ctime) {
 
 #pragma omp master
   {
+    // if(pm.pars.pfixed==0) {
+    //   BOOST_LOG_SEV(lg, info) << "Recompute collision frequencies";
+    //   compute_collisionfreq();
+    // }
     if(nm.rs.wch == 1) {
     INIT:
+      if(pm.pars.pfixed==0) {
+        BOOST_LOG_SEV(lg, info) << "Recompute collision frequencies";
+        compute_collisionfreq();
+      }
+      double wtime = omp_get_wtime();
+      clock_t begin_tcharge = std::clock();
+      BOOST_LOG_SEV(lg, info) << "Computing charges";
       // compute_moments(pdens, new_mom);
 	
       ls_qsystem qsysy(*ls_qsys);
-      double wtime = omp_get_wtime();
+
       double min_dtq = 1.0;
 #pragma omp parallel firstprivate(qsysy)// shared(min_dtq, ctime, ndens, pdens, qrate2d)//, ctime, qsys)
       {
@@ -1832,7 +1857,7 @@ int NEvo::evolve_onestepselfconsistent(double ctime) {
 	  min_dtq = std::min(min_dtq, ctx.common->hu);
 	  if (ctx.state <= 0) {
 	    std::cerr << "\nerror istate = " << ctx.state;
-	    //std::terminate();
+	    std::terminate();
 	  }
 	  // free context
 	  lsoda_free(&ctx);
@@ -1867,9 +1892,9 @@ int NEvo::evolve_onestepselfconsistent(double ctime) {
       
       pdens = ndens;
 
-      // wtime = omp_get_wtime() - wtime;
-      // BOOST_LOG_SEV(lg, info) << "Charging elapsed secs = " << wtime;
-      // BOOST_LOG_SEV(lg, info) << "Min dtq " << min_dtq;
+      wtime = omp_get_wtime() - wtime;
+      BOOST_LOG_SEV(lg, info) << "Charging elapsed secs = " << wtime;
+      BOOST_LOG_SEV(lg, info) << "Min dtq " << min_dtq;
     }//charging block    
     
     // growth clock
@@ -1878,17 +1903,29 @@ int NEvo::evolve_onestepselfconsistent(double ctime) {
       //err = advance_nocharging_ompadpsih4(ctime);
       err = advance_nosplit_ompadpsih4(ctime);
       if(err == -1) {
-	reterr = -1;
-	nm.tm.ndeltat *= 0.95;
-	BOOST_LOG_SEV(lg, info) << "t, New dt = " << ctime << '\t' << nm.tm.ndeltat;
-	goto INIT;
+	      reterr = -1;
+	      nm.tm.ndeltat *= 0.9;
+	      BOOST_LOG_SEV(lg, info) << "t, New dt = " << ctime << '\t' << nm.tm.ndeltat;
+        if (10.0*nm.tm.ndeltat < nm.tm.qdeltat) {
+          std::terminate();
+        }
+	      goto INIT;
       }
       else {
-	reterr = 0;
+	      reterr = 0;
       }
     }
     else {
       err = advance_nocharging_ompadp(ctime);
+      if(err == -1) {
+	      reterr = -1;
+	      nm.tm.ndeltat *= 0.9;
+	      BOOST_LOG_SEV(lg, info) << "t, New dt = " << ctime << '\t' << nm.tm.ndeltat;
+        if (10.0*nm.tm.ndeltat < nm.tm.qdeltat) {
+          std::terminate();
+        }
+	      goto INIT;
+      }
     }
     double end_tgrowth = omp_get_wtime();
     double elapsed_secs = end_tgrowth - begin_tgrowth;
@@ -1896,10 +1933,10 @@ int NEvo::evolve_onestepselfconsistent(double ctime) {
       << "Growth (coagulation+sgrowth+nucleation) elapsed secs = "
       << elapsed_secs;
     if (pm.pars.pfixed==0) {
-      BOOST_LOG_SEV(lg, info) << "Plasma evolution";
+      BOOST_LOG_SEV(lg, info) << "Plasma evolution - t=\t" << ctime;
 	    double ti = ctime;
 	    double tf = ctime + nm.tm.ndeltat;
-	    size_t N = 500;
+	    size_t N = 10000;
 	    double tstep = (tf-ti) / (N-1);
 
       boost::uintmax_t bmax_iter = EPS_MAXITER;
@@ -1910,25 +1947,105 @@ int NEvo::evolve_onestepselfconsistent(double ctime) {
 
 	    double t = ti;
 
-	    
+      // compute nanoparticle charge density
+      //compute_moments(ndens, new_mom);
+      double nano_qdens = 0.0;//abs(new_mom[2]);
+      for (unsigned int l = 0; l < cr.gm.vols.nsections; ++l) {
+        // warning only negative nanos cr.gm.chrgs.nsections
+        for (unsigned int q = 0; q < cr.gm.chrgs.maxnegative; ++q) {
+          nano_qdens += ndens[l][q] * cr.gm.chrgs.charges[q];
+        }
+      }
+	    nano_qdens = std::abs(nano_qdens);
+      
+      //ion loss
+      double ion_loss = 0.0;
+      for (unsigned int l = 0; l < cr.gm.vols.nsections; ++l) {
+        for (unsigned int q = cr.gm.chrgs.maxnegative; q < cr.gm.chrgs.nsections; ++q) {
+          ion_loss += ndens[l][q]*ifreq[l][q];
+        }
+      }
+      plasma.ion_loss.first = ion_loss;
+      double e_min = 0.0;//1e-6;
+      double e_max = 100.0;//1000.0;
+      boost::uintmax_t max_iter = 1000000;
+      tools::eps_tolerance<double> ntol(30);
+      // double e_guess = 4;
+      // double sfactor = 2;
+      // bool is_rising = true;
 	    for (size_t i=0; i<N; ++i) {
         plasma.mean_energy.second = 
                     tools::newton_raphson_iterate(plasma,
                                                   plasma.mean_energy.first,
-		                                              0.1, 50.0, get_digits,
+		                                              e_min, e_max, get_digits,
                                                   bmax_iter);
-		    plasma.meta_evolution(tstep);
+        // auto new_energy = tools::toms748_solve(plasma, e_min, e_max,
+        //                                        tol, max_iter);
+        // std::pair<double, double> new_energy = tools::bracket_and_solve_root(plasma,
+        //                                                 e_guess,
+        //                                                 sfactor,
+        //                                                 is_rising,
+        //                                                 ntol,
+        //                                                 max_iter);
+		    // plasma.mean_energy.second = 0.5*(new_energy.first+new_energy.second);
+        plasma.meta_evolution(tstep);
 		    plasma.meta_dens.first = plasma.meta_dens.second;
+        plasma.electron_evolution(tstep, nano_qdens);
+		    plasma.e_dens.first = plasma.e_dens.second;
 		    plasma.mean_energy.first = plasma.mean_energy.second;
 
 		    t += tstep;
 	    }
-      *plasma_file << std::endl;
-      *plasma_file << t;
+
+      // std::pair<double, double> new_energy;
+      // double e_min = 0.1;//1e-6;
+      // double e_max = 50.0;//1000.0;
+      // boost::uintmax_t max_iter = 1000;
+	    // tools::eps_tolerance<double> ntol(30);
+      // double energy;
+      // plasma.meta_on = 1.0;
+      // for (size_t i=0; i<N; ++i) {
+      //   plasma.meta_dens.first = 0.0;
+      //   plasma.meta_dens.second = 0.0;
+      //   new_energy = tools::toms748_solve(plasma, e_min, e_max,
+      //                                     ntol, max_iter);
+      //   // new_energy = tools::bisect(plasma, e_min, e_max,
+      //   //                                   ntol, max_iter);
+      //   // plasma.mean_energy.second = 
+      //   //             tools::newton_raphson_iterate(plasma,
+      //   //                                           plasma.mean_energy.first,
+		  //   //                                           0.1, 50.0, get_digits,
+      //   //                                           bmax_iter);
+      //   plasma.mean_energy.second = 0.5*(new_energy.first+new_energy.second);
+      //   if (plasma.meta_on>0.0) {
+		  //     plasma.meta_evolution(tstep);
+		  //     plasma.meta_dens.first = plasma.meta_dens.second;
+      //   }
+      //   plasma.electron_evolution(tstep, nano_qdens);
+		  //   plasma.e_dens.first = plasma.e_dens.second;
+
+		  //   plasma.mean_energy.first = plasma.mean_energy.second;
+
+		  //   t += tstep;
+	    // }
+
+      // write to plasma file
+      *plasma_file << tf;
       *plasma_file << '\t' << plasma.mean_energy.second;
 		  *plasma_file << '\t' << plasma.e_dens.first;
 		  *plasma_file << '\t' << plasma.ion_dens.first;
 		  *plasma_file << '\t' << plasma.meta_dens.first;
+      *plasma_file << '\t' << nano_qdens;
+      *plasma_file << '\t' << ion_loss;
+      *plasma_file << std::endl;
+
+      // update energy and densities
+      BOOST_LOG_SEV(lg, info) << "Updating energy " << pm.es.emean << ", to "
+                              << plasma.mean_energy.first;
+      pm.es.emean = plasma.mean_energy.first;
+      BOOST_LOG_SEV(lg, info) << "Updating electron density " << pm.es.ne
+                              << ", to " << plasma.e_dens.first;
+      pm.es.ne = plasma.e_dens.first;
     }
   }//omp master
   return reterr;
@@ -2589,10 +2706,12 @@ int NEvo::advance_nocharging_ompadp(const double ctime) {
 	  if (ndens[l][q]<-1.0e-1) {
 	    BOOST_LOG_SEV(lg, info) << "Negative nanoparticle ndensity (coagulation)";
 	    //nm.tm.ndeltat *= 0.9;
-	    BOOST_LOG_SEV(lg, info) << "New dt = " << nm.tm.ndeltat;
-	    if (nm.tm.ndeltat < nm.tm.qdeltat) {
-	      //std::terminate();
-	    }
+	    // BOOST_LOG_SEV(lg, info) << "t, New dt = " << ctime << '\t' 
+      //                         << nm.tm.ndeltat;
+	    // if (nm.tm.ndeltat < nm.tm.qdeltat) {
+	    //   std::terminate();
+	    // }
+      return -1;
 	  }
 	  ndens[l][q] = 0.0;
 	  if (pdens[l][q] > 0.0) {
@@ -3833,52 +3952,51 @@ int NEvo::init_plasma() {
 }
 
 int NEvo::test_plasma() {
-	double ti = 0.0;
-	double tf = 5e-4;
-	size_t N = 500;
-	double tstep = (tf-ti) / (N-1);
+	// double ti = 0.0;
+	// double tf = 5e-4;
+	// size_t N = 500;
+	// double tstep = (tf-ti) / (N-1);
 
-  boost::uintmax_t bmax_iter = EPS_MAXITER;
-	tools::eps_tolerance<double> tol = EPS_TOL;
+  // boost::uintmax_t bmax_iter = EPS_MAXITER;
+	// tools::eps_tolerance<double> tol = EPS_TOL;
 
-	const int digits = std::numeric_limits<double>::digits;
-  int get_digits = static_cast<int>(digits * 0.6);
+	// const int digits = std::numeric_limits<double>::digits;
+  // int get_digits = static_cast<int>(digits * 0.6);
 
-	std::fstream* plasma_file = 
-                  new std::fstream(dirname + nano_filename + "-plasmatest.dat",
-                                   std::fstream::out);
+	// std::fstream* plasma_file = 
+  //                 new std::fstream(dirname + nano_filename + "-plasmatest.dat",
+  //                                  std::fstream::out);
 
-	double t = ti;
+	// double t = ti;
 
-	plasma.mean_energy.first = 8.0;
-	for (size_t i=0; i<N; ++i) {
-		*plasma_file << t;
+	// plasma.mean_energy.first = 8.0;
+	// for (size_t i=0; i<N; ++i) {
+	// 	*plasma_file << t;
 
-		plasma.mean_energy.second = 
-                    tools::newton_raphson_iterate(plasma,
-                                                  plasma.mean_energy.first,
-		                                              0.1, 50.0, get_digits,
-                                                  bmax_iter);
-		*plasma_file << '\t' << plasma.mean_energy.second;
-		*plasma_file << '\t' << plasma.e_dens.first;
-		*plasma_file << '\t' << plasma.ion_dens.first;
-		*plasma_file << '\t' << plasma.meta_dens.first;
-		*plasma_file << std::endl;
+	// 	plasma.mean_energy.second = 
+  //                   tools::newton_raphson_iterate(plasma,
+  //                                                 plasma.mean_energy.first,
+	// 	                                              0.1, 50.0, get_digits,
+  //                                                 bmax_iter);
+	// 	*plasma_file << '\t' << plasma.mean_energy.second;
+	// 	*plasma_file << '\t' << plasma.e_dens.first;
+	// 	*plasma_file << '\t' << plasma.ion_dens.first;
+	// 	*plasma_file << '\t' << plasma.meta_dens.first;
+	// 	*plasma_file << std::endl;
 
-		plasma.meta_evolution(tstep);
-		plasma.meta_dens.first = plasma.meta_dens.second;
-		plasma.mean_energy.first = plasma.mean_energy.second;
+	// 	plasma.meta_evolution(tstep);
+	// 	plasma.meta_dens.first = plasma.meta_dens.second;
+	// 	plasma.mean_energy.first = plasma.mean_energy.second;
 
-		t += tstep;
-	}
+	// 	t += tstep;
+	// }
 
-	plasma_file->close();
-	delete(plasma_file);
+	// plasma_file->close();
+	// delete(plasma_file);
 
   return 0;
 }
 
 int NEvo::evolve_plasma(double ctime) {
-
   return 0;
 }

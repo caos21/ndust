@@ -141,7 +141,7 @@
               <number>2</number>
              </property>
              <property name="value">
-              <number>30</number>
+              <number>60</number>
              </property>
             </widget>
            </item>
@@ -224,7 +224,7 @@
               <string>Minimum mean radius</string>
              </property>
              <property name="text">
-              <string>0.375</string>
+              <string>0.5</string>
              </property>
              <property name="alignment">
               <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
@@ -394,7 +394,7 @@
               <number>2</number>
              </property>
              <property name="value">
-              <number>30</number>
+              <number>70</number>
              </property>
             </widget>
            </item>
@@ -806,7 +806,7 @@
                 <string>MPC</string>
                </property>
                <property name="checked">
-                <bool>true</bool>
+                <bool>false</bool>
                </property>
               </widget>
              </item>
@@ -827,6 +827,9 @@
                </property>
                <property name="text">
                 <string>Coulomb</string>
+               </property>
+               <property name="checked">
+                <bool>true</bool>
                </property>
               </widget>
              </item>
@@ -1051,7 +1054,7 @@
               <string/>
              </property>
              <property name="checked">
-              <bool>true</bool>
+              <bool>false</bool>
              </property>
              <property name="tristate">
               <bool>false</bool>
@@ -1477,7 +1480,7 @@
            <item row="1" column="2">
             <widget class="QLineEdit" name="lineEdit_ne">
              <property name="text">
-              <string>1e15</string>
+              <string>1e16</string>
              </property>
              <property name="alignment">
               <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
@@ -1531,7 +1534,7 @@
            <item row="1" column="2">
             <widget class="QLineEdit" name="lineEdit_ni">
              <property name="text">
-              <string>1e15</string>
+              <string>1e17</string>
              </property>
              <property name="alignment">
               <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
@@ -1775,7 +1778,7 @@
               <string/>
              </property>
              <property name="checked">
-              <bool>false</bool>
+              <bool>true</bool>
              </property>
             </widget>
            </item>
@@ -1993,7 +1996,7 @@
            <item row="0" column="2">
             <widget class="QLineEdit" name="lineEdit_ndeltat">
              <property name="text">
-              <string>1e-7</string>
+              <string>1e-4</string>
              </property>
              <property name="alignment">
               <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
@@ -2010,7 +2013,7 @@
            <item row="1" column="2">
             <widget class="QLineEdit" name="lineEdit_qdeltat">
              <property name="text">
-              <string>1e-10</string>
+              <string>1e-8</string>
              </property>
              <property name="alignment">
               <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
@@ -2027,7 +2030,7 @@
            <item row="2" column="2">
             <widget class="QLineEdit" name="lineEdit_tstop">
              <property name="text">
-              <string>0.02</string>
+              <string>0.05</string>
              </property>
              <property name="alignment">
               <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
@@ -2236,7 +2239,7 @@
            <item row="0" column="2">
             <widget class="QLineEdit" name="lineEdit_indens">
              <property name="text">
-              <string>1.0E15</string>
+              <string>1.0E10</string>
              </property>
              <property name="alignment">
               <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>

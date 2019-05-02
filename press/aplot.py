@@ -630,7 +630,9 @@ XMeshDiam = []
 YMeshChrgs = [] 
 
 class read_results():
-  def __init__(self, nanoh5prefix = None, gridh5prefix = None, plasmah5prefix = None, xc = None, defpath = r'/home/ben/git/ndust/data/'):
+  def __init__(self, nanoh5prefix = None, gridh5prefix = None,
+               plasmah5prefix = None, xc = None,
+               defpath = r'/home/ben/git/ndust/data/'):
     self.nanoh5prefix = None
     self.gridh5prefix = None
     self.plasmah5prefix = None
@@ -657,7 +659,7 @@ class read_results():
     try:
       NanoFile =  h5py.File(self.nanofname, 'r')
     except:
-      print("Error in open nano file: {}".format(nanofname))
+      print("Error in open nano file: {}".format(self.nanofname))
 
     # Read plasma file
     self.gridfname = self.defpath + self.gridh5prefix + '.h5'
@@ -665,7 +667,7 @@ class read_results():
     try: 
       GridFile = h5py.File(self.gridfname, 'r')
     except:
-      print("Error in open grid file: {}".format(gridfname))
+      print("Error in open grid file: {}".format(self.gridfname))
     
     # Read plasma file
     self.plasmafname = self.defpath + self.plasmah5prefix + '.h5'
@@ -673,7 +675,7 @@ class read_results():
     try:
       PlasmaFile = h5py.File(self.plasmafname, 'r')
     except:
-      print("Error in open plasma file: {}".format(plasmafname))
+      print("Error in open plasma file: {}".format(self.plasmafname))
 
     ## group volumes
     self.gvols = GridFile.get("Volume_sections")
@@ -863,7 +865,7 @@ plt.xlabel(r'Charges ($e$)')
 #plt.ylabel(r'Density ($1/m^3$)')
 plt.yscale('log')
 plt.ylim([10, 5e16])
-plt.xlim([-50, 5])
+plt.xlim([-100, 5])
 #plt.xlim([-110, 5])
 #plt.xlim([-70, 5])
 #plt.ylim([QPivots[0], QPivots[-1]])

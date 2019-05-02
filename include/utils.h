@@ -66,7 +66,7 @@ namespace utils {
   
   template <typename T>
     T relative_error(T true_value, T expected_value){
-    return fabs((expected_value - true_value)/true_value);
+    return std::abs((expected_value - true_value)/true_value);
   }
 
   template <typename T>
