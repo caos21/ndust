@@ -39,6 +39,9 @@
 // BOOST Math toolkit
 #include <boost/math/tools/roots.hpp>
 
+const boost::uintmax_t EPS_MAXITER = 10000;
+const boost::math::tools::eps_tolerance<double> EPS_TOL(30);
+
 // #include <cvode/cvode.h>
 // // error, check version
 // //#include <cvode/cvode_dense.h>
@@ -56,7 +59,8 @@
 #include "../include/PlasmaModel.h"
 #include "../include/NanoModel.h"
 
-#include "../include/Plasma.h"
+//#include "../include/Plasma.h"
+#include "../include/PlasmaChem.h"
 
 typedef double value_type;
 typedef std::vector<double> state_type;
@@ -174,18 +178,6 @@ public:
   */
   int evolve_radapt();
 
-  //! Plasma init
-  /*! 
-   * Plasma init reactions
-  */
-  int init_plasma();
-
-  //! Plasma test
-  /*! 
-   * Plasma test
-  */
-  int test_plasma();
-
   //! Plasma evolution only
   /*! 
    * Plasma evolution
@@ -219,7 +211,7 @@ public:
 
   NanoModel nm;                       //!< Nano model for calculations.
 
-  Plasma plasma;                      //!< Plasma module.
+  PlasmaChem plasma;                      //!< Plasma module.
 
   double ctime;                       //!< Current time of simulation.
 
@@ -278,6 +270,14 @@ public:
   
   // stream for plain dat plasma file
   std::fstream* plasma_file;
+
+  ssize_t plasmadens_size;
+	std::vector<double> plasma_ndens;
+  std::vector<double> plasma_pdens;
+	std::vector<double> density_sourcedrain;
+	double energy_sourcedrain;
+  double min_dtq;
+
 
   darray moments;
 

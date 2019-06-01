@@ -95,7 +95,7 @@ class Window(QMainWindow, Ui_MainWindow):
     self.show()
 
     self.prefix = ""
-    self.dirname = "../data/"
+    self.dirname = "/mnt/data/ben/ndust/data/"
 
     self.server = [" guillimin:~/duster/results/", " cottos:~/duster/results/"]
 

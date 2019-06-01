@@ -500,27 +500,45 @@ int NEvo::evolve_selfconsistent() {
   
   // HACK refactor WARNING
   if(pm.pars.pfixed==0) {
+    BOOST_LOG_SEV(lg, info) << "Initialize plasma rates";
+    plasma.init_rates();
     BOOST_LOG_SEV(lg, info) << "Initialize plasma parameters";
-    auto e = init_plasma();
-    plasma.mean_energy.first = pm.es.emean;
-    BOOST_LOG_SEV(lg, info) << "--> Mean electron energy: " << plasma.mean_energy.first;
-    plasma.e_dens.first = pm.es.ne;
-    plasma.e_dens.second = pm.es.ne;
-    BOOST_LOG_SEV(lg, info) << "--> Electron density: " << plasma.e_dens.first;
-    plasma.ion_dens.first = pm.is.ni;
-    plasma.ion_dens.second = pm.is.ni;
-    BOOST_LOG_SEV(lg, info) << "--> Ion density: " << plasma.ion_dens.first;
-    plasma.meta_dens.first = pm.ms.nm;
-    plasma.meta_dens.second = pm.ms.nm;
-    BOOST_LOG_SEV(lg, info) << "--> Metastable density: " << plasma.meta_dens.first;
+    plasma.init_parameters();
+
+
+    plasmadens_size = 7;
+
+	  plasma_ndens.resize(plasmadens_size);
+    plasma_pdens.resize(plasmadens_size);
+	  density_sourcedrain.resize(plasmadens_size);
+	  energy_sourcedrain = 0.0;
+    min_dtq = 1.0;
+
+    for(unsigned int q=0; q<plasmadens_size; ++q) {
+      plasma_ndens[q] = 0.0;
+      plasma_pdens[q] = 1.0;
+		  density_sourcedrain[q] = 0.0;
+    }
+
+    // Solve plasma without nanos
+    plasma.solve(0.0, 1e-6, 1e-7, density_sourcedrain,
+          energy_sourcedrain, plasma_pdens, plasma_ndens, min_dtq);
+
+
+    plasma_pdens = plasma_ndens;
+
     plasma_file = new std::fstream(dirname + nano_filename + "-plasma.dat",
                                    std::fstream::out);
     *plasma_file << "#t";
     *plasma_file << '\t' << "energy";
-		*plasma_file << '\t' << "ne";
-    *plasma_file << '\t' << "ni";
-    *plasma_file << '\t' << "nm";
-    *plasma_file << '\t' << "N";
+	  *plasma_file << '\t' << "ne";
+    *plasma_file << '\t' << "nArp";
+    *plasma_file << '\t' << "nArm";
+    *plasma_file << '\t' << "SiH3p";
+	  *plasma_file << '\t' << "SiH3";
+	  *plasma_file << '\t' << "SiH2";
+	  *plasma_file << '\t' << "neps";
+    *plasma_file << '\t' << "Nq";
     *plasma_file << std::endl;
   }
   // BOOST remove DELETE WARNING
@@ -547,6 +565,17 @@ int NEvo::evolve_selfconsistent() {
       // get num_threads
       int num_threads = omp_get_num_threads();
       // execute loop in master thread
+      
+      // we want to write 'nwrites' time results in file
+      int nwrites = 100;
+      int writecount = 1;
+      bool first_write = true;
+      double time2write = nm.tm.tstop / nwrites;
+      // treat the case of dt smaller than time2write
+      if (time2write<orig_dtn) {
+        time2write = nm.tm.tstop/orig_dtn;
+        nwrites = ceil(time2write);
+      }
 
       for(unsigned int t=0; err<0; ++t, ++npcount) {
 
@@ -557,10 +586,19 @@ int NEvo::evolve_selfconsistent() {
         {
           err_onestep = evolve_onestepselfconsistent(ctime);
         }
-        if(npcount>static_cast<unsigned int>((0.01*nm.tm.tstop)/orig_dtn)) {
+        // if(npcount>static_cast<unsigned int>((0.01*nm.tm.tstop)/orig_dtn)) {
+        //   write_one_step(ctime, begin_sim, one_step_begin);
+        //   npcount=0;
+        // }
+        if(/*first_write ||*/ (ctime>=writecount*time2write)) {
+          BOOST_LOG_SEV(lg, info) << "Writing, time = " << ctime
+                                  << "\t t2w = " << time2write*writecount;
+
+          //first_write = false;
+          writecount++;
           write_one_step(ctime, begin_sim, one_step_begin);
-          npcount=0;
         }
+
         if(ctime>nm.tm.tstop-nm.tm.ndeltat) {
           BOOST_LOG_SEV(lg, info) << "Done!, time = " << ctime;
           clock_t end_sim = std::clock();
@@ -1824,8 +1862,8 @@ int NEvo::evolve_onestepselfconsistent(double ctime) {
 	  // set the target density
 	  for(unsigned int q=0; q<cr.gm.chrgs.nsections; ++q) {
 	    nqdens[q] = pdens[l][q];
-	    atol[q] = 1.0e-4;
-	    rtol[q] = 1.0e-2;
+	    atol[q] = 1.0e-3;
+	    rtol[q] = 1.0e-3;
 	    //sum1 += pdens[l][q];
 	  }
 	  // get time
@@ -1840,7 +1878,7 @@ int NEvo::evolve_onestepselfconsistent(double ctime) {
 	  opt.rtol = rtol;              // relative tolerance
 	  opt.atol = atol;              // absolute tolerance
 	  opt.itask = 1;                // normal integration
-	  opt.mxstep = 1000000000;      // max steps
+	  opt.mxstep = 100000000;      // max steps
 	  // set lsoda context
 	  struct lsoda_context_t ctx = {
 					.function = ls_qsystemf,
@@ -1853,19 +1891,28 @@ int NEvo::evolve_onestepselfconsistent(double ctime) {
 	  double tin = ttime;
 	  double tout = ttime+ldtn;
 	  // integrate
-	  lsoda(&ctx, nqdens.data(), &tin, tout);
+	  lsoda(&ctx, &nqdens[0], &tin, tout);
 	  min_dtq = std::min(min_dtq, ctx.common->hu);
 	  if (ctx.state <= 0) {
 	    std::cerr << "\nerror istate = " << ctx.state;
-	    std::terminate();
+      std::cerr << "\nLSODA error in charging " << ctx.state;
+      std::cerr << "\nmin dtq = " << min_dtq << "\n\n";
+	    //std::terminate();
 	  }
 	  // free context
 	  lsoda_free(&ctx);
 	  
 	  for(unsigned int q=0; q<cr.gm.chrgs.nsections; ++q) {
 	    ndens[l][q] = (nqdens[q]>0? nqdens[q]: 0.0);
+      //ndens[l][q] = nqdens[q];
 	    qrate2d[l][q] = (ndens[l][q]-pdens[l][q])/ldtn;
-	  }	  
+	  }
+
+    // for(unsigned int q=0; q<cr.gm.chrgs.nsections; ++q) {
+	  //   ndens[l][q] = (nqdens[q]>0? nqdens[q]: 0.0);
+	  //   qrate2d[l][q] = (ndens[l][q]-pdens[l][q])/ldtn;
+	  // }
+    	  
 	}//for l in sections
       }// parallel region
       //#pragma omp flush
@@ -1896,7 +1943,93 @@ int NEvo::evolve_onestepselfconsistent(double ctime) {
       BOOST_LOG_SEV(lg, info) << "Charging elapsed secs = " << wtime;
       BOOST_LOG_SEV(lg, info) << "Min dtq " << min_dtq;
     }//charging block    
-    
+
+// // TIME SPLIT PLASMA to solve in ctime -> ctime + 0.5 deltat
+
+// if (pm.pars.pfixed==0) {
+//       BOOST_LOG_SEV(lg, info) << "Plasma evolution - t=\t" << ctime;
+
+//       // compute nanoparticle charge density
+//       //compute_moments(ndens, new_mom);
+//       double nano_qdens = 0.0;//abs(new_mom[2]);
+//       double nano_qdens_rate = 0.0;
+//       for (unsigned int l = 0; l < cr.gm.vols.nsections; ++l) {
+//         // warning only negative nanos cr.gm.chrgs.nsections
+//         for (unsigned int q = 0; q < cr.gm.chrgs.nsections; ++q) {
+//           nano_qdens += ndens[l][q] * cr.gm.chrgs.charges[q];
+//           nano_qdens_rate += qrate2d[l][q];
+//         }
+//       }
+// 	    //nano_qdens = std::abs(nano_qdens);
+      
+//       //ion loss
+//       double ion_loss = 0.0;
+//       double electron_loss = 0.0;
+//       double energy_loss = 0.0;
+//       for (unsigned int l = 0; l < cr.gm.vols.nsections; ++l) {
+//         // for (unsigned int q = cr.gm.chrgs.maxnegative; q < cr.gm.chrgs.nsections; ++q) {
+//         for (unsigned int q = 0; q < cr.gm.chrgs.nsections; ++q) {
+//           ion_loss += ndens[l][q]*ifreq[l][q];
+//           electron_loss += ndens[l][q]*(efreq[l][q]-0*tfreq[l][q]);
+//           energy_loss += phid[l][q]*ndens[l][q]*efreq[l][q];
+//         }
+//       }
+
+//       density_sourcedrain[0] = electron_loss;
+//       density_sourcedrain[1] = ion_loss;
+//       density_sourcedrain[2] = 0.0;
+//       density_sourcedrain[3] = 0.0;
+//       density_sourcedrain[4] = 0.0;
+//       density_sourcedrain[5] = 0.0;
+//       density_sourcedrain[6] = abs(energy_loss);
+//       BOOST_LOG_SEV(lg, info) << "electron_loss " << electron_loss;
+//       BOOST_LOG_SEV(lg, info) << "ion_loss " << ion_loss;
+//       BOOST_LOG_SEV(lg, info) << "energy_loss " << energy_loss;
+
+//       plasma.nano_qdens = nano_qdens;
+//       plasma.nano_qdens_rate = nano_qdens_rate;
+//       BOOST_LOG_SEV(lg, info) << "total charge " << nano_qdens;
+//       BOOST_LOG_SEV(lg, info) << "charge rate " << nano_qdens_rate;
+
+//       // write to plasma file
+//       plasma.solve(ctime, ctime+0.5*nm.tm.ndeltat, nm.tm.ndeltat, density_sourcedrain,
+// 					 energy_sourcedrain, plasma_pdens, plasma_ndens, min_dtq);
+
+//       *plasma_file << ctime+0.5*nm.tm.ndeltat;
+//       *plasma_file << '\t' << plasma_ndens[6]/plasma_ndens[0];
+//       *plasma_file << '\t' << plasma_ndens[0];
+//       *plasma_file << '\t' << plasma_ndens[1];
+//       *plasma_file << '\t' << plasma_ndens[2];
+//       *plasma_file << '\t' << plasma_ndens[3];
+//       *plasma_file << '\t' << plasma_ndens[4];
+//       *plasma_file << '\t' << plasma_ndens[5];
+//       *plasma_file << '\t' << plasma_ndens[6];
+//       *plasma_file << '\t' << -nano_qdens;
+//       *plasma_file << std::endl;
+
+//       plasma_pdens = plasma_ndens;
+
+//       // update energy and densities
+//       BOOST_LOG_SEV(lg, info) << "Updating energy " << pm.es.emean << ", to "
+//                               << plasma.ndens[6]/plasma.ndens[0];
+//       pm.es.emean = plasma.ndens[6]/plasma.ndens[0];
+//       BOOST_LOG_SEV(lg, info) << "Updating electron density " << pm.es.ne
+//                               << ", to " << plasma.ndens[0];
+//       BOOST_LOG_SEV(lg, info) << "Updating ion density " << pm.is.ni
+//                               << ", to " << plasma.ndens[1];
+//       pm.es.ne = plasma.ndens[0];
+//       pm.is.ni = plasma.ndens[1];
+//       BOOST_LOG_SEV(lg, info) << "Quasi-neutrality "
+//           << plasma.ndens[1]+plasma.ndens[3] + nano_qdens - plasma.ndens[0];
+//       if ((pm.es.ne < 0) || (pm.is.ni < 0)) {
+//         BOOST_LOG_SEV(lg, info) << "Negative plasma densities ";
+//         std::cerr << std::endl << "Negative plasma densities " << std::endl;
+//         std::terminate();
+//       }
+//     }
+
+// // TIME SPLIT PLASMA
+
     // growth clock
     double begin_tgrowth = omp_get_wtime();
     if(nm.rs.wsih4==1) {
@@ -1934,118 +2067,86 @@ int NEvo::evolve_onestepselfconsistent(double ctime) {
       << elapsed_secs;
     if (pm.pars.pfixed==0) {
       BOOST_LOG_SEV(lg, info) << "Plasma evolution - t=\t" << ctime;
-	    double ti = ctime;
-	    double tf = ctime + nm.tm.ndeltat;
-	    size_t N = 10000;
-	    double tstep = (tf-ti) / (N-1);
-
-      boost::uintmax_t bmax_iter = EPS_MAXITER;
-	    tools::eps_tolerance<double> tol = EPS_TOL;
-
-	    const int digits = std::numeric_limits<double>::digits;
-      int get_digits = static_cast<int>(digits * 0.6);
-
-	    double t = ti;
 
       // compute nanoparticle charge density
       //compute_moments(ndens, new_mom);
       double nano_qdens = 0.0;//abs(new_mom[2]);
+      double nano_qdens_rate = 0.0;
       for (unsigned int l = 0; l < cr.gm.vols.nsections; ++l) {
         // warning only negative nanos cr.gm.chrgs.nsections
-        for (unsigned int q = 0; q < cr.gm.chrgs.maxnegative; ++q) {
+        for (unsigned int q = 0; q < cr.gm.chrgs.nsections; ++q) {
           nano_qdens += ndens[l][q] * cr.gm.chrgs.charges[q];
+          nano_qdens_rate += qrate2d[l][q];
         }
       }
-	    nano_qdens = std::abs(nano_qdens);
+	    //nano_qdens = std::abs(nano_qdens);
       
       //ion loss
       double ion_loss = 0.0;
+      double electron_loss = 0.0;
+      double energy_loss = 0.0;
       for (unsigned int l = 0; l < cr.gm.vols.nsections; ++l) {
-        for (unsigned int q = cr.gm.chrgs.maxnegative; q < cr.gm.chrgs.nsections; ++q) {
+        // for (unsigned int q = cr.gm.chrgs.maxnegative; q < cr.gm.chrgs.nsections; ++q) {
+        for (unsigned int q = 0; q < cr.gm.chrgs.nsections; ++q) {
           ion_loss += ndens[l][q]*ifreq[l][q];
+          electron_loss += ndens[l][q]*(efreq[l][q]-tfreq[l][q]);
+          energy_loss += phid[l][q]*ndens[l][q]*efreq[l][q];
         }
       }
-      plasma.ion_loss.first = ion_loss;
-      double e_min = 0.0;//1e-6;
-      double e_max = 100.0;//1000.0;
-      boost::uintmax_t max_iter = 1000000;
-      tools::eps_tolerance<double> ntol(30);
-      // double e_guess = 4;
-      // double sfactor = 2;
-      // bool is_rising = true;
-	    for (size_t i=0; i<N; ++i) {
-        plasma.mean_energy.second = 
-                    tools::newton_raphson_iterate(plasma,
-                                                  plasma.mean_energy.first,
-		                                              e_min, e_max, get_digits,
-                                                  bmax_iter);
-        // auto new_energy = tools::toms748_solve(plasma, e_min, e_max,
-        //                                        tol, max_iter);
-        // std::pair<double, double> new_energy = tools::bracket_and_solve_root(plasma,
-        //                                                 e_guess,
-        //                                                 sfactor,
-        //                                                 is_rising,
-        //                                                 ntol,
-        //                                                 max_iter);
-		    // plasma.mean_energy.second = 0.5*(new_energy.first+new_energy.second);
-        plasma.meta_evolution(tstep);
-		    plasma.meta_dens.first = plasma.meta_dens.second;
-        plasma.electron_evolution(tstep, nano_qdens);
-		    plasma.e_dens.first = plasma.e_dens.second;
-		    plasma.mean_energy.first = plasma.mean_energy.second;
 
-		    t += tstep;
-	    }
+      density_sourcedrain[0] = electron_loss;
+      density_sourcedrain[1] = ion_loss;
+      density_sourcedrain[2] = 0.0;
+      density_sourcedrain[3] = 0.0;
+      density_sourcedrain[4] = 0.0;
+      density_sourcedrain[5] = 0.0;
+      density_sourcedrain[6] = abs(energy_loss);
+      BOOST_LOG_SEV(lg, info) << "electron_loss " << electron_loss;
+      BOOST_LOG_SEV(lg, info) << "ion_loss " << ion_loss;
+      BOOST_LOG_SEV(lg, info) << "energy_loss " << energy_loss;
 
-      // std::pair<double, double> new_energy;
-      // double e_min = 0.1;//1e-6;
-      // double e_max = 50.0;//1000.0;
-      // boost::uintmax_t max_iter = 1000;
-	    // tools::eps_tolerance<double> ntol(30);
-      // double energy;
-      // plasma.meta_on = 1.0;
-      // for (size_t i=0; i<N; ++i) {
-      //   plasma.meta_dens.first = 0.0;
-      //   plasma.meta_dens.second = 0.0;
-      //   new_energy = tools::toms748_solve(plasma, e_min, e_max,
-      //                                     ntol, max_iter);
-      //   // new_energy = tools::bisect(plasma, e_min, e_max,
-      //   //                                   ntol, max_iter);
-      //   // plasma.mean_energy.second = 
-      //   //             tools::newton_raphson_iterate(plasma,
-      //   //                                           plasma.mean_energy.first,
-		  //   //                                           0.1, 50.0, get_digits,
-      //   //                                           bmax_iter);
-      //   plasma.mean_energy.second = 0.5*(new_energy.first+new_energy.second);
-      //   if (plasma.meta_on>0.0) {
-		  //     plasma.meta_evolution(tstep);
-		  //     plasma.meta_dens.first = plasma.meta_dens.second;
-      //   }
-      //   plasma.electron_evolution(tstep, nano_qdens);
-		  //   plasma.e_dens.first = plasma.e_dens.second;
-
-		  //   plasma.mean_energy.first = plasma.mean_energy.second;
-
-		  //   t += tstep;
-	    // }
+      plasma.nano_qdens = nano_qdens;
+      plasma.nano_qdens_rate = nano_qdens_rate;
+      BOOST_LOG_SEV(lg, info) << "total charge " << nano_qdens;
+      BOOST_LOG_SEV(lg, info) << "charge rate " << nano_qdens_rate;
 
       // write to plasma file
-      *plasma_file << tf;
-      *plasma_file << '\t' << plasma.mean_energy.second;
-		  *plasma_file << '\t' << plasma.e_dens.first;
-		  *plasma_file << '\t' << plasma.ion_dens.first;
-		  *plasma_file << '\t' << plasma.meta_dens.first;
-      *plasma_file << '\t' << nano_qdens;
-      *plasma_file << '\t' << ion_loss;
+      plasma.solve(ctime/*+0.5*nm.tm.ndeltat*/, ctime+nm.tm.ndeltat, nm.tm.ndeltat, density_sourcedrain,
+					 energy_sourcedrain, plasma_pdens, plasma_ndens, min_dtq);
+
+      plasma_ndens[1] = plasma_ndens[0]-nano_qdens-plasma_ndens[3];
+      *plasma_file << ctime+nm.tm.ndeltat;
+      *plasma_file << '\t' << plasma_ndens[6]/plasma_ndens[0];
+      *plasma_file << '\t' << plasma_ndens[0];
+      *plasma_file << '\t' << plasma_ndens[1];
+      *plasma_file << '\t' << plasma_ndens[2];
+      *plasma_file << '\t' << plasma_ndens[3];
+      *plasma_file << '\t' << plasma_ndens[4];
+      *plasma_file << '\t' << plasma_ndens[5];
+      *plasma_file << '\t' << plasma_ndens[6];
+      *plasma_file << '\t' << -nano_qdens;
+      //*plasma_file << '\t' << plasma.ndens[1];
       *plasma_file << std::endl;
+
+      plasma_pdens = plasma_ndens;
 
       // update energy and densities
       BOOST_LOG_SEV(lg, info) << "Updating energy " << pm.es.emean << ", to "
-                              << plasma.mean_energy.first;
-      pm.es.emean = plasma.mean_energy.first;
+                              << plasma_ndens[6]/plasma_ndens[0];
+      pm.es.emean = plasma_ndens[6]/plasma_ndens[0];
       BOOST_LOG_SEV(lg, info) << "Updating electron density " << pm.es.ne
-                              << ", to " << plasma.e_dens.first;
-      pm.es.ne = plasma.e_dens.first;
+                              << ", to " << plasma_ndens[0];
+      BOOST_LOG_SEV(lg, info) << "Updating ion density " << pm.is.ni
+                              << ", to " << plasma_ndens[1];
+      pm.es.ne = plasma_ndens[0];
+      pm.is.ni = plasma_ndens[1];
+      BOOST_LOG_SEV(lg, info) << "Quasi-neutrality "
+          << plasma_ndens[1]+plasma_ndens[3] + nano_qdens - plasma_ndens[0];
+      if ((pm.es.ne < 0) || (pm.is.ni < 0)) {
+        BOOST_LOG_SEV(lg, info) << "Negative plasma densities ";
+        std::cerr << std::endl << "Negative plasma densities " << std::endl;
+        std::terminate();
+      }
     }
   }//omp master
   return reterr;
@@ -3125,40 +3226,49 @@ int NEvo::advance_nosplit_ompadpsih4(const double ctime) {
   	//   * (wco*kcoagulation[l][q]+wsg*gsurfacegrowth[l][q]+wnu*jnucleation[l][q]);
 
 	// semi implicit
-	ndens[l][q] = (pdens[l][q]
-  	  + nm.tm.ndeltat
-		       * (wco*birth_vector[l][q]+wsg*gsurfacegrowth[l][q]+wnu*jnucleation[l][q]))
-	  /(1.0+nm.tm.ndeltat*death_vector[l][q]);
+        ndens[l][q] = (pdens[l][q]
+          + nm.tm.ndeltat
+              * (wco*birth_vector[l][q]+wsg*gsurfacegrowth[l][q]+wnu*jnucleation[l][q]))
+        /(1.0+nm.tm.ndeltat*death_vector[l][q]);
 
-  	crate2d[l][q] = wco * kcoagulation[l][q];
-        //DANGER WARNING
+        crate2d[l][q] = wco * kcoagulation[l][q];
+            //DANGER WARNING
         if (ndens[l][q]<0.0/*EPSILONETA*/){//EPSILON) {
-  	  if (ndens[l][q]<-1.0e-1) {
-	    BOOST_LOG_SEV(lg, info) << "\n[ee] Negative nanoparticle ndensity (coagulation) : "
-				    << ndens[l][q] << " , " << pdens[l][q];
+          if (ndens[l][q]<-1.0e-1) {
+          BOOST_LOG_SEV(lg, info) << "\n[ee] Negative nanoparticle ndensity (coagulation) : "
+                << ndens[l][q] << " , " << pdens[l][q];
 
-	    BOOST_LOG_SEV(lg, info) << "\n[ee] Diameter " << cr.gm.vols.diameters[l]*2e9;
-	    BOOST_LOG_SEV(lg, info) << "\n[ee] Charge " << cr.gm.chrgs.charges[q];
-   	    BOOST_LOG_SEV(lg, info) << ndens[l][q];
-  	    BOOST_LOG_SEV(lg, info) << pdens[l][q];
-    	    BOOST_LOG_SEV(lg, info) << wco*kcoagulation[l][q];
-  	    BOOST_LOG_SEV(lg, info) << wsg*gsurfacegrowth[l][q];
-  	    BOOST_LOG_SEV(lg, info) << wnu*jnucleation[l][q];
-  	    BOOST_LOG_SEV(lg, info) << wco*kcoagulation[l][q]+wsg*gsurfacegrowth[l][q]+wnu*jnucleation[l][q];
-  	    if (nm.tm.ndeltat < nm.tm.qdeltat) {
-  	      std::terminate();
-  	    }
-	    return -1;
-  	  }
-  	  ndens[l][q] = 0.0;
-  	  if (pdens[l][q] > 0.0) {
-  	    ndens[l][q] = pdens[l][q];
-  	  }
+          BOOST_LOG_SEV(lg, info) << "\n[ee] Diameter " << cr.gm.vols.diameters[l]*2e9;
+          BOOST_LOG_SEV(lg, info) << "\n[ee] Charge " << cr.gm.chrgs.charges[q];
+            BOOST_LOG_SEV(lg, info) << ndens[l][q];
+            BOOST_LOG_SEV(lg, info) << pdens[l][q];
+              BOOST_LOG_SEV(lg, info) << wco*kcoagulation[l][q];
+            BOOST_LOG_SEV(lg, info) << wsg*gsurfacegrowth[l][q];
+            BOOST_LOG_SEV(lg, info) << wnu*jnucleation[l][q];
+            BOOST_LOG_SEV(lg, info) << wco*kcoagulation[l][q]+wsg*gsurfacegrowth[l][q]+wnu*jnucleation[l][q];
+            if (nm.tm.ndeltat < nm.tm.qdeltat) {
+              std::terminate();
+            }
+          return -1;
+          }
+          ndens[l][q] = 0.0;
+          if (pdens[l][q] > 0.0) {
+            ndens[l][q] = pdens[l][q];
+          }
         }
         kcoagulation[l][q] = 0.0;
       }// for q 
     }// for l
     
+    // WARNING
+    // erase spurious densities
+    for (unsigned int l = 0; l < cr.gm.vols.nsections; ++l) {
+      for (unsigned int q = 0; q < cr.gm.chrgs.nsections; ++q) {
+        if (ndens[l][q] < 0.1) {
+          ndens[l][q] = 0.0;
+        }
+      }
+    }
   // INIT:
   //   for (unsigned int l = 0; l < cr.gm.vols.nsections; ++l) {
   //     //#pragma omp parallel for
@@ -3875,125 +3985,6 @@ int NEvo::compute_coagulation_omp() {
 //       }
 //     }
   }
-  return 0;
-}
-
-int NEvo::init_plasma() {
-  std::map<std::string, std::array<double, 3> > rates;
-
-  rates["ionization"]            = {4.25e13, 371860.0, 0.60};
-  rates["excitation"]            = {7.04e15, 286662.0, 0.00};
-  rates["stepwise_ionization"]   = {7.52e16, 124191.0, 0.00};
-  rates["superelastic_colision"] = {2.60e14,      0.0, 0.74};
-  rates["metastable_pooling"]    = {3.70e14,      0.0, 0.00};	
-
-  // convert to MKSA
-  for (auto &m : rates) {
-    std::tie(m.second[0], m.second[1]) = arrhenius_values(m.second[0], m.second[1]);
-  }
-
-  // in m3/s
-  rates["quenching_toresonant"] = {2.0e-13, 0.0, 0.0};
-  rates["twobody_quenching"]    = {3.0e-21, 0.0, 0.0};
-  rates["threebody_quenching"]  = {1.1e-43, 0.0, 0.0};
-
-  std::stringstream ss;
-
-  ss << std::setw(24) << "Rate";
-  ss << std::setw(24) << "Constants";
-  BOOST_LOG_SEV(lg, info) << ss.str();
-  BOOST_LOG_SEV(lg, info) << "---------------------------------"
-                             "---------------------------------";  
-  for (auto m : rates) {
-    ss.str("");
-    ss << std::setw(24);
-    ss << m.first;
-    //ss << std::endl << m.first;
-    for (auto v: m.second) {
-      ss << std::setw(12);
-      ss << v;
-    }
-    BOOST_LOG_SEV(lg, info) << ss.str();
-  }
-
-	ratemap rates_map;
-
-	for (auto m : rates) {
-		std::shared_ptr<Rate> r(new Rate(m.first, m.second[1], m.second[0], m.second[2]));
-		rates_map[m.first] = r;
-	}
-	
-	double epsi = 0.1;
-	double epsf = 25.0;
-	size_t N = 100;
-	double step = (epsf-epsi) / (N-1);
-
-	std::fstream *rate_file = 
-                  new std::fstream(dirname + nano_filename + "-rates.dat",
-                                   std::fstream::out);
-
-	double eps = epsi;
-	for (size_t i=0; i<N; ++i) {
-		*rate_file << eps;
-		for (auto mr : rates_map) {
-			Rate &r = *mr.second;
-			*rate_file << '\t' << r(eps);
-		}
-		*rate_file << std::endl;
-		eps += step;
-	}
-	
-	rate_file-> close();
-	delete(rate_file);
-
-	plasma = Plasma(rates_map);
-
-  return 0;
-}
-
-int NEvo::test_plasma() {
-	// double ti = 0.0;
-	// double tf = 5e-4;
-	// size_t N = 500;
-	// double tstep = (tf-ti) / (N-1);
-
-  // boost::uintmax_t bmax_iter = EPS_MAXITER;
-	// tools::eps_tolerance<double> tol = EPS_TOL;
-
-	// const int digits = std::numeric_limits<double>::digits;
-  // int get_digits = static_cast<int>(digits * 0.6);
-
-	// std::fstream* plasma_file = 
-  //                 new std::fstream(dirname + nano_filename + "-plasmatest.dat",
-  //                                  std::fstream::out);
-
-	// double t = ti;
-
-	// plasma.mean_energy.first = 8.0;
-	// for (size_t i=0; i<N; ++i) {
-	// 	*plasma_file << t;
-
-	// 	plasma.mean_energy.second = 
-  //                   tools::newton_raphson_iterate(plasma,
-  //                                                 plasma.mean_energy.first,
-	// 	                                              0.1, 50.0, get_digits,
-  //                                                 bmax_iter);
-	// 	*plasma_file << '\t' << plasma.mean_energy.second;
-	// 	*plasma_file << '\t' << plasma.e_dens.first;
-	// 	*plasma_file << '\t' << plasma.ion_dens.first;
-	// 	*plasma_file << '\t' << plasma.meta_dens.first;
-	// 	*plasma_file << std::endl;
-
-	// 	plasma.meta_evolution(tstep);
-	// 	plasma.meta_dens.first = plasma.meta_dens.second;
-	// 	plasma.mean_energy.first = plasma.mean_energy.second;
-
-	// 	t += tstep;
-	// }
-
-	// plasma_file->close();
-	// delete(plasma_file);
-
   return 0;
 }
 
