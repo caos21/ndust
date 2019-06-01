@@ -139,6 +139,27 @@ int NanoModel::read_rates() {
   BOOST_LOG_SEV(lg, info) << "--> Surface growth: "
                           << (rs.wsg==1 ? "yes" : "no");
 
+  err = read_attrib_hdf5<int>(h5obj, "/Rates", "wsih4",
+                              rs.wsih4);
+
+  BOOST_LOG_SEV(lg, info) << "--> SiH4 coupling: "
+                          << (rs.wsih4==1 ? "yes" : "no");
+
+  err = read_attrib_hdf5<double>(h5obj, "/Rates", "sih4ratio",
+                                 rs.sih4ratio);
+
+  BOOST_LOG_SEV(lg, info) << "--> SiH4 to gas ratio: " << rs.sih4ratio;
+  
+  err = read_attrib_hdf5<int>(h5obj, "/Rates", "sih4nmol",
+                              rs.sih4nmol);
+
+  BOOST_LOG_SEV(lg, info) << "--> SiH4 molecules per nucleated nanoparticle: "
+                          << rs.sih4nmol;
+
+  err = read_attrib_hdf5<double>(h5obj, "/Rates", "sih4mass",
+				 rs.sih4mass);
+
+  BOOST_LOG_SEV(lg, info) << "--> SiH4 mass: " << rs.sih4mass;
   return 0;
 }
 
@@ -177,6 +198,23 @@ int NanoModel::read_density() {
 
     BOOST_LOG_SEV(lg, info) << "--> Distribution width: " << ds.width;
   }
+
+  unsigned int wchargewidth = 0;
+  err = read_attrib_hdf5<unsigned int>(h5obj, sgroup, "chargewidth", wchargewidth);
+  if (wchargewidth>0) {
+    ds.chargewidth = true;
+    BOOST_LOG_SEV(lg, info) << "--> Distribution charge width: " << ds.chargewidth;
+    err = read_attrib_hdf5<int>(h5obj, sgroup, "chargenegwidth", ds.chargenegwidth);
+    BOOST_LOG_SEV(lg, info) << "    + Maximum negative charge width: " << ds.chargenegwidth;
+    err = read_attrib_hdf5<int>(h5obj, sgroup, "chargeposwidth", ds.chargeposwidth);
+    BOOST_LOG_SEV(lg, info) << "    + Maximum positive charge width: " << ds.chargeposwidth;
+  }
+  else {
+    ds.chargewidth = false;
+    ds.chargenegwidth = 0;
+    ds.chargeposwidth = 0;
+    BOOST_LOG_SEV(lg, info) << "--> Distribution charge width: " << ds.chargewidth;
+  }  
 
   return 0;
 }

@@ -83,6 +83,18 @@ int GridModel::read_gridsystem() {
   int err = 0;
   BOOST_LOG_SEV(lg, info) << "Grid system: ";
 
+  unsigned int qpivot = 0;
+  err = read_attrib_hdf5<unsigned int>(h5obj, "/Grid_system", "Charge_pivot",
+                         qpivot);
+  if (qpivot == 0) {
+    gsys.charge_pivot = false;
+  }
+  else {
+    gsys.charge_pivot = true;
+  }
+  
+  BOOST_LOG_SEV(lg, info) << "--> Charge pivot: " << gsys.charge_pivot;
+  
   err = read_attrib_hdf5<double>(h5obj, "/Grid_system", "Temperature",
                          gsys.temperature);
   BOOST_LOG_SEV(lg, info) << "--> Temperature: " << gsys.temperature;

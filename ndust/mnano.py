@@ -56,7 +56,7 @@ class Rates(mh5u.H5Writable):
   """ Represents the rates nucleation, surface growth, coagulation
       and charging.
   """
-  def __init__(self, h5obj, wnu, nucleation_rate, wsg, sgrowth_rate, wco, wch):
+  def __init__(self, h5obj, wnu, nucleation_rate, wsg, sgrowth_rate, wco, wch, wsih4, sih4ratio, sih4nmol):
     """ Initial values
     """
     # hdf5 file object
@@ -86,13 +86,26 @@ class Rates(mh5u.H5Writable):
     #
     # With charging
     self.wch = mh5u.Attrib("wch", int(wch))
+    # With SiH4
+    self.wsih4 = mh5u.Attrib("wsih4", int(wsih4))
+    # SiH4 : gas ratio
+    self.sih4ratio = mh5u.Attrib("sih4ratio", sih4ratio)
+    # Number of SiH4 per nucleated particle
+    self.sih4nmol = mh5u.Attrib("sih4nmol", sih4nmol)
+    # mass of SiH4
+    sih4mass = 1.67e-27*(28.+4.)
+    self.sih4mass = mh5u.Attrib("sih4mass", sih4mass)
     #
     self.writable_list = [self.wnu,
                           self.nucleation_rate,
                           self.wsg,
                           self.sgrowth_rate,
                           self.wco,
-                          self.wch]
+                          self.wch,
+                          self.wsih4,
+                          self.sih4ratio,
+                          self.sih4nmol,
+                          self.sih4mass]
 #
 # ------ Time class ------
 class Time(mh5u.H5Writable):
@@ -122,7 +135,8 @@ class Time(mh5u.H5Writable):
 class Density(mh5u.H5Writable):
   """ Represents the nanoparticle density parameters
   """
-  def __init__(self, h5obj, indens, qtol, distribution, peakpos, width):
+  def __init__(self, h5obj, indens, qtol, distribution, peakpos, width,
+               withchargewidth, chargewidth):
     """ Initial values
     """
     # hdf5 file object
@@ -143,12 +157,20 @@ class Density(mh5u.H5Writable):
     #
     # Set width (in terms of section number)
     self.width = mh5u.Attrib("width", width)
+    #
+    # Set chargewidth
+    self.chargewidth = mh5u.Attrib("chargewidth", int(withchargewidth))
+    self.chargenegwidth = mh5u.Attrib("chargenegwidth", chargewidth["negative"])
+    self.chargeposwidth = mh5u.Attrib("chargeposwidth", chargewidth["positive"])
 
     self.writable_list = [self.indens,
                           self.qtol,
                           self.distribution,
                           self.peakpos,
-                          self.width]
+                          self.width,
+                          self.chargewidth,
+                          self.chargenegwidth,
+                          self.chargeposwidth]
 #
 # ------ Description class ------
 class Description(mh5u.H5Writable):

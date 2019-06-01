@@ -77,6 +77,12 @@ class Window(QMainWindow, Ui_MainWindow):
     self.checkbox_wch = self.ui.checkBox_wch
     self.checkbox_wch.toggled.connect(self.toggle_charging)
 
+    self.checkbox_sih4coupled = self.ui.checkBox_sih4coupled
+    self.checkbox_sih4coupled.toggled.connect(self.toggle_sih4coupled)
+
+    self.checkbox_chargewidth = self.ui.checkBox_chargewidth
+    self.checkbox_chargewidth.toggled.connect(self.toggle_chargewidth)
+    
     # plasma tab
     plasma_save_btn = self.ui.buttonBox_plasma_save.button(QtWidgets.QDialogButtonBox.Save)
     plasma_save_btn.clicked.connect(self.plasma_save)
@@ -89,7 +95,7 @@ class Window(QMainWindow, Ui_MainWindow):
     self.show()
 
     self.prefix = ""
-    self.dirname = "../data/"
+    self.dirname = "/mnt/data/ben/ndust/data/"
 
     self.server = [" guillimin:~/duster/results/", " cottos:~/duster/results/"]
 
@@ -228,6 +234,11 @@ class Window(QMainWindow, Ui_MainWindow):
     #profile_rerr = le2float(self.ui.lineEdit_ptol)
     #h5f.attrs["profile_rerr"] = profile_rerr
 
+    # Use pivot method in charges (1D/2D)
+    qpivot = False
+    if self.ui.checkBox_qpivot.isChecked():
+      qpivot = True
+
     # Nanoparticle temperature
     temperature = le2float(self.ui.lineEdit_temp)
 
@@ -235,7 +246,7 @@ class Window(QMainWindow, Ui_MainWindow):
     nmdensity = le2float(self.ui.lineEdit_nmdens)
 
     # instantiate the group GridSystem
-    self.gsys = mg.GridSystem(h5f, temperature, nmdensity)
+    self.gsys = mg.GridSystem(h5f, qpivot, temperature, nmdensity)
 
     # write group
     self.gsys.toHDF5()
@@ -337,6 +348,8 @@ class Window(QMainWindow, Ui_MainWindow):
       method = 2# Coulomb
     elif self.ui.radioButton_Hybrid.isChecked():
       method = 3# Hybrid
+    elif self.ui.radioButton_free.isChecked():
+      method = 4# Free, no interaction
     #
     self.einteraction = mg.EInteraction(h5f, multiplier, dconstant, method,
                                         terms)
@@ -404,7 +417,32 @@ class Window(QMainWindow, Ui_MainWindow):
     else:
       self.ui.label_wch.setEnabled(0)
 #
-
+  def toggle_sih4coupled(self):
+    """ Toggle sih4 coupled
+    """
+    if self.checkbox_sih4coupled.isChecked():
+      self.ui.label_sih4ratio.setEnabled(1)
+      self.ui.lineEdit_sih4ratio.setEnabled(1)
+      #
+      self.ui.label_sih4nmol.setEnabled(1)
+      self.ui.spinBox_sih4nmol.setEnabled(1)
+    else:
+      self.ui.label_sih4ratio.setEnabled(0)
+      self.ui.lineEdit_sih4ratio.setEnabled(0)
+      #
+      self.ui.label_sih4nmol.setEnabled(0)
+      self.ui.spinBox_sih4nmol.setEnabled(0)
+#
+  def toggle_chargewidth(self):
+    """ Toggle charge width
+    """
+    if self.checkbox_chargewidth.isChecked():
+      self.ui.spinBox_chargeposwidth.setEnabled(1)
+      self.ui.spinBox_chargenegwidth.setEnabled(1)
+    else:
+      self.ui.spinBox_chargeposwidth.setEnabled(0)
+      self.ui.spinBox_chargenegwidth.setEnabled(0)      
+#
   def plasma_save(self):
     """ Save plasma file
     """      
@@ -531,14 +569,20 @@ class Window(QMainWindow, Ui_MainWindow):
     # with charging
     wch = self.ui.checkBox_wch.isChecked()
 
+    #coupled SiH4
+    wsih4 = self.ui.checkBox_sih4coupled.isChecked()
+    # SiH4 to gas ratio (1/ gas to SiH4 ratio)
+    sih4ratio = 1.0/le2float(self.ui.lineEdit_sih4ratio)
+    #
+    sih4nmol = self.ui.spinBox_sih4nmol.value()
+    #
     # instantiate the group Nanoparticles
     self.rates = mn.Rates(h5f, wnu, nucleation_rate,
                           wsg, sgrowth_rate,
-                          wco, wch)
-
+                          wco, wch, wsih4, sih4ratio, sih4nmol)
     # write group
     self.rates.toHDF5()
-
+    
   # Time
     # nanoparticle growth delta time
     ndeltat = le2float(self.ui.lineEdit_ndeltat)
@@ -573,8 +617,19 @@ class Window(QMainWindow, Ui_MainWindow):
     peakpos = self.update_peakradius()
     width = self.ui.spinBox_width.value()
 
+    withchargewidth = False
+    chargewidth = {"negative": 0, "positive": 0}
+    if self.checkbox_chargewidth.isChecked():
+      chargenegwidth = self.ui.spinBox_chargenegwidth.value()
+      chargeposwidth = self.ui.spinBox_chargeposwidth.value()
+      if chargenegwidth != 0 or chargeposwidth !=0:
+        withchargewidth = True
+        chargewidth["negative"] = chargenegwidth
+        chargewidth["positive"] = chargeposwidth
+      
     # instantiate the group Time
-    self.density = mn.Density(h5f, indens, qtol, distribution, peakpos, width)
+    self.density = mn.Density(h5f, indens, qtol, distribution, peakpos, width,
+                              withchargewidth, chargewidth)
 
     # write group
     self.density.toHDF5()

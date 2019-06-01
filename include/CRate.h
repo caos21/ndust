@@ -31,12 +31,14 @@
 // hdf5 c++ bindings
 #include <H5Cpp.h>
 
+#include "utils.h"
 #include "log.h"
 #include "h5plasma.h"
 #include "GridModel.h"
 #include "eint.h"
 #include "enhancement.h"
 #include "eta.h"
+
 
 /**
   * class CRate
@@ -290,6 +292,12 @@ private:
   */
   void compute_etafactor();
 
+  //! Compute etafactor volume and charge pivoting
+  /*! 
+    Compute etafactor two components volume and charge
+  */
+  void compute_etafactor2C();
+  
   //! Write etafactor
   /*! 
     Write etafactor
@@ -307,6 +315,13 @@ private:
     Compute deathfactor
   */
   void compute_deathfactor();
+
+
+  //! Compute deathfactor volume and charge pivoting
+  /*! 
+    Compute deathfactor two components volume and charge
+  */
+  void compute_deathfactor2C();
   
   //! Write deathfactor
   /*! 

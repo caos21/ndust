@@ -127,8 +127,13 @@ int main(int argc, char **argv) {
   NEvo nevo(dirname, grid_filename, plasma_filename, nano_filename, lg);
   nevo.open();
   nevo.read();
-  //nevo.evolve();
-  nevo.evolve_omp();
+  ///////nevo.evolve();
+  // nevo.evolve_omp();
+  ///nevo.init_plasma();// working plasma test
+  ///nevo.test_plasma();// working plasma test
+  //nevo.evolve_plasma();
+  //////nevo.evolve_radapt();
+  nevo.evolve_selfconsistent();
   nevo.write();
   nevo.close();
 

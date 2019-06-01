@@ -32,9 +32,9 @@
 #define EPSILONZETA 1.0e-250
 #define EPSILON 1.0e-150
 // #define EPSILONETA 1.0e-50
-#define EPSILONETA 1.0e-18
+#define EPSILONETA 1.0e-80//1.0e-18
 // #define EPSILONDEATH 1.0e-50
-#define EPSILONDEATH 1.0e-18//1.0e-30
+#define EPSILONDEATH 1.0e-60//1.0e-18//1.0e-30
 //
 #define ZETA1_12 0.0833333333333
 #define ZETA1_720 0.00138888888889
@@ -233,7 +233,7 @@ const double Kcoul = 1.0/(4.0*pi*EpsilonZero);
 const double eCharge = 1.6021766208e-19;//GSL_CONST_MKSA_ELECTRON_CHARGE;
 const double Kboltz_eV = Kboltz / eCharge; // eV / K
 const double eMass = GSL_CONST_MKSA_MASS_ELECTRON;
-// const double NAvogadro = GSL_CONST_NUM_AVOGADRO; // 1/mol
+const double NAvogadro = GSL_CONST_NUM_AVOGADRO; // 1/mol
 // const double ArMMass = 39.948; // Argon Molecular Mass (NIST) in g/mol
 // const double ArMass = (ArMMass/NAvogadro)/1000.0; // Argon Mass in Kg
 // const double Acc = 0.9; // Accommodation factor alpha_m
