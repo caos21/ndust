@@ -1306,7 +1306,7 @@ namespace enhancement {
       // }
 
       auto start = std::chrono::system_clock::now();
-	    
+      
       BOOST_LOG_SEV(lg, info) << "Size for array efactor : " << efactor.size();
             
       BOOST_LOG_SEV(lg, info) << "Enhancement: expanding pair potentials";
@@ -1314,54 +1314,54 @@ namespace enhancement {
       // iterate in reduced_pairs
       #pragma omp parallel for
       for (unsigned int irp=0; irp<reduced_pairs.size(); ++irp) {
-	
-	// this is the index of reduced pairs, i.e., non repeated pair
-	unsigned int index = reduced_pairs[irp].id_;
+  
+        // this is the index of reduced pairs, i.e., non repeated pair
+        unsigned int index = reduced_pairs[irp].id_;
 
-	// contact potential for this reduced pairhas the same ordering
-	// of reduced pairs
-	double contact_potential = contact_potentials[irp].potential_;
-	
-	// get repeated combinations (of particle_pairs)
-	std::vector<long> reps = reduced_pairs[irp].repetitions_;
+        // contact potential for this reduced pairhas the same ordering
+        // of reduced pairs
+        double contact_potential = contact_potentials[irp].potential_;
+        
+        // get repeated combinations (of particle_pairs)
+        std::vector<long> reps = reduced_pairs[irp].repetitions_;
 
-	// find if index is in barrier_potentials, i.e., if a potential
-	// barrier exists
-	ContactPotentialIterator barrier_it = std::find_if(barrier_potentials.begin(),
-							   barrier_potentials.end(),
-							   find_id(irp));
-	
+        // find if index is in barrier_potentials, i.e., if a potential
+        // barrier exists
+        ContactPotentialIterator barrier_it = std::find_if(barrier_potentials.begin(),
+                      barrier_potentials.end(),
+                      find_id(irp));
+    
         // iterate in vector of repeated combinations
-	for(unsigned int jrep=0; jrep<reps.size(); ++jrep) {
-	  long rep_index = reps[jrep];
-	  short l = particle_pairs[rep_index].l_;
-	  short q = particle_pairs[rep_index].q_;
-	  short m = particle_pairs[rep_index].m_;
-	  short p = particle_pairs[rep_index].p_;
+        for(unsigned int jrep=0; jrep<reps.size(); ++jrep) {
+          long rep_index = reps[jrep];
+          short l = particle_pairs[rep_index].l_;
+          short q = particle_pairs[rep_index].q_;
+          short m = particle_pairs[rep_index].m_;
+          short p = particle_pairs[rep_index].p_;
 
-	  double tr1 = rarray[l];//(!notswapd ? rarray[l] : rarray[m]);
-	  //std::cerr << "\nn q is " << q;
-	  double tq1 = qarray[q];//(!notswapd ? qarray[q] : qarray[p]);
-	  double potprefactor = tq1*tq1/tr1;
-	  double phimin = potprefactor*contact_potential;
-	  //std::cerr << "\n\n";
+          double tr1 = rarray[l];//(!notswapd ? rarray[l] : rarray[m]);
+          //std::cerr << "\nn q is " << q;
+          double tq1 = qarray[q];//(!notswapd ? qarray[q] : qarray[p]);
+          double potprefactor = tq1*tq1/tr1;
+          double phimin = potprefactor*contact_potential;
+          //std::cerr << "\n\n";
 
-	  cpotentials[m][p][l][q] = phimin;
-	  cpotentials[l][q][m][p] = phimin;
-	  // we have potential barrier
-	  // ** if barrier compute eta       
-	  if(barrier_it != barrier_potentials.end()) {
-	    double phimax = potprefactor*(*barrier_it).potential_;
-	    // update potentials
-	    bpotentials[m][p][l][q] = phimax;
-	    bpotentials[l][q][m][p] = phimax;
-	    unsigned int idr = barrier_it - barrier_potentials.begin();
-	    rbarriers[l][q][m][p] = rbarrier_array[idr]*tr1;
-	    rbarriers[m][p][l][q] = rbarrier_array[idr]*tr1;
-	  }
-	  
-	  //std::cout << std::endl << l << '\t' << q << '\t' << m << '\t' << p << '\t' << efactor[l][q][m][p];
-	}
+          cpotentials[m][p][l][q] = phimin;
+          cpotentials[l][q][m][p] = phimin;
+          // we have potential barrier
+          // ** if barrier compute eta       
+          if(barrier_it != barrier_potentials.end()) {
+            double phimax = potprefactor*(*barrier_it).potential_;
+            // update potentials
+            bpotentials[m][p][l][q] = phimax;
+            bpotentials[l][q][m][p] = phimax;
+            unsigned int idr = barrier_it - barrier_potentials.begin();            
+            rbarriers[m][p][l][q] = rbarrier_array[idr]*tr1;
+            rbarriers[l][q][m][p] = rbarrier_array[idr]*tr1;
+          }
+          
+          //std::cout << std::endl << l << '\t' << q << '\t' << m << '\t' << p << '\t' << efactor[l][q][m][p];
+        }
       }
 
       auto end = std::chrono::system_clock::now();
@@ -1374,52 +1374,53 @@ namespace enhancement {
       
       #pragma omp parallel for 
       for (unsigned int l=0; l<rarray_size; ++l) {
-	// iterate in charges particle 1
-	for (unsigned int q=0; q<qarray_size; ++q) {
-	  // iterate in radii particle 2
-	  for (unsigned int m=0; m<rarray_size; ++m) {
-	    // iterate in charges particle 2	
-	    for (unsigned int p=0; p<qarray_size; ++p) {
-	      double phimin = cpotentials[l][q][m][p];
-    	      double phimax = bpotentials[l][q][m][p];
+        // iterate in charges particle 1
+        for (unsigned int q=0; q<qarray_size; ++q) {
+          // iterate in radii particle 2
+          for (unsigned int m=0; m<rarray_size; ++m) {
+            // iterate in charges particle 2	
+            for (unsigned int p=0; p<qarray_size; ++p) {
+              double phimin = cpotentials[l][q][m][p];
+              double phimax = bpotentials[l][q][m][p];
 
-	      // checks if a barrier exists over potential_threshold
-	      // FIXME change to 0
-	      if (fabs(phimax) > potential_threshold) {
-		//double phimax = bpotentials[l][q][m][p];
-		double eta = eta_barrier(phimin, phimax);
+              // checks if a barrier exists over potential_threshold
+              // FIXME change to 0
+              //if (fabs(phimax) > potential_threshold) {
+              if (fabs(phimax) != 0.0) {
+                //double phimax = bpotentials[l][q][m][p];
+                double eta = eta_barrier(phimin, phimax);
 
-		// In the hybrid approach eta can be negative
-		// in the case of phimin > phimax
-		if (eta<0.0){
-		  BOOST_LOG_SEV(lg, warning) << "Negative enhancement factor";
-		  BOOST_LOG_SEV(lg, warning) << "phimin : " << phimin;
-		  BOOST_LOG_SEV(lg, warning) << "phimax : " << phimax;
-		  if(phimin > 0.0) {
-		    eta = eta_repulsive(phimin);
-		  }
-		  else {
-		    eta = eta_attractive(phimin);
-		  }		  
-		}
-		//#pragma omp atomic write
-		efactor[l][q][m][p] = eta;		
-	      }
-	      else {
-		if(phimin > 0.0) {
-		  double eta = eta_repulsive(phimin);
-		  //#pragma omp atomic write
-		  efactor[l][q][m][p] = eta;
-		}
-		else {
-		  double eta = eta_attractive(phimin);
-		  //#pragma omp atomic write
-		  efactor[l][q][m][p] = eta;		  
-		}
-	      }
-	    }
-	  }
-	}
+                // In the hybrid approach eta can be negative
+                // in the case of phimin > phimax
+                if (eta<0.0) {
+                  BOOST_LOG_SEV(lg, warning) << "Negative enhancement factor";
+                  BOOST_LOG_SEV(lg, warning) << "phimin : " << phimin;
+                  BOOST_LOG_SEV(lg, warning) << "phimax : " << phimax;
+                  if(phimin > 0.0) {
+                    eta = eta_repulsive(phimin);
+                  }
+                  else {
+                    eta = eta_attractive(phimin);
+                  }		  
+                }
+                //#pragma omp atomic write
+                efactor[l][q][m][p] = eta;		
+              }
+              else {
+                if(phimin > 0.0) {
+                  double eta = eta_repulsive(phimin);
+                  //#pragma omp atomic write
+                  efactor[l][q][m][p] = eta;
+                }
+                else {
+                  double eta = eta_attractive(phimin);
+                  //#pragma omp atomic write
+                  efactor[l][q][m][p] = eta;		  
+                }
+              }
+            }
+          }
+        }
       }
 
       end = std::chrono::system_clock::now();
@@ -1431,12 +1432,12 @@ namespace enhancement {
       start = std::chrono::system_clock::now();
       
       for (unsigned int i = 0; i<neutral_pairs.size(); ++i) {
-      	short l = neutral_pairs[i].l_;
-      	short q = neutral_pairs[i].q_;
-      	short m = neutral_pairs[i].m_;
-      	short p = neutral_pairs[i].p_;
-      	efactor[l][q][m][p] = 1.0;
-      	efactor[m][p][l][q] = 1.0;
+        short l = neutral_pairs[i].l_;
+        short q = neutral_pairs[i].q_;
+        short m = neutral_pairs[i].m_;
+        short p = neutral_pairs[i].p_;
+        efactor[l][q][m][p] = 1.0;
+        efactor[m][p][l][q] = 1.0;
       }
 
       end = std::chrono::system_clock::now();
@@ -1575,7 +1576,8 @@ namespace enhancement {
 
 	// checks if a barrier exists over potential_threshold
 	// FIXME change to 0
-	if (fabs(phimax) > potential_threshold) {
+	//if (fabs(phimax) > potential_threshold) {
+  if (fabs(phimax) != 0.0) {
 	  //double phimax = bpotentials[l][q][m][p];
 	  double eta = eta_barrier(phimin, phimax);
 

@@ -188,7 +188,8 @@ class plot():
     if xc is None:
       self.xc = xmlcfg()
 
-    self.defpath = r'/home/ben/git/ndust/data/'
+    #self.defpath = r'/home/ben/git/ndust/data/'
+    self.defpath = r'/mnt/data/ben/ndust/data/'
     
     self.h5nanoprefix = h5nanoprefix
     #os.chdir(self.defpath)
@@ -238,6 +239,14 @@ class plot():
     self.log10res = np.zeros_like(self.result)
     self.log10res[self.res_gt_0] = np.log10(self.result[self.res_gt_0])
 
+    # rates groups
+    self.charging_group = self.nanofile.get("Charging")
+    self.coagulation_group = self.nanofile.get("Coagulation")
+    self.birth_group = self.nanofile.get("Birth")
+    self.death_group = self.nanofile.get("Death")
+    self.surfacegrowth_group = self.nanofile.get("Surface_growth")
+    self.nucleation_group = self.nanofile.get("Nucleation")
+
     #self.gtotals = self.nanofile.get("totals")
     #self.total_charge = self.gtotals.attrs["total_charge"]
 
@@ -273,8 +282,8 @@ class plot():
     #self.system = self.plasmafile.get("system")
     #self.xpos = np.array(self.system.get("pos"))
 
-    self.nanofile.close()
-    self.gridfile.close()
+    # self.nanofile.close()
+    # self.gridfile.close()
 
     self.levelsf = None
 
@@ -283,6 +292,10 @@ class plot():
     self.ddens = np.sum(self.result, axis=0)
     self.cdens = np.sum(self.result, axis=1)
 
+  def close(self):
+    self.nanofile.close()
+    self.gridfile.close()
+    
   def print_moments(self):
     print("")
     print("Moments results - sum")
@@ -632,12 +645,13 @@ YMeshChrgs = []
 class read_results():
   def __init__(self, nanoh5prefix = None, gridh5prefix = None,
                plasmah5prefix = None, xc = None,
-               defpath = r'/home/ben/git/ndust/data/'):
+               defpath =  r'/mnt/data/ben/ndust/data/'):
     self.nanoh5prefix = None
     self.gridh5prefix = None
     self.plasmah5prefix = None
 
-    self.defpath = r'/home/ben/git/ndust/data/'
+    #self.defpath = r'/home/ben/git/ndust/data/'
+    self.defpath = defpath#r'/mnt/data/ben/ndust/data/'
 
     if (nanoh5prefix and gridh5prefix and plasmah5prefix) is None:
       print("Error invalid prefix: nanoh5prefix: {}, gridh5prefix: {}, plasmah5prefix: {}".format(nanoh5prefix, gridh5prefix, plasmah5prefix))

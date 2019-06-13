@@ -150,6 +150,12 @@ public:
   /*! 
    * Nanoparticle growth evolution
   */
+  int solve();
+
+  //! Start calculations
+  /*! 
+   * Nanoparticle growth evolution
+  */
   int evolve();
 
   //! Start calculations
@@ -312,6 +318,24 @@ public:
 private:
 // Private methods
 //
+
+  //! Solve One step evolution
+  /*! 
+   * Nanoparticle growth one step
+  */
+  int solve_onestep(double ctime);
+
+  //! Solve charging
+  /*! 
+   * Nanoparticle charging
+  */
+  int solve_charging(const double ttime, const double ldtn);
+
+  //! Solve plasma
+  /*! 
+   * Plasma solution
+  */
+  int solve_plasma(const double ttime, const double ldtn);
 
   //! One step evolution
   /*! 
