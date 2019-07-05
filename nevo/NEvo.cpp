@@ -178,7 +178,9 @@ int NEvo::solve() {
     }
 
     // Solve plasma without nanos to prevent numerical instabilities
-    plasma.solve(0.0, 1e-6, 1e-7, density_sourcedrain,
+    // plasma.solve(0.0, 1e-6, 1e-7, density_sourcedrain,
+    //       energy_sourcedrain, plasma_pdens, plasma_ndens, min_dtq);
+    plasma.solve(0.0, 1e-3, 1e-7, density_sourcedrain,
           energy_sourcedrain, plasma_pdens, plasma_ndens, min_dtq);
 
     plasma_pdens = plasma_ndens;
@@ -222,7 +224,7 @@ int NEvo::solve() {
       int num_threads = omp_get_num_threads();
       // execute loop in master thread
       
-      // we want to write 'nwrites' time results in file
+      // we want to write 'nwrites' times the results in file
       int nwrites = 100;
       int writecount = 1;
       bool first_write = true;
@@ -1365,11 +1367,6 @@ int NEvo::compute_collisionfreq() {
   darray radii2 //= cr.gm.chrgs.charges*cr.gm.chrgs.charges;
                 = cr.gm.vols.radii * cr.gm.vols.radii;
 
-  // for (auto r: radii2) {
-  //   std::cerr << std::endl << r;
-  // }
-  // std::terminate();
-
   double max_efreq = efreq[0][0];
   double max_ifreq = ifreq[0][0];
   double min_efreq = efreq[0][0];
@@ -1811,6 +1808,9 @@ int NEvo::solve_onestep(double ctime) {
 	      nm.tm.ndeltat *= 0.9;
 	      BOOST_LOG_SEV(lg, info) << "t, New dt = " << ctime << '\t' << nm.tm.ndeltat;
         if (10.0*nm.tm.ndeltat < nm.tm.qdeltat) {
+          BOOST_LOG_SEV(lg, info) << "10*dtn < dtq " << ctime 
+                                  << '\t' << 10.0*nm.tm.ndeltat
+                                  << '\t' << nm.tm.qdeltat;
           std::terminate();
         }
 	      goto INIT;
@@ -1884,13 +1884,13 @@ int NEvo::solve_plasma(const double ttime, const double ldtn) {
     }
   }
 
-  density_sourcedrain[0] = electron_loss/ldtn;
-  density_sourcedrain[1] = ion_loss/ldtn;
+  density_sourcedrain[0] = electron_loss;///ldtn;
+  density_sourcedrain[1] = ion_loss;///ldtn;
   density_sourcedrain[2] = 0.0;
   density_sourcedrain[3] = 0.0;
   density_sourcedrain[4] = 0.0;
   density_sourcedrain[5] = 0.0;
-  density_sourcedrain[6] = abs(energy_loss)/ldtn;
+  density_sourcedrain[6] = abs(energy_loss);///ldtn;
   BOOST_LOG_SEV(lg, info) << "electron_loss " << electron_loss;
   BOOST_LOG_SEV(lg, info) << "ion_loss " << ion_loss;
   BOOST_LOG_SEV(lg, info) << "energy_loss " << energy_loss;
@@ -1900,6 +1900,10 @@ int NEvo::solve_plasma(const double ttime, const double ldtn) {
   BOOST_LOG_SEV(lg, info) << "total charge " << nano_qdens;
   BOOST_LOG_SEV(lg, info) << "charge rate " << nano_qdens_rate;
 
+  if (nm.rs.wsih4==1) {
+    BOOST_LOG_SEV(lg, info) << "plasma: updating sih4 density" << nsih4;
+    plasma.update_nSiH4(nsih4);
+  }
   // solve plasma
   plasma.solve(ttime, ttime+ldtn, ldtn, density_sourcedrain,
                energy_sourcedrain, plasma_pdens, plasma_ndens, min_dtq);
@@ -1989,7 +1993,7 @@ int NEvo::solve_charging(const double ttime, const double ldtn) {
         std::cerr << "\nerror istate = " << ctx.state;
         std::cerr << "\nLSODA error in charging " << ctx.state;
         std::cerr << "\nmin dtq = " << min_dtq << "\n\n";
-        //std::terminate();
+        std::terminate();
       }
       // free context
       lsoda_free(&ctx);
@@ -3217,6 +3221,9 @@ int NEvo::advance_nocharging_ompadp(const double ctime) {
             BOOST_LOG_SEV(lg, info) << wnu*jnucleation[l][q];
             BOOST_LOG_SEV(lg, info) << wco*kcoagulation[l][q]+wsg*gsurfacegrowth[l][q]+wnu*jnucleation[l][q];
             if (nm.tm.ndeltat < nm.tm.qdeltat) {
+              BOOST_LOG_SEV(lg, info) << "dtn < dtq " << ctime 
+                                  << '\t' << nm.tm.ndeltat
+                                  << '\t' << nm.tm.qdeltat;
               std::terminate();
             }
           return -1;
@@ -3644,7 +3651,11 @@ int NEvo::advance_nosplit_ompadpsih4(const double ctime) {
                     * (wco*birth_vector[l][q]+wsg*gsurfacegrowth[l][q]+wnu*jnucleation[l][q]))
                     /(1.0+nm.tm.ndeltat*wco*death_vector[l][q]);
 
-        crate2d[l][q] = wco * kcoagulation[l][q];
+	      crate2d[l][q] = wco * kcoagulation[l][q];
+        nrate2d[l][q] = wnu * jnucleation[l][q];
+        srate2d[l][q] = wsg * gsurfacegrowth[l][q];
+        death_vector[l][q] = wco * death_vector[l][q]*pdens[l][q];
+        
             //DANGER WARNING
         if (ndens[l][q]<0.0/*EPSILONETA*/){//EPSILON) {
           if (ndens[l][q]<-1.0e-1) {
