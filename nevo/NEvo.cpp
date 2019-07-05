@@ -136,6 +136,158 @@ int NEvo::write() {
   return 0;
 }
 
+
+// --------------------solve --------------------
+
+int NEvo::solve() {
+
+  int err;
+
+  // store the original nano delta time
+  double orig_dtn = nm.tm.ndeltat;
+ 
+  if(nm.rs.wsih4==1) {
+    BOOST_LOG_SEV(lg, info) << "With SiH4 rates";
+    err = compute_precompute_sih4();
+  }
+  else {
+    BOOST_LOG_SEV(lg, info) << "Without SiH4 rates";
+    err = compute_precompute();
+  }
+  
+  // HACK refactor WARNING
+  if(pm.pars.pfixed==0) {
+    BOOST_LOG_SEV(lg, info) << "Initialize plasma rates";
+    plasma.init_rates();
+    BOOST_LOG_SEV(lg, info) << "Initialize plasma parameters";
+    plasma.init_parameters();
+
+
+    plasmadens_size = 7;
+
+	  plasma_ndens.resize(plasmadens_size);
+    plasma_pdens.resize(plasmadens_size);
+	  density_sourcedrain.resize(plasmadens_size);
+	  energy_sourcedrain = 0.0;
+    min_dtq = 1.0;
+
+    for(unsigned int q=0; q<plasmadens_size; ++q) {
+      plasma_ndens[q] = 0.0;
+      plasma_pdens[q] = 1.0;
+		  density_sourcedrain[q] = 0.0;
+    }
+
+    // Solve plasma without nanos to prevent numerical instabilities
+    // plasma.solve(0.0, 1e-6, 1e-7, density_sourcedrain,
+    //       energy_sourcedrain, plasma_pdens, plasma_ndens, min_dtq);
+    plasma.solve(0.0, 1e-3, 1e-7, density_sourcedrain,
+          energy_sourcedrain, plasma_pdens, plasma_ndens, min_dtq);
+
+    plasma_pdens = plasma_ndens;
+
+    plasma_file = new std::fstream(dirname + nano_filename + "-plasma.dat",
+                                   std::fstream::out);
+    *plasma_file << "#t";
+    *plasma_file << '\t' << "energy";
+	  *plasma_file << '\t' << "ne";
+    *plasma_file << '\t' << "nArp";
+    *plasma_file << '\t' << "nArm";
+    *plasma_file << '\t' << "SiH3p";
+	  *plasma_file << '\t' << "SiH3";
+	  *plasma_file << '\t' << "SiH2";
+	  *plasma_file << '\t' << "neps";
+    *plasma_file << '\t' << "Nq";
+    *plasma_file << std::endl;
+  }
+  // BOOST remove DELETE WARNING
+  qsys = new qsystem(this);
+
+  // lsoda
+  ls_qsys = new ls_qsystem(this);
+
+  // IMPORTANT set nested parallelism
+  omp_set_nested(true);
+  
+  clock_t begin_sim = std::clock();
+  ctime = 0.0;
+  err = -1;
+  int err_onestep = 0;
+#pragma omp parallel //shared(ctime, nm, err)
+  {//begin parallel omp
+#pragma omp master
+    {// begin master omp, controls the iterations in t (time)
+      BOOST_LOG_SEV(lg, info) << "Master thread";
+      omp_info();
+    
+      unsigned int npcount = 0;
+      // get num_threads
+      int num_threads = omp_get_num_threads();
+      // execute loop in master thread
+      
+      // we want to write 'nwrites' times the results in file
+      int nwrites = 100;
+      int writecount = 1;
+      bool first_write = true;
+      double time2write = nm.tm.tstop / nwrites;
+      // treat the case of dt smaller than time2write
+      if (time2write<orig_dtn) {
+        time2write = nm.tm.tstop/orig_dtn;
+        nwrites = ceil(time2write);
+      }
+
+      for(unsigned int t=0; err<0; ++t, ++npcount) {
+
+        //clock_t one_step_begin = std::clock();
+        double one_step_begin = omp_get_wtime();
+// fork
+#pragma omp parallel /*num_threads(num_threads) shared(ctime)*/
+        {
+          err_onestep = solve_onestep(ctime);
+        }
+
+        if(/*first_write ||*/ (ctime>=writecount*time2write)) {
+          BOOST_LOG_SEV(lg, info) << "Writing, time = " << ctime
+                                  << "\t t2w = " << time2write*writecount;
+
+          //first_write = false;
+          writecount++;
+          write_one_step(ctime, begin_sim, one_step_begin);
+        }
+
+        if(ctime>=nm.tm.tstop/*-nm.tm.ndeltat*/) {
+          BOOST_LOG_SEV(lg, info) << "Done!, time = " << ctime;
+          clock_t end_sim = std::clock();
+          double elapsed_secs = double(end_sim - begin_sim) / CLOCKS_PER_SEC;
+          BOOST_LOG_SEV(lg, info) << "Nanoparticle module elapsed time "
+                << elapsed_secs;
+          int err_ = 0;
+          //int err_ = write_partial_results(ctime);
+          err_ = write_dataset2d_hdf5(h5obj_nano, "Density", "density", ndens,
+              cr.gm.vols.nsections, cr.gm.chrgs.nsections);
+          plasma_file->flush();
+#pragma omp critical
+          {
+            err = 0;
+          }
+	      //break;
+	      }
+	      if (err_onestep == 0) {
+          // update time
+          ctime += nm.tm.ndeltat;
+          // update density
+          pdens = ndens;
+          // WARNING reset dtn
+          //nm.tm.ndeltat = orig_dtn;
+          //BOOST_LOG_SEV(lg, info) << "Reset to original dtn = " << nm.tm.ndeltat;	    
+        }
+	    }
+    }// end master omp
+  }// end parallel omp    
+  
+  return err;
+}
+// -------------------- solve --------------------
+
 int NEvo::evolve() {
   // IMPORTANT set nested parallelism
   omp_set_nested(true);
@@ -631,9 +783,6 @@ int NEvo::evolve_selfconsistent() {
   return err;
 }
 // -------------------- evolve selfconsistent --------------------
-
-
-
 
 
 // // -------------------- evolve openmp --------------------
@@ -1181,10 +1330,6 @@ int NEvo::compute_precompute_sih4() {
   return err;
 }
 
-
-
-
-
 int NEvo::compute_nanoparticle_potential() {
   for (unsigned int l = 0; l < cr.gm.vols.nsections; ++l) {
     for (unsigned int q = 0; q < cr.gm.chrgs.nsections; ++q) {
@@ -1221,11 +1366,6 @@ int NEvo::compute_collisionfreq() {
 
   darray radii2 //= cr.gm.chrgs.charges*cr.gm.chrgs.charges;
                 = cr.gm.vols.radii * cr.gm.vols.radii;
-
-  // for (auto r: radii2) {
-  //   std::cerr << std::endl << r;
-  // }
-  // std::terminate();
 
   double max_efreq = efreq[0][0];
   double max_ifreq = ifreq[0][0];
@@ -1562,8 +1702,8 @@ int NEvo::compute_explicit_charging(double dt) {
 
 
 int NEvo::write_one_step(double ctime,
-			 double begin_sim,
-			 double one_step_begin) {
+                         double begin_sim,
+			                   double one_step_begin) {
 
   clock_t elapsed_sim = std::clock();
   double elapsed_secs = double(elapsed_sim - begin_sim) / CLOCKS_PER_SEC;
@@ -1600,6 +1740,14 @@ int NEvo::write_partial_results(double ctime) {
   err = write_dataset2d_hdf5(h5obj_nano, "Coagulation", rate_name, crate2d,
                              cr.gm.vols.nsections, cr.gm.chrgs.nsections);
   err = create_dsattrib_hdf5(h5obj_nano, "Coagulation", rate_name, "time", ctime);
+    // birth and death rates
+  err = write_dataset2d_hdf5(h5obj_nano, "Birth", rate_name, birth_vector,
+                             cr.gm.vols.nsections, cr.gm.chrgs.nsections);
+  err = create_dsattrib_hdf5(h5obj_nano, "Birth", rate_name, "time", ctime);
+  
+  err = write_dataset2d_hdf5(h5obj_nano, "Death", rate_name, death_vector,
+                             cr.gm.vols.nsections, cr.gm.chrgs.nsections);
+  err = create_dsattrib_hdf5(h5obj_nano, "Death", rate_name, "time", ctime);
   
   // Surface growth rate
   err = write_dataset2d_hdf5(h5obj_nano, "Surface_growth", rate_name, srate2d,
@@ -1616,6 +1764,260 @@ int NEvo::write_partial_results(double ctime) {
 
   return 0;
 }
+
+// ------------------------ solve_onestep -----------------------------------
+
+int NEvo::solve_onestep(double ctime) {
+
+  int qerr, err, reterr = 0;
+
+  darray new_mom(0.0, 3);
+  darray old_mom(0.0, 3);
+  //mom.resize(3);
+
+#pragma omp master
+  {
+    INIT:// after a change in nanodt we must recompute all
+    if(nm.rs.wch == 1) {
+      //INIT:
+      qerr = solve_charging(ctime, 0.5*nm.tm.ndeltat);
+    }//charging block 
+
+    // growth clock
+    double begin_tgrowth = omp_get_wtime();
+    if(nm.rs.wsih4==1) {
+      //err = advance_nocharging_ompadpsih4(ctime);
+      err = advance_nosplit_ompadpsih4(ctime);
+      if(err == -1) {
+	      reterr = -1;
+	      nm.tm.ndeltat *= 0.9;
+	      BOOST_LOG_SEV(lg, info) << "t, New dt = " << ctime << '\t' << nm.tm.ndeltat;
+        if (10.0*nm.tm.ndeltat < nm.tm.qdeltat) {
+          std::terminate();
+        }
+	      goto INIT;
+      }
+      else {
+	      reterr = 0;
+      }
+    }
+    else {
+      err = advance_nocharging_ompadp(ctime);
+      if(err == -1) {
+	      reterr = -1;
+	      nm.tm.ndeltat *= 0.9;
+	      BOOST_LOG_SEV(lg, info) << "t, New dt = " << ctime << '\t' << nm.tm.ndeltat;
+        if (10.0*nm.tm.ndeltat < nm.tm.qdeltat) {
+          BOOST_LOG_SEV(lg, info) << "10*dtn < dtq " << ctime 
+                                  << '\t' << 10.0*nm.tm.ndeltat
+                                  << '\t' << nm.tm.qdeltat;
+          std::terminate();
+        }
+	      goto INIT;
+      }
+    }
+    double end_tgrowth = omp_get_wtime();
+    double elapsed_secs = end_tgrowth - begin_tgrowth;
+    BOOST_LOG_SEV(lg, info)
+      << "Growth (coagulation+sgrowth+nucleation) elapsed secs = "
+      << elapsed_secs;
+    if(nm.rs.wch == 1) {
+      //INIT:
+      qerr = solve_charging(ctime+0.5*nm.tm.ndeltat, 0.5*nm.tm.ndeltat);
+      if(pm.pars.pfixed==0) {
+        double nano_qdens = 0.0;//abs(new_mom[2]);
+        double nano_qdens_rate = 0.0;
+        for (unsigned int l = 0; l < cr.gm.vols.nsections; ++l) {
+          // warning only negative nanos cr.gm.chrgs.nsections
+          for (unsigned int q = 0; q < cr.gm.chrgs.nsections; ++q) {
+            nano_qdens += ndens[l][q] * cr.gm.chrgs.charges[q];
+            nano_qdens_rate += qrate2d[l][q];
+          }
+        }
+        *plasma_file << ctime+nm.tm.ndeltat;
+        *plasma_file << '\t' << plasma_ndens[6]/plasma_ndens[0];
+        *plasma_file << '\t' << plasma_ndens[0];
+        *plasma_file << '\t' << plasma_ndens[1];
+        *plasma_file << '\t' << plasma_ndens[2];
+        *plasma_file << '\t' << plasma_ndens[3];
+        *plasma_file << '\t' << plasma_ndens[4];
+        *plasma_file << '\t' << plasma_ndens[5];
+        *plasma_file << '\t' << plasma_ndens[6];
+        *plasma_file << '\t' << -nano_qdens;
+        //*plasma_file << '\t' << plasma.ndens[1];
+        *plasma_file << std::endl;
+      }
+    }
+  }//omp master
+  return reterr;
+}
+
+// ------------------------ solve_onestep --------------------------------
+
+// ------------------------ solve plasma ---------------------------------
+int NEvo::solve_plasma(const double ttime, const double ldtn) {
+  BOOST_LOG_SEV(lg, info) << "Plasma evolution - t=\t" << ttime;
+
+  // compute nanoparticle charge density
+  //compute_moments(ndens, new_mom);
+  double nano_qdens = 0.0;//abs(new_mom[2]);
+  double nano_qdens_rate = 0.0;
+  for (unsigned int l = 0; l < cr.gm.vols.nsections; ++l) {
+    // warning only negative nanos cr.gm.chrgs.nsections
+    for (unsigned int q = 0; q < cr.gm.chrgs.nsections; ++q) {
+      nano_qdens += ndens[l][q] * cr.gm.chrgs.charges[q];
+      nano_qdens_rate += qrate2d[l][q];
+    }
+  }
+  //nano_qdens = std::abs(nano_qdens);
+  
+  //ion loss
+  double ion_loss = 0.0;
+  double electron_loss = 0.0;
+  double energy_loss = 0.0;
+  for (unsigned int l = 0; l < cr.gm.vols.nsections; ++l) {
+    // for (unsigned int q = cr.gm.chrgs.maxnegative; q < cr.gm.chrgs.nsections; ++q) {
+    for (unsigned int q = 0; q < cr.gm.chrgs.nsections; ++q) {
+      ion_loss += ndens[l][q]*ifreq[l][q];
+      electron_loss += ndens[l][q]*(efreq[l][q]-tfreq[l][q]);
+      energy_loss += phid[l][q]*ndens[l][q]*efreq[l][q];
+    }
+  }
+
+  density_sourcedrain[0] = electron_loss;///ldtn;
+  density_sourcedrain[1] = ion_loss;///ldtn;
+  density_sourcedrain[2] = 0.0;
+  density_sourcedrain[3] = 0.0;
+  density_sourcedrain[4] = 0.0;
+  density_sourcedrain[5] = 0.0;
+  density_sourcedrain[6] = abs(energy_loss);///ldtn;
+  BOOST_LOG_SEV(lg, info) << "electron_loss " << electron_loss;
+  BOOST_LOG_SEV(lg, info) << "ion_loss " << ion_loss;
+  BOOST_LOG_SEV(lg, info) << "energy_loss " << energy_loss;
+
+  plasma.nano_qdens = nano_qdens;
+  plasma.nano_qdens_rate = nano_qdens_rate;
+  BOOST_LOG_SEV(lg, info) << "total charge " << nano_qdens;
+  BOOST_LOG_SEV(lg, info) << "charge rate " << nano_qdens_rate;
+
+  if (nm.rs.wsih4==1) {
+    BOOST_LOG_SEV(lg, info) << "plasma: updating sih4 density" << nsih4;
+    plasma.update_nSiH4(nsih4);
+  }
+  // solve plasma
+  plasma.solve(ttime, ttime+ldtn, ldtn, density_sourcedrain,
+               energy_sourcedrain, plasma_pdens, plasma_ndens, min_dtq);
+
+  plasma_ndens[1] = plasma_ndens[0]-nano_qdens-plasma_ndens[3];
+
+  plasma_pdens = plasma_ndens;
+
+  // update energy and densities
+  BOOST_LOG_SEV(lg, info) << "Updating energy " << pm.es.emean << ", to "
+                          << plasma_ndens[6]/plasma_ndens[0];
+  pm.es.emean = plasma_ndens[6]/plasma_ndens[0];
+  BOOST_LOG_SEV(lg, info) << "Updating electron density " << pm.es.ne
+                          << ", to " << plasma_ndens[0];
+  BOOST_LOG_SEV(lg, info) << "Updating ion density " << pm.is.ni
+                          << ", to " << plasma_ndens[1];
+  pm.es.ne = plasma_ndens[0];
+  pm.is.ni = plasma_ndens[1];
+  BOOST_LOG_SEV(lg, info) << "Quasi-neutrality "
+      << plasma_ndens[1]+plasma_ndens[3] + nano_qdens - plasma_ndens[0];
+  if ((pm.es.ne < 0) || (pm.is.ni < 0)) {
+    BOOST_LOG_SEV(lg, info) << "Negative plasma densities ";
+    std::cerr << std::endl << "Negative plasma densities " << std::endl;
+    std::terminate();
+  }
+  return 0;
+}
+
+
+int NEvo::solve_charging(const double ttime, const double ldtn) {
+  if(pm.pars.pfixed==0) {
+    solve_plasma(ttime, ldtn);
+    BOOST_LOG_SEV(lg, info) << "Recompute collision frequencies";
+    compute_collisionfreq();
+  }
+  double wtime = omp_get_wtime();
+  clock_t begin_tcharge = std::clock();
+  BOOST_LOG_SEV(lg, info) << "Computing charges";
+  // compute_moments(pdens, new_mom);
+
+  ls_qsystem qsysy(*ls_qsys);
+
+  double min_dtq = 1.0;
+#pragma omp parallel firstprivate(qsysy)// shared(min_dtq, ctime, ndens, pdens, qrate2d)//, ctime, qsys)
+  {
+#pragma omp for nowait schedule(dynamic)// ordered schedule(static, 1)// nowait
+    for(unsigned int l=0; l<cr.gm.vols.nsections; ++l) {
+      // work with section l
+      qsysy.l = l;
+      // each thread owns a density vector (fixed l)
+      state_type nqdens(cr.gm.chrgs.nsections);
+      // tolerances for lsoda
+      double atol[cr.gm.chrgs.nsections], rtol[cr.gm.chrgs.nsections];
+      // set the target density
+      for(unsigned int q=0; q<cr.gm.chrgs.nsections; ++q) {
+        nqdens[q] = pdens[l][q];
+        atol[q] = 1.0e-3;
+        rtol[q] = 1.0e-3;
+        //sum1 += pdens[l][q];
+      }
+      // get time
+      double ldtq = nm.tm.qdeltat;
+      // INTEGRATE LSODA begins
+      // set options
+      struct lsoda_opt_t opt = {0};
+      //opt.h0 = ldtq;                // initial time step
+      opt.ixpr = 0;                 // additional printing
+      opt.rtol = rtol;              // relative tolerance
+      opt.atol = atol;              // absolute tolerance
+      opt.itask = 1;                // normal integration
+      opt.mxstep = 100000000;      // max steps
+      // set lsoda context
+      struct lsoda_context_t ctx = {
+            .function = ls_qsystemf,
+            .data = &qsysy,
+            .neq = static_cast<int>(cr.gm.chrgs.nsections),
+            .state = 1,
+      };
+      lsoda_prepare(&ctx, &opt);
+      // time for lsoda
+      double tin = ttime;
+      double tout = ttime+ldtn;
+      // integrate
+      lsoda(&ctx, &nqdens[0], &tin, tout);
+      min_dtq = std::min(min_dtq, ctx.common->hu);
+      if (ctx.state <= 0) {
+        std::cerr << "\nerror istate = " << ctx.state;
+        std::cerr << "\nLSODA error in charging " << ctx.state;
+        std::cerr << "\nmin dtq = " << min_dtq << "\n\n";
+        std::terminate();
+      }
+      // free context
+      lsoda_free(&ctx);
+      
+      for(unsigned int q=0; q<cr.gm.chrgs.nsections; ++q) {
+        ndens[l][q] = (nqdens[q]>0? nqdens[q]: 0.0);
+        //ndens[l][q] = nqdens[q];
+        qrate2d[l][q] = (ndens[l][q]-pdens[l][q])/ldtn;
+      }          
+    }//for l in sections
+  }// parallel region
+
+  pdens = ndens;
+
+  wtime = omp_get_wtime() - wtime;
+  BOOST_LOG_SEV(lg, info) << "Charging elapsed secs = " << wtime;
+  BOOST_LOG_SEV(lg, info) << "Min dtq " << min_dtq;
+  return 0;
+}
+
+// ------------------------ solve_charging -------------------------------
+
+
+
 
 int NEvo::evolve_one_step(double ctime) {
   int err;
@@ -2765,11 +3167,15 @@ int NEvo::advance_nocharging_ompadp(const double ctime) {
   //{
   // TODO refactor
   // if((nm.rs.wnu == 1) || (nm.rs.wsg == 1)) {
-  if((wnu == 1) || (wsg == 1)) {
-    compute_split_sgnucleation();
-  }
+  // if((wnu == 1) || (wsg == 1)) {
+  //   compute_split_sgnucleation();
+  // }
 
   //}
+
+  if(wsg == 1.0) {
+    compute_sgrowth();
+  }
   double begin_tcoagulation = omp_get_wtime();
     
   if(nm.rs.wco == 1) {
@@ -2785,41 +3191,47 @@ int NEvo::advance_nocharging_ompadp(const double ctime) {
     for (unsigned int l = 0; l < cr.gm.vols.nsections; ++l) {
       //#pragma omp parallel for
       for (unsigned int q = 0; q < cr.gm.chrgs.nsections; ++q) {
-        ndens[l][q] = pdens[l][q]
-                    + nm.rs.wco * nm.tm.ndeltat
-                          * kcoagulation[l][q];
-	crate2d[l][q] = nm.rs.wco * kcoagulation[l][q];
-        //DANGER WARNING
+        // ndens[l][q] = pdens[l][q]
+        //             + nm.rs.wco * nm.tm.ndeltat
+        //                   * kcoagulation[l][q];
+
+        ndens[l][q] = (pdens[l][q]
+                        + nm.tm.ndeltat
+                          * (wco*birth_vector[l][q]+ wsg*gsurfacegrowth[l][q]+wnu*jnucleation[l][q]))
+                            /(1.0+nm.tm.ndeltat*wco*death_vector[l][q]);
+        // ndens[l][q] = (pdens[l][q]
+        //                 + nm.tm.ndeltat
+        //                   * (wco*kcoagulation[l][q]+ wsg*gsurfacegrowth[l][q]+wnu*jnucleation[l][q]));
+	      crate2d[l][q] = wco * kcoagulation[l][q];
+        nrate2d[l][q] = wnu * jnucleation[l][q];
+        srate2d[l][q] = wsg * gsurfacegrowth[l][q];
+        death_vector[l][q] = wco * death_vector[l][q]*pdens[l][q];
+
         if (ndens[l][q]<0.0/*EPSILONETA*/){//EPSILON) {
-          //std::cerr << "\n[ee] Negative nanoparticle ndensity (coagulation)";
-	  //BOOST_LOG_SEV(lg, info) << "\n[ee] Negative nanoparticle ndensity (coagulation) : "
-	  //			  << ndens[l][q] << " , " << pdens[l][q];
-	  //std::terminate();
-	  //std::cerr << "\n[ee] Diameter " << cr.gm.vols.diameters[l]*2e9;
-	  //std::cerr << "\n[ee] Charge " << cr.gm.chrgs.charges[q];
-	  //std::cerr << "\n[ee] pdens " << pdens[l][q];
-	  //std::cerr << "\n[ee] ndens " << ndens[l][q];
-	  //std::cerr << "\n[ee]";
-	  // if (ndens[l][q]<-1.0e-2) {
-	  //   nm.tm.ndeltat *= 0.75;
-	  //   BOOST_LOG_SEV(lg, info) << "\n[ee] New dt = ";
-	  // }
-	  if (ndens[l][q]<-1.0e-1) {
-	    BOOST_LOG_SEV(lg, info) << "Negative nanoparticle ndensity (coagulation)";
-	    //nm.tm.ndeltat *= 0.9;
-	    // BOOST_LOG_SEV(lg, info) << "t, New dt = " << ctime << '\t' 
-      //                         << nm.tm.ndeltat;
-	    // if (nm.tm.ndeltat < nm.tm.qdeltat) {
-	    //   std::terminate();
-	    // }
-      return -1;
-	  }
-	  ndens[l][q] = 0.0;
-	  if (pdens[l][q] > 0.0) {
-	    ndens[l][q] = pdens[l][q];
-	  }
-          
-	  
+          if (ndens[l][q]<-1.0e-1) {
+            BOOST_LOG_SEV(lg, info) << "\n[ee] Negative nanoparticle ndensity (coagulation) : "
+                  << ndens[l][q] << " , " << pdens[l][q];
+
+            BOOST_LOG_SEV(lg, info) << "\n[ee] Diameter " << cr.gm.vols.diameters[l]*2e9;
+            BOOST_LOG_SEV(lg, info) << "\n[ee] Charge " << cr.gm.chrgs.charges[q];
+            BOOST_LOG_SEV(lg, info) << ndens[l][q];
+            BOOST_LOG_SEV(lg, info) << pdens[l][q];
+            BOOST_LOG_SEV(lg, info) << wco*kcoagulation[l][q];
+            BOOST_LOG_SEV(lg, info) << wsg*gsurfacegrowth[l][q];
+            BOOST_LOG_SEV(lg, info) << wnu*jnucleation[l][q];
+            BOOST_LOG_SEV(lg, info) << wco*kcoagulation[l][q]+wsg*gsurfacegrowth[l][q]+wnu*jnucleation[l][q];
+            if (nm.tm.ndeltat < nm.tm.qdeltat) {
+              BOOST_LOG_SEV(lg, info) << "dtn < dtq " << ctime 
+                                  << '\t' << nm.tm.ndeltat
+                                  << '\t' << nm.tm.qdeltat;
+              std::terminate();
+            }
+          return -1;
+          }
+          ndens[l][q] = 0.0;
+          if (pdens[l][q] > 0.0) {
+            ndens[l][q] = pdens[l][q];
+          }
         }
         kcoagulation[l][q] = 0.0;
       }// for q 
@@ -2827,6 +3239,16 @@ int NEvo::advance_nocharging_ompadp(const double ctime) {
     //    }// omp parallel
     // update density
     //#pragma omp barrier
+
+    // WARNING
+    // erase spurious densities
+    for (unsigned int l = 0; l < cr.gm.vols.nsections; ++l) {
+      for (unsigned int q = 0; q < cr.gm.chrgs.nsections; ++q) {
+        if (ndens[l][q] < 0.1) {
+          ndens[l][q] = 0.0;
+        }
+      }
+    }
     pdens = ndens;
     //}
   }
@@ -2837,9 +3259,9 @@ int NEvo::advance_nocharging_ompadp(const double ctime) {
 
   //#pragma omp single
   //{    
-  if((nm.rs.wnu == 1) || (nm.rs.wsg == 1)) {
-    compute_split_sgnucleation();  
-  }
+  // if((nm.rs.wnu == 1) || (nm.rs.wsg == 1)) {
+  //   compute_split_sgnucleation();  
+  // }
   //}
   return 0;
 }
@@ -3013,7 +3435,7 @@ int NEvo::advance_nocharging_ompadpsih4(const double ctime) {
         ndens[l][q] = pdens[l][q]
                     + nm.rs.wco * nm.tm.ndeltat
                           * kcoagulation[l][q];
-	crate2d[l][q] = nm.rs.wco * kcoagulation[l][q];
+	      crate2d[l][q] = nm.rs.wco * kcoagulation[l][q];
         //DANGER WARNING
         if (ndens[l][q]<0.0/*EPSILONETA*/){//EPSILON) {
           //std::cerr << "\n[ee] Negative nanoparticle ndensity (coagulation)";
@@ -3029,20 +3451,18 @@ int NEvo::advance_nocharging_ompadpsih4(const double ctime) {
 	  //   nm.tm.ndeltat *= 0.75;
 	  //   BOOST_LOG_SEV(lg, info) << "\n[ee] New dt = ";
 	  // }
-	  if (ndens[l][q]<-1.0e-1) {
-	    BOOST_LOG_SEV(lg, info) << "Negative nanoparticle ndensity (coagulation)";
-	    nm.tm.ndeltat *= 0.9;
-	    BOOST_LOG_SEV(lg, info) << "New dt = " << nm.tm.ndeltat;
-	    if (nm.tm.ndeltat < nm.tm.qdeltat) {
-	      std::terminate();
-	    }
-	  }
-	  ndens[l][q] = 0.0;
-	  if (pdens[l][q] > 0.0) {
-	    ndens[l][q] = pdens[l][q];
-	  }
-          
-	  
+          if (ndens[l][q]<-1.0e-1) {
+            BOOST_LOG_SEV(lg, info) << "Negative nanoparticle ndensity (coagulation)";
+            nm.tm.ndeltat *= 0.9;
+            BOOST_LOG_SEV(lg, info) << "New dt = " << nm.tm.ndeltat;
+            if (nm.tm.ndeltat < nm.tm.qdeltat) {
+              std::terminate();
+            }
+          }
+          ndens[l][q] = 0.0;
+          if (pdens[l][q] > 0.0) {
+            ndens[l][q] = pdens[l][q];
+          }
         }
         kcoagulation[l][q] = 0.0;
       }// for q 
@@ -3227,22 +3647,26 @@ int NEvo::advance_nosplit_ompadpsih4(const double ctime) {
 
 	// semi implicit
         ndens[l][q] = (pdens[l][q]
-          + nm.tm.ndeltat
-              * (wco*birth_vector[l][q]+wsg*gsurfacegrowth[l][q]+wnu*jnucleation[l][q]))
-        /(1.0+nm.tm.ndeltat*death_vector[l][q]);
+                    + nm.tm.ndeltat
+                    * (wco*birth_vector[l][q]+wsg*gsurfacegrowth[l][q]+wnu*jnucleation[l][q]))
+                    /(1.0+nm.tm.ndeltat*wco*death_vector[l][q]);
 
-        crate2d[l][q] = wco * kcoagulation[l][q];
+	      crate2d[l][q] = wco * kcoagulation[l][q];
+        nrate2d[l][q] = wnu * jnucleation[l][q];
+        srate2d[l][q] = wsg * gsurfacegrowth[l][q];
+        death_vector[l][q] = wco * death_vector[l][q]*pdens[l][q];
+        
             //DANGER WARNING
         if (ndens[l][q]<0.0/*EPSILONETA*/){//EPSILON) {
           if (ndens[l][q]<-1.0e-1) {
-          BOOST_LOG_SEV(lg, info) << "\n[ee] Negative nanoparticle ndensity (coagulation) : "
+            BOOST_LOG_SEV(lg, info) << "\n[ee] Negative nanoparticle ndensity (coagulation) : "
                 << ndens[l][q] << " , " << pdens[l][q];
 
-          BOOST_LOG_SEV(lg, info) << "\n[ee] Diameter " << cr.gm.vols.diameters[l]*2e9;
-          BOOST_LOG_SEV(lg, info) << "\n[ee] Charge " << cr.gm.chrgs.charges[q];
+            BOOST_LOG_SEV(lg, info) << "\n[ee] Diameter " << cr.gm.vols.diameters[l]*2e9;
+            BOOST_LOG_SEV(lg, info) << "\n[ee] Charge " << cr.gm.chrgs.charges[q];
             BOOST_LOG_SEV(lg, info) << ndens[l][q];
             BOOST_LOG_SEV(lg, info) << pdens[l][q];
-              BOOST_LOG_SEV(lg, info) << wco*kcoagulation[l][q];
+            BOOST_LOG_SEV(lg, info) << wco*kcoagulation[l][q];
             BOOST_LOG_SEV(lg, info) << wsg*gsurfacegrowth[l][q];
             BOOST_LOG_SEV(lg, info) << wnu*jnucleation[l][q];
             BOOST_LOG_SEV(lg, info) << wco*kcoagulation[l][q]+wsg*gsurfacegrowth[l][q]+wnu*jnucleation[l][q];
@@ -3715,7 +4139,8 @@ int NEvo::compute_nosplit_sgnucleationsih4() {
   // sgrowth_total_rate = 0.0;
   for (unsigned int l = 0; l < cr.gm.vols.nsections; ++l) {
     for (unsigned int q = 0; q < cr.gm.chrgs.nsections; ++q) {	  
-      srate2d[l][q] = gsurfacegrowth[l][q]/dtg;
+      srate2d[l][q] = gsurfacegrowth[l][q];///dtg;
+      nrate2d[l][q] = jnucleation[l][q];
       // sgrowth_total_rate += srate2d[l][q];
     }
   }
@@ -3732,17 +4157,18 @@ int NEvo::compute_sgrowth() {
 // Explicit Surface Growth
 //
 // #pragma omp for collapse(2)
-    for (unsigned int l = 1; l < cr.gm.vols.nsections-1; ++l) {
-      for (unsigned int q = 0; q < cr.gm.chrgs.nsections; ++q) {
-        gsurfacegrowth[l][q] = adim_srate[l-1]*pdens[l-1][q]
-                             - adim_srate[l]*pdens[l][q];
-        // Growth to last section only adds particles, removal requires to
-        // add sections (note sign plus + )
-        gsurfacegrowth[cr.gm.vols.nsections-1][q] = adim_srate[cr.gm.vols.nsections-2]
-                                        * pdens[cr.gm.vols.nsections-2][q];
-        // Growth of first section only removes particles
-        // (note sign minus - )
-        gsurfacegrowth[0][q] = -adim_srate[0]*pdens[0][q];
+  for (unsigned int l = 1; l < cr.gm.vols.nsections-1; ++l) {
+    for (unsigned int q = 0; q < cr.gm.chrgs.nsections; ++q) {
+      // Growth to last section only adds particles, removal requires to
+      // add sections (note sign plus + )
+      gsurfacegrowth[cr.gm.vols.nsections-1][q] = adim_srate[cr.gm.vols.nsections-2]
+                                      * pdens[cr.gm.vols.nsections-2][q];
+      // Growth of first section only removes particles
+      // (note sign minus - )
+      gsurfacegrowth[0][q] = -adim_srate[0]*pdens[0][q];
+
+      gsurfacegrowth[l][q] = adim_srate[l-1]*pdens[l-1][q]
+                           - adim_srate[l]*pdens[l][q];
     }
   }
   return 0;
@@ -3940,11 +4366,16 @@ int NEvo::compute_coagulation_omp() {
 
 #pragma omp barrier
   
+  // for (unsigned int l = 0; l < cr.gm.vols.nsections; ++l) {
+  //   for (unsigned int q = 0; q < cr.gm.chrgs.nsections; ++q) {
+  //     death_vector[l][q] = death_vector[l][q]*pdens[l][q];
+  //   }
+  // }
 #pragma omp for collapse(2)
     for (unsigned int l = 0; l < cr.gm.vols.nsections; ++l) {
       for (unsigned int q = 0; q < cr.gm.chrgs.nsections; ++q) {
-	kcoagulation[l][q] = birth_vector[l][q]
-	  - death_vector[l][q]*pdens[l][q];
+        kcoagulation[l][q] = birth_vector[l][q]
+	                         - death_vector[l][q]*pdens[l][q];
 
 	// WARNING DANGER
 	//       if(abs(kcoagulation[l][q])<EPSILONETA) {

@@ -246,8 +246,20 @@ int CRate::compute_list(std::vector<std::string> sfilelist_) {
   BOOST_LOG_SEV(lg, info) << "Computing coagulation rate";
   compute_rcoagulation();
   BOOST_LOG_SEV(lg, info) << "Done... coagulation rate";
+
+
+  BOOST_LOG_SEV(lg, info) << "Computing eta creation rate";
+  compute_etafactor();
+  BOOST_LOG_SEV(lg, info) << "Done... eta";
+
+  BOOST_LOG_SEV(lg, info) << "Computing death rate";
+  compute_deathfactor();
+  BOOST_LOG_SEV(lg, info) << "Done... death";
+
   end = std::chrono::system_clock::now();
   elapsed_seconds = end-start;
+
+  
   BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
 
   BOOST_LOG_SEV(lg, info) << "Computing eta creation rate";
@@ -502,13 +514,13 @@ int CRate::compute_frompairs() {
   BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
   
 
-  BOOST_LOG_SEV(lg, info) << "Computing eta creation rate";
-  compute_etafactor();
-  BOOST_LOG_SEV(lg, info) << "Done... eta";
+  // BOOST_LOG_SEV(lg, info) << "Computing eta creation rate";
+  // compute_etafactor();
+  // BOOST_LOG_SEV(lg, info) << "Done... eta";
 
-  BOOST_LOG_SEV(lg, info) << "Computing death rate";
-  compute_deathfactor();
-  BOOST_LOG_SEV(lg, info) << "Done... death";
+  // BOOST_LOG_SEV(lg, info) << "Computing death rate";
+  // compute_deathfactor();
+  // BOOST_LOG_SEV(lg, info) << "Done... death";
 
   return 0;
 }

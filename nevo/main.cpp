@@ -133,7 +133,8 @@ int main(int argc, char **argv) {
   ///nevo.test_plasma();// working plasma test
   //nevo.evolve_plasma();
   //////nevo.evolve_radapt();
-  nevo.evolve_selfconsistent();
+  //nevo.evolve_selfconsistent();
+  nevo.solve();
   nevo.write();
   nevo.close();
 
