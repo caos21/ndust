@@ -49,6 +49,7 @@ typedef boost::multi_array<double, 3> boost_array3d;
 typedef boost::multi_array<double, 4> boost_array4d;
 
 typedef boost::multi_array_ref<double, 4> boost_array4d_ref;
+typedef boost::const_multi_array_ref<double, 4> const_boost_array4d_ref;
 
 typedef boost::array<boost_array2d::index, 2> bgrid2d;
 typedef boost::array<boost_array3d::index, 3> bgrid3d;
@@ -61,6 +62,8 @@ typedef boost::multi_array_ref<short, 2> boost_shortarray2d_ref;
 // u integer type
 typedef boost::multi_array<unsigned int, 2> boost_uint_array2d;
 typedef boost::array<boost_uint_array2d::index, 2> buigrid2d;
+
+typedef boost::multi_array<short unsigned int, 4> boost_short_array4d;
 
 // Define template array = valarray
 template<typename Type>

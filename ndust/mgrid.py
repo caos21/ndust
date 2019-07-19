@@ -322,3 +322,26 @@ class EInteraction(mh5u.H5Writable):
                           self.method,
                           self.terms]
 #
+# ------ van der Waals Interaction class ------
+class VDWaals(mh5u.H5Writable):
+  """ Represents the parameters for the electrostatic interaction of
+      nanoparticles
+  """
+
+  def __init__(self, h5obj, vdw=0, cutoff=0.0, bf=0):    
+    """ Initial values
+    """
+    self.h5obj = h5obj
+    # Create group
+    self.h5path = self.h5obj.create_group("vanderWaals_interaction")
+    #
+    self.vdw = mh5u.Attrib("On", vdw)
+    #
+    self.cutoff = mh5u.Attrib("Cutoff", cutoff)
+    #
+    self.bf = mh5u.Attrib("Brute_force", bf)
+    #
+    self.writable_list = [self.vdw,
+                          self.cutoff,
+                          self.bf]
+#

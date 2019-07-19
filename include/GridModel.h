@@ -83,6 +83,19 @@ struct einteraction {
   unsigned int method;              //!< Method used to compute interaction
   unsigned int terms;               //!< Number of terms of MPC expansion
 };
+
+/**
+  * struct vdwaals
+  *
+  * Stores van der Waals interaction information
+  *
+  */
+struct vdwinteraction {
+  bool vdw;                         //!< set to true if vdw is considered
+  double cutoff;                    //!< cutoff for vdw interaction
+  bool bf;                          //!< set to true if vdw is considered
+};
+
 /**
   * class GridModel
   *
@@ -123,6 +136,7 @@ public:
   vsections vols;                     //!< Volume sections.
   qsections chrgs;                    //!< Charge sections.
   einteraction einter;                //!< Electrostatic interaction.
+  vdwinteraction vdwinter;            //!< vdW interaction.
   //
 private:
 // Private methods
@@ -156,6 +170,12 @@ private:
    * Read the electrostatic interaction attributes
   */
   int read_einteraction();
+
+  //! Read h5 datafile van der Waals interaction
+  /*! 
+   * Read the van der Waals interaction attributes
+  */
+  int read_vdwinteraction();
 };
 
 #endif

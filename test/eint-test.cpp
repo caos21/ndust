@@ -402,6 +402,97 @@ BOOST_AUTO_TEST_CASE( nanoparticles ) {
     BOOST_REQUIRE_CLOSE(true_val, test_val, PTOL);
     
   }
+
+  double r1 = 50e-9;
+  double z1 = -1;
+  double q1 = z1*eCharge;
+  double z2 = -1;
+  double q2 = z2*eCharge;
+  double r2 = 1e-9;
+  double rmin = (r1+r2)*1.05;
+  double rmax = (r1+r2)*1.5;
+  double rc = 2.1e-10;
+  double AH = 20e-20; 
+  {
+    BOOST_TEST_MESSAGE( "[ii] Testing vdW..." );
+    
+    double test_val = (AH/6.0)*potential_vdw_nodim(rmin/r1, r2/r1);
+    double true_val = -9.895502093308545e-22;    
+    BOOST_TEST_MESSAGE( "[ii] UvdW = " << true_val << " ? " << test_val);
+    BOOST_REQUIRE_CLOSE(true_val, test_val, PTOL);
+
+    test_val = (AH/6.0)*potential_vdw_nodim(rmax/r1, r2/r1);
+    true_val = -1.1821190934316789e-24;
+    BOOST_TEST_MESSAGE( "[ii] UvdW = " << true_val << " ? " << test_val);
+    BOOST_REQUIRE_CLOSE(true_val, test_val, PTOL);
+
+    test_val = (AH/(6.0*r1))*force_vdw_nodim(rmin/r1, r2/r1);
+    true_val = -9.227958856942327e-13;
+    BOOST_TEST_MESSAGE( "[ii] FvdW = " << true_val << " ? " << test_val);
+    BOOST_REQUIRE_CLOSE(true_val, test_val, PTOL);
+
+    test_val = (AH/(6.0*r1))*force_vdw_nodim(rmax/r1, r2/r1);
+    true_val = -1.6202297331198898e-16;
+    BOOST_TEST_MESSAGE( "[ii] FvdW = " << true_val << " ? " << test_val);
+    BOOST_REQUIRE_CLOSE(true_val, test_val, PTOL);
+
+    true_val = -4.352478534386367e-12;
+    force_ipavdw_funct fipavdwfunct(r1, q1, r2, q2, eps, AH, rc, 1.0, 1.0);
+    test_val = fipavdwfunct(rmin);
+    BOOST_TEST_MESSAGE( "[ii] FT(rmin) = " << true_val << " ? " << test_val);
+    BOOST_REQUIRE_CLOSE(true_val, test_val, PTOL);
+
+    true_val = -1.930921758028609e-15;
+    test_val = fipavdwfunct(rmax);
+    BOOST_TEST_MESSAGE( "[ii] FT(rmax) = " << true_val << " ? " << test_val);
+    BOOST_REQUIRE_CLOSE(true_val, test_val, PTOL);
+    
+    true_val = -4.43293089981587e-12;
+    fipavdwfunct.q1 = 0.0;
+    fipavdwfunct.q2 = q2;
+    test_val = fipavdwfunct(rmin);
+    BOOST_TEST_MESSAGE( "[ii] FT(q1=0) = " << true_val << " ? " << test_val);
+    BOOST_REQUIRE_CLOSE(true_val, test_val, PTOL);
+    
+    true_val = -9.227967041725532e-13;
+    fipavdwfunct.q1 = q1;
+    fipavdwfunct.q2 = 0.0;
+    test_val = fipavdwfunct(rmin);
+    BOOST_TEST_MESSAGE( "[ii] FT(q2=0) = " << true_val << " ? " << test_val);
+    BOOST_REQUIRE_CLOSE(true_val, test_val, PTOL);
+
+    true_val = -9.227958856942327e-13;
+    fipavdwfunct.q1 = 0.0;
+    fipavdwfunct.q2 = 0.0;
+    test_val = fipavdwfunct(rmin);
+    BOOST_TEST_MESSAGE( "[ii] FT = FvdW = " << true_val << " ? " << test_val);
+    BOOST_REQUIRE_CLOSE(true_val, test_val, PTOL);
+
+    true_val = -1.6202297331198898e-16;
+    fipavdwfunct.q1 = 0.0;
+    fipavdwfunct.q2 = 0.0;
+    test_val = fipavdwfunct(rmax);
+    BOOST_TEST_MESSAGE( "[ii] FT = FvdW = " << true_val << " ? " << test_val);
+    BOOST_REQUIRE_CLOSE(true_val, test_val, PTOL);
+  }
+  {
+    darray rtarray = linear<double>(r1+r2, (r1+r2)*1.6, 250);
+
+    ofstream outfile("vdw_test.dat");
+    outfile << "#r\tpotential+vdw\tforce_vdw\tpotential_ipavdw_force_ipavdw";    
+    
+    force_ipavdw_funct fipavdwfunct(r1, q1, r2, q2, eps, AH, rc, 1.0, 1.0);
+
+    for (unsigned int i=0; i<99; ++i) {
+      outfile << '\n' << rtarray[i]*1e9
+	      << '\t' << (AH/6.0)*potential_vdw_nodim(rtarray[i]/r1, r2/r1)/eCharge
+        << '\t' << (AH/(6.0*r1))*force_vdw_nodim(rtarray[i]/r1, r2/r1)
+        << '\t' << potential_ipavdw(rtarray[i], r1, q1, r2, q2, eps, AH, rc, 1.0, 1.0)/eCharge
+	      << '\t' << fipavdwfunct(rtarray[i]);
+    }
+    outfile << '\n';
+    outfile.close();    
+  }
 }
 
 

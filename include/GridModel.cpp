@@ -38,6 +38,9 @@ int GridModel::read() {
 
   // Einteraction attributes
   err = read_einteraction();
+
+  // vdwinteraction attributes
+  err = read_vdwinteraction();
 //   if(err!=0) {
 //     BOOST_LOG_SEV(lg, error) << "h5 I/O error closiing file. Terminate.";
 //     std::terminate();
@@ -203,3 +206,43 @@ int GridModel::read_einteraction() {
 
   return 0;
 }
+
+//
+// ----------------------------- vdwinteraction -------------------------------
+int GridModel::read_vdwinteraction() {
+  int err = 0;
+  BOOST_LOG_SEV(lg, info) << "van der Waals interaction: ";
+
+  unsigned int vdw = 0;
+  err = read_attrib_hdf5<unsigned int>(h5obj, "/vanderWaals_interaction",
+                                       "On", vdw);
+  if (vdw == 0) {
+    vdwinter.vdw = false;
+  }
+  else {
+    vdwinter.vdw = true;
+  }
+  
+  BOOST_LOG_SEV(lg, info) << "--> On: " << vdwinter.vdw;
+
+  err = read_attrib_hdf5<double>(h5obj, "/vanderWaals_interaction",
+                                 "Cutoff", vdwinter.cutoff);
+  
+  BOOST_LOG_SEV(lg, info) << "--> Cutoff: " << vdwinter.cutoff;
+
+  unsigned int bf = 0;
+  err = read_attrib_hdf5<unsigned int>(h5obj, "/vanderWaals_interaction",
+                                       "Brute_force", bf);
+  if (bf == 0) {
+    vdwinter.bf = false;
+  }
+  else {
+    vdwinter.bf = true;
+  }
+
+  BOOST_LOG_SEV(lg, info) << "--> Brute force: " << vdwinter.bf;
+
+  return 0;
+}
+
+  

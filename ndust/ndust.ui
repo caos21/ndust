@@ -363,7 +363,7 @@
            <x>400</x>
            <y>10</y>
            <width>380</width>
-           <height>241</height>
+           <height>161</height>
           </rect>
          </property>
          <property name="title">
@@ -375,7 +375,7 @@
             <x>10</x>
             <y>40</y>
             <width>361</width>
-            <height>191</height>
+            <height>111</height>
            </rect>
           </property>
           <layout class="QGridLayout" name="gridLayout_5">
@@ -691,9 +691,9 @@
          <property name="geometry">
           <rect>
            <x>400</x>
-           <y>260</y>
+           <y>180</y>
            <width>381</width>
-           <height>331</height>
+           <height>311</height>
           </rect>
          </property>
          <property name="title">
@@ -718,7 +718,7 @@
             <x>10</x>
             <y>40</y>
             <width>361</width>
-            <height>281</height>
+            <height>261</height>
            </rect>
           </property>
           <layout class="QGridLayout" name="gridLayout_10">
@@ -797,19 +797,6 @@
            </item>
            <item row="2" column="2">
             <layout class="QGridLayout" name="gridLayout_method">
-             <item row="0" column="0">
-              <widget class="QRadioButton" name="radioButton_MPC">
-               <property name="layoutDirection">
-                <enum>Qt::RightToLeft</enum>
-               </property>
-               <property name="text">
-                <string>MPC</string>
-               </property>
-               <property name="checked">
-                <bool>false</bool>
-               </property>
-              </widget>
-             </item>
              <item row="1" column="0">
               <widget class="QRadioButton" name="radioButton_IPA">
                <property name="layoutDirection">
@@ -830,6 +817,19 @@
                </property>
                <property name="checked">
                 <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item row="0" column="0">
+              <widget class="QRadioButton" name="radioButton_MPC">
+               <property name="layoutDirection">
+                <enum>Qt::RightToLeft</enum>
+               </property>
+               <property name="text">
+                <string>MPC</string>
+               </property>
+               <property name="checked">
+                <bool>false</bool>
                </property>
               </widget>
              </item>
@@ -907,6 +907,97 @@
              </property>
              <property name="placeholderText">
               <string>Enter here a description for this grid</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+        </widget>
+        <widget class="QGroupBox" name="groupBox_vdw">
+         <property name="geometry">
+          <rect>
+           <x>400</x>
+           <y>500</y>
+           <width>381</width>
+           <height>91</height>
+          </rect>
+         </property>
+         <property name="title">
+          <string>van der Waals</string>
+         </property>
+         <widget class="Line" name="line_16">
+          <property name="geometry">
+           <rect>
+            <x>10</x>
+            <y>20</y>
+            <width>360</width>
+            <height>16</height>
+           </rect>
+          </property>
+          <property name="orientation">
+           <enum>Qt::Horizontal</enum>
+          </property>
+         </widget>
+         <widget class="QWidget" name="gridLayoutWidget_21">
+          <property name="geometry">
+           <rect>
+            <x>10</x>
+            <y>40</y>
+            <width>361</width>
+            <height>58</height>
+           </rect>
+          </property>
+          <layout class="QGridLayout" name="gridLayout_vdw">
+           <item row="1" column="5">
+            <widget class="QLineEdit" name="lineEdit_cutoff">
+             <property name="enabled">
+              <bool>false</bool>
+             </property>
+             <property name="text">
+              <string>0.21e-9</string>
+             </property>
+             <property name="alignment">
+              <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+             </property>
+            </widget>
+           </item>
+           <item row="1" column="1">
+            <widget class="QCheckBox" name="checkBox_vdw">
+             <property name="text">
+              <string>On</string>
+             </property>
+            </widget>
+           </item>
+           <item row="1" column="4">
+            <widget class="QLabel" name="label_cutoff">
+             <property name="enabled">
+              <bool>false</bool>
+             </property>
+             <property name="text">
+              <string>Cutoff (nm)</string>
+             </property>
+            </widget>
+           </item>
+           <item row="1" column="3">
+            <spacer name="horizontalSpacer_vdw">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>40</width>
+               <height>20</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+           <item row="1" column="2">
+            <widget class="QCheckBox" name="checkBox_bf">
+             <property name="enabled">
+              <bool>false</bool>
+             </property>
+             <property name="text">
+              <string>Brute force</string>
              </property>
             </widget>
            </item>

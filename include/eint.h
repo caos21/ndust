@@ -81,6 +81,65 @@ namespace eint {
   typedef ublas::matrix<double> ubmatrix;
   typedef ublas::vector<double> ubvector;
 
+  //! Factorized (dimensionless) van der Waals non-retarded potential
+  /*!
+    \param rstar the separation r/(r1+r2).
+    \param omega the ratio r1/(r1+r2).
+    \param HA the Hamaker constant.
+  */
+  inline
+  double potential_vdw_fact(double rstar, double omega, double HA=1.0) {
+    double term1 = 2.0*omega*(1.0-omega)/(rstar*rstar-1.0);
+    double term2 = 2.0*omega*(1.0-omega)/(rstar*rstar-pow(2.0*omega-1.0,2));
+    double term3 = log((rstar*rstar-1.0)/(rstar*rstar-pow(2.0*omega-1.0,2)));
+    
+    double prefactor = -HA/6.0;
+    return prefactor*(term1 + term2 + term3);
+  }
+
+  //! van der Waals potential
+  /*!
+    \param rto the separation.
+    \param r1o radius of particle 1.
+    \param r2o radius of particle 2.
+    \param HA the Hamaker constant.
+    \param rSi van der Waals radius of silicon or cutoff.
+  */
+  inline
+  double potential_vdw(double rto, double r1o, double r2o, double rSi=0.21e-9,
+                       double HA=20e-20){
+    double omega = r1o/(r1o+r2o);
+    double rstar = rto/(r1o+r2o);
+
+    double pot_vdw = potential_vdw_fact(rstar+rSi/(r1o+r2o), omega)*tanh((rstar)/(rSi/(r1o+r2o)))*HA;
+
+    return pot_vdw;
+  }
+
+  //! van der Waals potential non dimensional
+  /*!
+    \param rt the separation rt/r1.
+    \param r21 ratio r2/r1.
+  */
+  inline
+  double potential_vdw_nodim(double rt, double r21) {
+    return (-2.*r21/(rt*rt - pow(r21 + 1., 2)) - 2.*r21/(rt*rt - pow(-r21 + 1., 2))
+          + log((rt*rt - pow(-r21 + 1.,2))/(rt*rt - pow(r21 + 1., 2))));
+  }
+
+  //! van der Waals force non dimensional
+  /*!
+    \param rt the separation rt/r1.
+    \param r21 ratio r2/r1.
+  */
+  inline
+  double force_vdw_nodim(double rt, double r21) {
+    return (- 4.*rt*r21/pow(rt*rt - pow(r21 + 1., 2), 2)
+            - 4.*rt*r21/pow(rt*rt - pow(-r21 + 1., 2), 2)
+            + 2.*rt/(rt*rt - pow(r21 + 1., 2))
+            - 2.*rt/(rt*rt - pow(-r21 + 1., 2)));
+  }
+
   //! Factorized (dimensionless) Coulomb potential
   /*!
     \param rt the separation.
@@ -95,6 +154,20 @@ namespace eint {
     return Kcoul*q21/rt;
   }
   
+  //! Factorized (dimensionless) Coulomb force
+  /*!
+    \param rt the separation.
+    \param r21 the ratio r2/r1.
+    \param q21 the ratio q2/q1.
+    \param eps the dielectric constant.
+  */
+  inline
+  double force_coulomb_fact(const double rt, const double r21,
+				const double q21) {
+
+    return Kcoul*q21/(rt*rt);
+  }
+
   //! Factorized (dimensionless) potential approximation IPA.
   /*!
     \param rt the separation.
@@ -131,6 +204,317 @@ namespace eint {
           - B/(pow(rt, 3)*pow(rt*rt - 1.0, 2));
   }
 
+  // Coulomb vdW
+
+  //! coulomb + van der Waals potential
+  /*!
+    \param r the separation.
+    \param r1 radius of particle 1.
+    \param q1 charge of particle 1.
+    \param r2 radius of particle 2.
+    \param q2 charge of particle 1.
+    \param eps the dielectric constant.
+    \param HA the Hamaker constant.
+    \param rc van der Waals radius of silicon or cutoff.
+    \param coulomb switch / multiplier for coulomb
+    \param vdw switch / multiplier for vdw
+  */
+  inline
+  double potential_coulombvdw(double r,
+                          double r1,
+                          double q1,
+                          double r2,
+                          double q2,
+                          double eps,
+                          double AH,
+                          double rc,
+                          double coulomb=1.0,
+                          double vdw=1.0) {
+    
+    // swap particles. We want to keep r21 < 1
+    if (r2 > r1) {
+      std::swap(r1, r2);
+      std::swap(q1, q2);
+    }
+
+    double q21 = 0.0;
+
+    // for neutrals only vdW holds
+    // WARNING float comparison
+    if ((q1 == 0.0) && (q2 == 0.0)) {
+      coulomb = 0.0;
+      q21 = 0.0;
+    }
+    else {
+      if (q1 == 0.0) {// p1 is neutral
+        std::swap(r1, r2);
+        std::swap(q1, q2);
+        q21 = 0.0;
+      }
+      else {// q1 != 0 and q2 
+        q21 = q2/q1;
+      }
+    }
+
+    double r21 = r2 / r1;
+
+    double rt  = r/r1;
+    
+    double rs = 0.0;
+    if (r > r1+r2+rc){
+      rs  = r/r1;
+    }
+    else {
+      rs = (r1+r2+rc)/r1;
+    }
+   
+    double coulombfactor = coulomb * q1*q1 / r1;
+    double vdwfactor = vdw * AH / 6.0;
+    
+    double coulombpot = 0.0;
+    double vdwpot = 0.0;
+
+    if (coulomb > 0.0) {// only coulomb
+      coulombpot = coulombfactor * potential_coulomb_fact(rt, r21, q21);
+    }
+    if (vdw > 0.0) {// only vdw
+      vdwpot = vdwfactor * potential_vdw_nodim(rs, r21);
+    }
+
+    return coulombpot + vdwpot;
+  }
+
+  //! coulomb + van der Waals force
+  /*!
+    \param r the separation.
+    \param r1 radius of particle 1.
+    \param q1 charge of particle 1.
+    \param r2 radius of particle 2.
+    \param q2 charge of particle 1.
+    \param eps the dielectric constant.
+    \param HA the Hamaker constant.
+    \param rc van der Waals radius of silicon or cutoff.
+    \param coulomb switch / multiplier for coulomb
+    \param vdw switch / multiplier for vdw
+  */
+  inline
+  double force_coulombvdw(double r,
+                      double r1,
+                      double q1,
+                      double r2,
+                      double q2,
+                      double eps,
+                      double AH,
+                      double rc,
+                      double coulomb=1.0,
+                      double vdw=1.0) {
+    
+    // swap particles. We want to keep r21 < 1
+    if (r2 > r1) {
+      std::swap(r1, r2);
+      std::swap(q1, q2);
+    }
+
+    double q21 = 0.0;
+
+    // for neutrals only vdW holds
+    // WARNING float comparison
+    if ((q1 == 0.0) && (q2 == 0.0)) {
+      coulomb = 0.0;
+      q21 = 0.0;
+    }
+    else {
+      if (q1 == 0.0) {// p1 is neutral
+        std::swap(r1, r2);
+        std::swap(q1, q2);
+        q21 = 0.0;
+      }
+      else {// q1 != 0 and q2 
+        q21 = q2/q1;
+      }
+    }
+
+    double r21 = r2 / r1;
+
+    double rt  = r/r1;
+    
+    double rs = 0.0;
+    if (r > r1+r2+rc){
+        rs  = r/r1;
+    }
+    else {
+        rs = (r1+r2+rc)/r1;
+    }
+   
+    double coulombfactor = coulomb * q1*q1 / (r1*r1);
+    double vdwfactor = vdw * AH / (6.0*r1);
+    double coulombforce = 0.0;
+    double vdwforce = 0.0;
+
+    if (coulomb > 0.0) {// only coulomb
+      coulombforce = coulombfactor * force_coulomb_fact(rt, r21, q21);
+    }
+    if (vdw > 0.0) {// only vdw
+      vdwforce = vdwfactor * force_vdw_nodim(rs, r21);
+    }
+    return coulombforce + vdwforce;
+  }
+
+
+  // IPA vdW
+  //! IPA + van der Waals potential
+  /*!
+    \param r the separation.
+    \param r1 radius of particle 1.
+    \param q1 charge of particle 1.
+    \param r2 radius of particle 2.
+    \param q2 charge of particle 1.
+    \param eps the dielectric constant.
+    \param HA the Hamaker constant.
+    \param rc van der Waals radius of silicon or cutoff.
+    \param ipa switch / multiplier for ipa
+    \param vdw switch / multiplier for vdw
+  */
+  inline
+  double potential_ipavdw(double r,
+                          double r1,
+                          double q1,
+                          double r2,
+                          double q2,
+                          double eps,
+                          double AH,
+                          double rc,
+                          double ipa=1.0,
+                          double vdw=1.0) {
+    
+    // swap particles. We want to keep r21 < 1
+    if (r2 > r1) {
+      std::swap(r1, r2);
+      std::swap(q1, q2);
+    }
+
+    double q21 = 0.0;
+
+    // for neutrals only vdW holds
+    // WARNING float comparison
+    if ((q1 == 0.0) && (q2 == 0.0)) {
+      ipa = 0.0;
+      q21 = 0.0;
+    }
+    else {
+      if (q1 == 0.0) {// p1 is neutral
+        std::swap(r1, r2);
+        std::swap(q1, q2);
+        q21 = 0.0;
+      }
+      else {// q1 != 0 and q2 
+        q21 = q2/q1;
+      }
+    }
+
+    double r21 = r2 / r1;
+
+    double rt  = r/r1;
+    
+    double rs = 0.0;
+    if (r > r1+r2+rc){
+      rs  = r/r1;
+    }
+    else {
+      rs = (r1+r2+rc)/r1;
+    }
+   
+    double ipafactor = ipa * q1*q1 / r1;
+    double vdwfactor = vdw * AH / 6.0;
+    
+    double ipapot = 0.0;
+    double vdwpot = 0.0;
+
+    if (ipa > 0.0) {// only ipa
+      ipapot = ipafactor * potential_ipa_fact(rt, r21, q21, eps);
+    }
+    if (vdw > 0.0) {// only vdw
+      vdwpot = vdwfactor * potential_vdw_nodim(rs, r21);
+    }
+
+    return ipapot + vdwpot;
+  }
+
+  //! IPA + van der Waals force
+  /*!
+    \param r the separation.
+    \param r1 radius of particle 1.
+    \param q1 charge of particle 1.
+    \param r2 radius of particle 2.
+    \param q2 charge of particle 1.
+    \param eps the dielectric constant.
+    \param HA the Hamaker constant.
+    \param rc van der Waals radius of silicon or cutoff.
+    \param ipa switch / multiplier for ipa
+    \param vdw switch / multiplier for vdw
+  */
+  inline
+  double force_ipavdw(double r,
+                      double r1,
+                      double q1,
+                      double r2,
+                      double q2,
+                      double eps,
+                      double AH,
+                      double rc,
+                      double ipa=1.0,
+                      double vdw=1.0) {
+    
+    // swap particles. We want to keep r21 < 1
+    if (r2 > r1) {
+      std::swap(r1, r2);
+      std::swap(q1, q2);
+    }
+
+    double q21 = 0.0;
+
+    // for neutrals only vdW holds
+    // WARNING float comparison
+    if ((q1 == 0.0) && (q2 == 0.0)) {
+      ipa = 0.0;
+      q21 = 0.0;
+    }
+    else {
+      if (q1 == 0.0) {// p1 is neutral
+        std::swap(r1, r2);
+        std::swap(q1, q2);
+        q21 = 0.0;
+      }
+      else {// q1 != 0 and q2 
+        q21 = q2/q1;
+      }
+    }
+
+    double r21 = r2 / r1;
+
+    double rt  = r/r1;
+    
+    double rs = 0.0;
+    if (r > r1+r2+rc){
+        rs  = r/r1;
+    }
+    else {
+        rs = (r1+r2+rc)/r1;
+    }
+   
+    double ipafactor = ipa * q1*q1 / (r1*r1);
+    double vdwfactor = vdw * AH / (6.0*r1);
+    double ipaforce = 0.0;
+    double vdwforce = 0.0;
+
+    if (ipa > 0.0) {// only ipa
+      ipaforce = ipafactor * force_ipa_fact(rt, r21, q21, eps);
+    }
+    if (vdw > 0.0) {// only vdw
+      vdwforce = vdwfactor * force_vdw_nodim(rs, r21);
+    }
+    return ipaforce + vdwforce;
+  }
 
   /************/ 
   //! Series potential approximation.
@@ -651,7 +1035,73 @@ namespace eint {
     double r21;
     double q21;
   };
-  
+
+  struct potential_coulombvdw_funct
+  {
+    potential_coulombvdw_funct(double r1_,
+                       double q1_,
+                       double r2_,
+                       double q2_,
+                       double eps_,
+                       double AH_,
+                       double rc_,
+                       double coulomb_=1.0,
+                       double vdw_=1.0):
+                       r1(r1_), q1(q1_),
+                       r2(r2_), q2(q2_),
+                       eps(eps_), AH(AH_),
+                       rc(rc_), coulomb(coulomb_), vdw(vdw_){
+    }
+
+    double operator()(double const& r) {
+      return potential_coulombvdw(r, r1, q1, r2, q2, eps, AH, rc, coulomb, vdw);
+    }
+
+    double r1;
+    double q1;
+    double r2;
+    double q2;
+    double eps;
+    double AH;
+    double rc;
+    double coulomb;
+    double vdw;
+
+  };
+
+  struct force_coulombvdw_funct
+  {
+    force_coulombvdw_funct(double r1_,
+                       double q1_,
+                       double r2_,
+                       double q2_,
+                       double eps_,
+                       double AH_,
+                       double rc_,
+                       double coulomb_=1.0,
+                       double vdw_=1.0):
+                       r1(r1_), q1(q1_),
+                       r2(r2_), q2(q2_),
+                       eps(eps_), AH(AH_),
+                       rc(rc_), coulomb(coulomb_), vdw(vdw_){
+    }
+
+    double operator()(double const& r) {
+      return force_coulombvdw(r, r1, q1, r2, q2, eps, AH, rc, coulomb, vdw);
+    }
+
+    double r1;
+    double q1;
+    double r2;
+    double q2;
+    double eps;
+    double AH;
+    double rc;
+    double coulomb;
+    double vdw;
+
+  };
+
   struct potential_ipa_funct
   {
     potential_ipa_funct(double r21_, double q21_, double eps_):
@@ -683,7 +1133,71 @@ namespace eint {
   };
 
 
+  struct potential_ipavdw_funct
+  {
+    potential_ipavdw_funct(double r1_,
+                       double q1_,
+                       double r2_,
+                       double q2_,
+                       double eps_,
+                       double AH_,
+                       double rc_,
+                       double ipa_=1.0,
+                       double vdw_=1.0):
+                       r1(r1_), q1(q1_),
+                       r2(r2_), q2(q2_),
+                       eps(eps_), AH(AH_),
+                       rc(rc_), ipa(ipa_), vdw(vdw_){
+    }
 
+    double operator()(double const& r) {
+      return potential_ipavdw(r, r1, q1, r2, q2, eps, AH, rc, ipa, vdw);
+    }
+
+    double r1;
+    double q1;
+    double r2;
+    double q2;
+    double eps;
+    double AH;
+    double rc;
+    double ipa;
+    double vdw;
+
+  };
+
+  struct force_ipavdw_funct
+  {
+    force_ipavdw_funct(double r1_,
+                       double q1_,
+                       double r2_,
+                       double q2_,
+                       double eps_,
+                       double AH_,
+                       double rc_,
+                       double ipa_=1.0,
+                       double vdw_=1.0):
+                       r1(r1_), q1(q1_),
+                       r2(r2_), q2(q2_),
+                       eps(eps_), AH(AH_),
+                       rc(rc_), ipa(ipa_), vdw(vdw_){
+    }
+
+    double operator()(double const& r) {
+      return force_ipavdw(r, r1, q1, r2, q2, eps, AH, rc, ipa, vdw);
+    }
+
+    double r1;
+    double q1;
+    double r2;
+    double q2;
+    double eps;
+    double AH;
+    double rc;
+    double ipa;
+    double vdw;
+
+  };
 
   // multipolar coefficients potential functor
   struct potential_mpc_funct
@@ -807,7 +1321,271 @@ namespace eint {
 #endif
 
   };
-  
+
+  // MPC + vdW
+  // multipolar coefficients potential functor
+  struct potential_mpcvdw_funct
+  {
+    potential_mpcvdw_funct(double r1_,
+                           double q1_,
+                           double r2_,
+                           double q2_,
+                           double eps_,
+                           unsigned int nterms_,
+                           double AH_,
+                           double rc_,
+                           double mpc_ = 1.0,
+                           double vdw_ = 1.0):
+                           r1(r1_), q1(q1_),
+                           r2(r2_), q2(q2_),
+                           eps(eps_), nterms(nterms_),
+                           AH(AH_), rc(rc_),
+                           mpc(mpc_), vdw(vdw_) {
+      update_parameters();
+    }
+
+    void update_parameters() {
+      // system is nterms - 0th term
+      unsigned int ssize = nterms-1;
+    
+      // 1, n-1 terms
+      A1coefficients = ublas::zero_vector<double>(ssize);
+      A2coefficients = ublas::zero_vector<double>(ssize);
+
+      // 0 terms
+      A10 = 0.0;
+      A20 = 0.0;
+
+      // swap particles. We want to keep r21 < 1
+      if (r2 > r1) {
+        std::swap(r1, r2);
+        std::swap(q1, q2);
+      }
+
+      q21 = 0.0;
+
+      // for neutrals only vdW holds
+      // WARNING float comparison
+      if ((q1 == 0.0) && (q2 == 0.0)) {
+        mpc = 0.0;
+        q21 = 0.0;
+      }
+      else {
+        if (q1 == 0.0) {// p1 is neutral
+          std::swap(r1, r2);
+          std::swap(q1, q2);
+          q21 = 0.0;
+        }
+        else {// q1 != 0 and q2 
+          q21 = q2/q1;
+        }
+      }
+
+      r21 = r2 / r1;
+
+      mpcfactor = mpc * q1 * q1 / r1;
+      vdwfactor = vdw * AH / 6.0;
+    }
+    // // constructor if coefficients are known
+    // potential_mpcvdw_funct(const ubvector &A1coefficients_,
+		// 	const ubvector &A2coefficients_,
+		// 	double A10_,
+		// 	double A20_,
+		// 	double eps_,
+		// 	unsigned int nterms_):
+    //                     A1coefficients(A1coefficients_),
+		//         A2coefficients(A2coefficients_),
+		//         eps(eps_),
+    //                     nterms(nterms_) {
+
+    // }
+    
+    double operator()(double const& r) {
+
+      rt = r / r1;
+      mpcpot = 0.0;
+      vdwpot = 0.0;
+
+      if (mpc > 0.0) {// mpc + vdw
+        // compute coefficients
+        compute_MPCoefficients(A1coefficients, A2coefficients,
+			                         A10, A20, rt, r21, q21, eps, nterms);
+        mpcpot = mpcfactor * mpc_potential(rt, r21, q21, A1coefficients, A2coefficients, eps);
+      }
+
+      if (vdw > 0.0) {
+        // cutoff
+        if (r > r1+r2+rc){
+          rs  = r/r1;
+        }
+        else {
+          rs = (r1+r2+rc)/r1;
+        }
+        vdwpot = vdwfactor * potential_vdw_nodim(rs, r21);
+      }
+     
+      return mpcpot + vdwpot;
+    }
+
+    ubvector A1coefficients;
+    ubvector A2coefficients;
+    double A10;
+    double A20;
+
+    double rt;
+    double rs;
+    double mpcfactor;
+    double vdwfactor;
+    
+    double r1;
+    double q1;
+    double r2;
+    double q2;
+    double r21;
+    double q21;
+    double eps;
+    unsigned int nterms;
+    double AH;
+    double rc;
+    double mpc;
+    double vdw;
+
+    double mpcpot;
+    double vdwpot;
+  };
+
+  // multipolar coefficients force functor
+  struct force_mpcvdw_funct {
+    force_mpcvdw_funct(double r1_,
+                      double q1_,
+                      double r2_,
+                      double q2_,
+                      double eps_,
+                      unsigned int nterms_,
+                      double AH_,
+                      double rc_,
+                      double mpc_ = 1.0,
+                      double vdw_ = 1.0):
+                      r1(r1_), q1(q1_),
+                      r2(r2_), q2(q2_),
+                      eps(eps_), nterms(nterms_),
+                      AH(AH_), rc(rc_),
+                      mpc(mpc_), vdw(vdw_) {
+      update_parameters();
+    }
+
+    void update_parameters() {
+      // system is nterms - 0th term
+      unsigned int ssize = nterms-1;
+    
+      // 1, n-1 terms
+      A1coefficients = ublas::zero_vector<double>(ssize);
+      A2coefficients = ublas::zero_vector<double>(ssize);
+
+      // 0 terms
+      A10 = 0.0;
+      A20 = 0.0;
+
+      // swap particles. We want to keep r21 < 1
+      if (r2 > r1) {
+        std::swap(r1, r2);
+        std::swap(q1, q2);
+      }
+
+      q21 = 0.0;
+
+      // for neutrals only vdW holds
+      // WARNING float comparison
+      if ((q1 == 0.0) && (q2 == 0.0)) {
+        mpc = 0.0;
+        q21 = 0.0;
+      }
+      else {
+        if (q1 == 0.0) {// p1 is neutral
+          std::swap(r1, r2);
+          std::swap(q1, q2);
+          q21 = 0.0;
+        }
+        else {// q1 != 0 and q2 
+          q21 = q2/q1;
+        }
+      }
+
+      r21 = r2 / r1;
+
+      mpcfactor = mpc * q1 * q1 / (r1*r1);
+      vdwfactor = vdw * AH / (6.0*r1);
+    }
+
+    // constructor if coefficients are known
+    force_mpcvdw_funct(const ubvector &A1coefficients_,
+		    const ubvector &A2coefficients_,
+		    double A10_,
+		    double A20_,
+                    double eps_,
+                    unsigned int nterms_):
+                      A1coefficients(A1coefficients_),
+		      A2coefficients(A2coefficients_),			
+		      eps(eps_),
+                      nterms(nterms_) {
+
+    }
+    
+    double operator()(double const& r) {
+
+      rt = r / r1;
+      mpcforce = 0.0;
+      vdwforce = 0.0;
+
+      if (mpc > 0.0) {// mpc + vdw
+        // compute coefficients
+        compute_MPCoefficients(A1coefficients, A2coefficients,
+			                         A10, A20, rt, r21, q21, eps, nterms);
+        mpcforce = mpcfactor * mpc_force(A10, A1coefficients, eps);
+      }
+
+      if (vdw > 0.0) {
+        // cutoff
+        if (r > r1+r2+rc){
+          rs  = r/r1;
+        }
+        else {
+          rs = (r1+r2+rc)/r1;
+        }
+        vdwforce = vdwfactor * force_vdw_nodim(rs, r21);
+      }
+      
+      return mpcforce + vdwforce;
+    }
+
+    ubvector A1coefficients;
+    ubvector A2coefficients;
+    double A10;
+    double A20;
+    
+    double rt;
+    double rs;
+    double mpcfactor;
+    double vdwfactor;
+    
+    double r1;
+    double q1;
+    double r2;
+    double q2;
+    double r21;
+    double q21;
+    double eps;
+    unsigned int nterms;
+    double AH;
+    double rc;
+    double mpc;
+    double vdw;
+
+    double mpcforce;
+    double vdwforce;
+  };
+  // MPC + vdW
+
   // compute eta factor for a pair of particles
   inline
   double efactor_mpc(double r1, double r2,
