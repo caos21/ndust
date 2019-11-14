@@ -107,13 +107,13 @@ class Window(QMainWindow, Ui_MainWindow):
     nano_close_btn = self.ui.buttonBox_nano_save.button(QtWidgets.QDialogButtonBox.Close)
     nano_close_btn.clicked.connect(QtWidgets.qApp.quit)
 
-    # show window
-    self.show()
-
     self.prefix = ""
     self.dirname = "/mnt/data/ben/ndust/data/"
 
     self.server = [" guillimin:~/duster/results/", " cottos:~/duster/results/"]
+
+    # show window
+    self.show()
 
   # grid
     # h5 filename for grid
@@ -240,7 +240,7 @@ class Window(QMainWindow, Ui_MainWindow):
 
   def open_h5file(self, filename, mode):
     try:
-      h5f = h5py.File(self.dirname+self.gridfilename, "w")
+      h5f = h5py.File(filename, "w")
     except (Exception) as e:
       print(e)
       self.errorWritingH5file(str(e))
@@ -592,11 +592,12 @@ class Window(QMainWindow, Ui_MainWindow):
     """ Save nano file
     """
     print("\n[ii] saving nano file\n")
-    self.nanofilename = str(self.ui.lineEdit_nano_save_name.displayText())
+    self.nanofilename = str(self.ui.lineEdit_nano_save_name.text())
     # WARNING must check for empty file FIXME
 
     h5f = self.open_h5file(self.dirname+self.nanofilename, "w")
     if h5f is None:
+      print("\n[ee] nano file error\n")
       return -1
   # Nanoparticles
     # Tunnel current check

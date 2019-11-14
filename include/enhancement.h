@@ -914,7 +914,7 @@ class Enhancement {
   }
 
   inline 
-  void compute_ipavdwpotential_contact(double cutoff) {
+  void compute_ipavdwpotential_contact(double cutoff, double vdw=1.0) {
     BOOST_LOG_SEV(lg, info) << "Computing IPA+vdW at contact...";
     auto start = std::chrono::system_clock::now();
     //
@@ -933,7 +933,7 @@ class Enhancement {
             double r2 = rarray[m];
             double q2 = qarray[p];
             double rt = r1+r2;
-            eint::potential_ipavdw_funct pipavdw(r1, q1, r2, q2, eps, AH, cutoff, 1.0, 1.0); 
+            eint::potential_ipavdw_funct pipavdw(r1, q1, r2, q2, eps, AH, cutoff, 1.0, vdw); 
             cpotentials[l][q][m][p] = pipavdw(rt);
           }
         }
@@ -1068,9 +1068,10 @@ class Enhancement {
   template <typename PotentialFunctor>
   void iterate_symmetric(short L, short Q, PotentialFunctor func,
                          double cutoff) {
-
+    // n differents particles with r and q
     short n = L*Q;
 
+    // vector of particle numbers -> pair l, q
     vp particle(n);
     for(short l=0; l<L; ++l) {
       for(short q=0; q<Q; ++q) {
@@ -1079,17 +1080,19 @@ class Enhancement {
           particle[pnumber] = p;
       }
     }
-    
 
+    // number of unique potentials to compute - non repeated combinations
+    // of particles    
     unsigned comb = n*(n+1)/2;
+
+    // vector to store the combinations
     vp vps(comb);
     
     unsigned count = 0;
     for(short i=0; i<n; ++i) {
       for(short k=i; k<n; ++k) {
-        //cout << "\n" << i << ", " << k;
           pp p = pp(i, k);
-          //vps.push_back(p);
+          // store the combinations particle number i , particle number j
           vps[count] = p;
           count++;
       }
@@ -1100,20 +1103,19 @@ class Enhancement {
     #pragma omp parallel for
     for(unsigned k=0; k<vps.size(); k++) {
 
-        short i = vps[k].first;// particle i
-        short j = vps[k].second;// particle j
+      short i = vps[k].first;// particle i
+      short j = vps[k].second;// particle j
 
-        count++;
+      count++;
 
-        short l = particle[i].first;
-        short q = particle[i].second;
+      // get indices (l,q), (m,r) for particles i and j
+      short l = particle[i].first;
+      short q = particle[i].second;
+      short m = particle[j].first;
+      short r = particle[j].second;
 
-        short m = particle[j].first;
-        short r = particle[j].second;
-
-        (this->*func)(l, q, m, r, cutoff);
-        //a4d[l][q][m][r] = func(l, q, m, r);
-        //a4d[m][r][l][q] = a4d[l][q][m][r];
+      // apply function to indices and cutoff
+      (this->*func)(l, q, m, r, cutoff);
     }
   }
 
@@ -1129,10 +1131,11 @@ class Enhancement {
   inline
   void compute_mpcvdwpotential_barrier_sym(double cutoff) {
     BOOST_LOG_SEV(lg, info) << "Computing MPC+vdW barrier symmetric...";
-
+    // pass the reference of the method to iterate_symmetric
     iterate_symmetric(rarray_size, qarray_size, &Enhancement::mpcvdwpotential_barrier, cutoff);
 
   }
+
   inline
   void compute_mpcvdwpotential_contact_bf(double cutoff) {
 

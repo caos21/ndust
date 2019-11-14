@@ -660,7 +660,7 @@ int CRate::compute() {
           BOOST_LOG_SEV(lg, info) << "Computing IPA+vdW potentials at contact...";
           start = std::chrono::system_clock::now();
           //
-          enh.compute_ipavdwpotential_contact(.21e-9);
+          enh.compute_ipavdwpotential_contact(.21e-9, 1.0);
           //
           end = std::chrono::system_clock::now();
           elapsed_seconds = end-start;
@@ -668,7 +668,7 @@ int CRate::compute() {
           BOOST_LOG_SEV(lg, info) << "Computing IPA potentials barriers...";
           start = std::chrono::system_clock::now();
           // here 0.0 in second argument for vdw = 0.0     
-          enh.compute_ipavdwpotential_barrier(gm.vdwinter.cutoff, 0.0);
+          enh.compute_ipavdwpotential_barrier(gm.vdwinter.cutoff, 1.0);
           //
           end = std::chrono::system_clock::now();
           elapsed_seconds = end-start;
@@ -743,7 +743,7 @@ int CRate::compute() {
         BOOST_LOG_SEV(lg, info) << "Brute force";
         BOOST_LOG_SEV(lg, info) << "Computing Coulomb + vdW potentials at contact...";
         start = std::chrono::system_clock::now();
-        enh.compute_coulombvdwpotential_contact(gm.vdwinter.cutoff);        
+        enh.compute_coulombvdwpotential_contact(gm.vdwinter.cutoff);
         end = std::chrono::system_clock::now();
         elapsed_seconds = end-start;
         BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();

@@ -308,7 +308,7 @@ class plot():
     ##print "Moments initial distribution - simps"
     ##moments_simps(cinitial, vpivots, qpivots)
 
-  def axis(self, axislabel):
+  def axis(self, fig, axislabel, qlims=None):
     plt.xlabel(axislabel[0], fontsize=self.xc.label_fontsize0)
     plt.ylabel(axislabel[1], fontsize=self.xc.label_fontsize1)
 
@@ -319,19 +319,25 @@ class plot():
 
     plt.xscale('log')
     #plt.yscale('log')
-
+    
     plt.xlim((self.dpivots[0], self.dpivots[-1]))
-    plt.ylim((self.qpivots[0], self.qpivots[-1]))
+    if qlims is None:
+        plt.ylim((self.qpivots[0], self.qpivots[-1]))
+    else:
+        plt.ylim((qlims[0], qlims[1]))
 
+    ax1 = fig.gca()
+    ax1.tick_params(axis='x', which='minor', direction='inout', length=10)
+    
   def minorticks(self, fig):
     ax1 = fig.gca()
     ax1.xaxis.set_minor_formatter(FormatStrFormatter("%2.1f"))
     ax1.tick_params(axis='both', which='minor',
-                    labelsize=self.xc.minortick_fontsize)
+                    labelsize=self.xc.minortick_fontsize, length=15)
 
 
   def plot_b3d(self, data, limits=None, title=r"Density", cmap=cm.seismic,
-               axislabel=[r'Diameter $(\text{nm)}$', r'$q(\# e)$', r'$\log N$'],
+               axislabel=[r'Diameter $(\text{nm)}$', r'$Charge (e)$', r'$\log N$'],
                vmin=None, vmax=None, savename="bars3d.png"):
     fig = plt.figure(title, figsize=(12, 9))
     fig.suptitle(title, size=self.xc.title_fontsize)
@@ -389,7 +395,7 @@ class plot():
     self.plot_b3d(self.log10res, limits)
 
   def pcolor_dens(self, data, msg="Pcolor", cmap=cm.viridis,
-                axislabel=[r'Diameter $(\mathrm{nm)}$', r'$q(\# e)$', r'$\log N$'],
+                axislabel=[r'Diameter $(\mathrm{nm)}$', r'$Charge (e)$', r'$\log N$'],
                 vmin=None, vmax=None, savename="figpc.png"):
     """
     """
@@ -403,7 +409,7 @@ class plot():
     if vmax is None:
       vmax=data.max()
 
-    self.axis(axislabel)
+    self.axis(fig, axislabel)
 
     PC = plt.pcolormesh(self.X, self.Y, data, cmap=cmap,
                         vmin=vmin, vmax=vmax)
@@ -422,8 +428,8 @@ class plot():
     self.pcolor_dens(self.log10res, u"Density")
 
   def plot_fcontours(self, data, msg="Filled contours", cmap=cm.viridis,
-                    axislabel=[r'Diameter $(\mathrm{nm)}$', r'$q(\# e)$', r'$\log N$'],
-                    savename="figc.png"):
+                    axislabel=[r'Diameter $(\mathrm{nm)}$', r'Charge $(e)$', r'$\log N_{ik}$'],
+                    savename="figc.png", qlims=None):
     """
     """
     fig = plt.figure(msg, figsize=(12, 9))
@@ -432,8 +438,8 @@ class plot():
     if self.levelsf is None:
       self.levelsf = np.arange(1, 18, 2)
 
-    self.axis(axislabel)
-    self.minorticks(fig)
+    self.axis(fig, axislabel, qlims)
+    #self.minorticks(fig)
 
     CSF = plt.contourf(self.X, self.Y, data, levels=self.levelsf, cmap=cmap, origin='lower',
                       extent=self.extents_linear)
@@ -450,12 +456,16 @@ class plot():
     CB.ax.tick_params(labelsize=self.xc.tick_fontsize)
     CB.add_lines(CS)
 
+    #plt.tight_layout()
     plt.savefig(savename, bbox_inches='tight')
     plt.show()
 
   def plot_fdens(self):
     self.plot_fcontours(self.log10res, r'Density',
                         savename="rescf.png")
+  def plot_ndens(self, qlims, savename):
+    self.plot_fcontours(self.log10res, r'Density',
+                        savename=savename, qlims=qlims)
 
   def axis1d(self, data, pivots, axislabel, log=True, logy=True):
     plt.xlabel(axislabel[0], fontsize=self.xc.label_fontsize0)
@@ -472,9 +482,11 @@ class plot():
 
     plt.xlim((pivots[0], pivots[-1]))
     plt.ylim((1, data.max()))
+    
+    plt.tick_params(axis='both', which='minor', direction='in', length=8)
 
   def plot_bars(self, pivots, data, width, log=True, msg=u"Size distribution",
-                axislabel=[r'$Diameter (\text{nm)}$', r'$N(1/m^3)$'],
+                axislabel=[r'Diameter $(\text{nm)}$', r'$N(1/m^3)$'],
                 savename="dbars.png", color=current_palette[0], figname="ddiam",
                 ylim=None, logy=True):
     """
@@ -513,13 +525,36 @@ class plot():
     plt.savefig(savename, bbox_inches='tight')
     plt.show()
 
+  def plot_curve(self, pivots, data, log=True, msg=u"Size distribution",
+                axislabel=[r'Diameter $(\text{nm)}$', r'Density $(m^{{-3}})$'],
+                savename="dbars.png", color=current_palette[0], figname="ddiam",
+                ylim=None, logy=True):
+    """
+    """
+    # Create the figure
+    fig = plt.figure(figname, figsize=(12, 9))
+    fig.suptitle(msg, size=self.xc.title_fontsize)
+
+    self.axis1d(data, pivots, axislabel, log=log, logy=logy)
+    #self.minorticks(fig)
+
+    pcurve = plt.plot(pivots, data, linewidth=3)
+
+    if ylim is not None:
+        plt.ylim(ylim)
+    plt.savefig(savename, bbox_inches='tight')
+    plt.show()
+    
   def plot_diams(self, ylim=None, logy=True):
     self.plot_bars(self.dpivots, self.ddens, self.width_vpivots, ylim=ylim, logy=logy)
 
+  def plot_cdiams(self, ylim=None, logy=True):
+    self.plot_curve(self.dpivots, self.ddens, ylim=ylim, logy=logy)
+    
   def plot_charges(self, ylim=None, logy=True):
     self.plot_bars(self.qpivots, self.cdens, self.width_qpivots, log=False,
                    msg=u"Charge distribution",
-                   axislabel=[r'$q(e)$', r'$N(1/m^3)$'], savename="cbars.png",
+                   axislabel=[r'Charge $(e)$', r'$N (1/m^3)$'], savename="cbars.png",
                    color=current_palette[1], figname="qbar", ylim=ylim, logy=logy)
 
 
@@ -862,7 +897,7 @@ plt.yscale('log')
 plt.ylim([10, 5e16])
 #plt.ylim([10, 1e18])
 #plt.xlim([0.75, 80])
-plt.xlim([0.75, 100])
+plt.xlim([0.75, 250])
 #plt.xlim([DPivots[0], DPivots[-1]])
 
 DBARS = []
@@ -879,7 +914,7 @@ plt.xlabel(r'Charges ($e$)')
 #plt.ylabel(r'Density ($1/m^3$)')
 plt.yscale('log')
 plt.ylim([10, 5e16])
-plt.xlim([-100, 5])
+plt.xlim([-50, 5])
 #plt.xlim([-110, 5])
 #plt.xlim([-70, 5])
 #plt.ylim([QPivots[0], QPivots[-1]])
