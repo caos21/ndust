@@ -471,7 +471,7 @@ double rt_affinity(double R, double Z){
   double ptunnel(double Z, double R){
 
     double prefac1 = (-Z)*sqrt(2.0 * Kboltz
-                   * cr.gm.gsys.temperature/eCharge)*(0.5/R);
+                   * cr.gm.gsys.temperature/eMass)*(0.5/R);
     double rt = rt_affinity(R, Z);
     return prefac1*tunnel(rt, R, Z);
   }

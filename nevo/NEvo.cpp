@@ -1445,13 +1445,34 @@ int NEvo::compute_collisionfreq() {
             min_tfreq = tfreq[l][q];
           }
 //           if ((tfreq[l][q] > efreq[l][q])/*&&(tfreq[l][q] > max_ifreq)*/) {
-//             tfreq[l][q] = efreq[l][q];
+//             tfreq[l][q] = 0.0;
+//             efreq[l][q] = 0.0;
 //           }
           //WARNING if tunnel frequency is too higher
           // FIXME these allow to accelerate the calculations
-          if ((tfreq[l][q] > efreq[l][q])/*&&(tfreq[l][q] > max_ifreq)*/) {
-             efreq[l][q] = 0.0;
-             tfreq[l][q] = 0.0;
+//           if ((tfreq[l][q] > efreq[l][q])/*&&(tfreq[l][q] > max_ifreq)*/) {
+//              //efreq[l][q] = 0.0;
+//              //tfreq[l][q] = 0.0;
+//              //efreq[l][q] = 0.0;
+//              //tfreq[l][q] = 10.0*efreq[l][q];
+//             if ((efreq[l][q]>0) && (tfreq[l][q]>max_efreq)) {
+//               tfreq[l][q] = 2.0*max_efreq;
+//             }
+//           }
+//           if ((tfreq[l][q] > ifreq[l][q])/*&&(tfreq[l][q] > max_ifreq)*/) {
+//              //efreq[l][q] = 0.0;
+//              //tfreq[l][q] = 0.0;
+//              //efreq[l][q] = 0.0;
+//              //tfreq[l][q] = 10.0*efreq[l][q];
+//             if ((ifreq[l][q]>0) && (tfreq[l][q]>max_ifreq)) {
+//               tfreq[l][q] = 10.0*max_ifreq;
+//             }
+//           }
+//           if ((tfreq[l][q] > 10.0*efreq[l][q]) && (efreq[l][q] > ifreq[l][q])) {
+//              tfreq[l][q] = 10.0*efreq[l][q];
+//           }
+          if ((tfreq[l][q] > 1e6*ifreq[l][q]) && (ifreq[l][q] > efreq[l][q])) {
+             tfreq[l][q] = 1e6*ifreq[l][q];//1e6
           }
         }
       }

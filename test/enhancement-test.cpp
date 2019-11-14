@@ -138,7 +138,7 @@ BOOST_AUTO_TEST_CASE( coulomb_enhancement_test ) {
     }
     
     BOOST_TEST_MESSAGE( "\n\n[ii] Testing enhancement factor..." );
-    enh.compute_enhancement_factor();
+    //enh.compute_enhancement_factor();
 
     print_efactor(efactor, rsize, qsize);
     

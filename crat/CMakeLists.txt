@@ -54,6 +54,8 @@ set (LIBS "${LIBS} -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE -D_BSD_SOURCE -D_FO
 # -frecord-gcc-switches
 # records flags passed to gcc
 # can be retrieved by $readelf -p .GCC.command.line crat
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -std=gnu++14 -march=znver1 -Ofast -ftree-vectorize -fopt-info-vec-missed=vec.miss -frecord-gcc-switches -fgraphite-identity -ftree-loop-distribution -floop-nest-optimize -flto")
+
 set(CMAKE_CXX_COMPILE_FLAGS "${CMAKE_CXX_COMPILE_FLAGS} -Ofast -frecord-gcc-switches -march=znver1")
 
 set(CMAKE_CXX_LINK_FLAGS "${CMAKE_CXX_LINK_FLAGS} -Ofast -frecord-gcc-switches -march=znver1")

@@ -51,10 +51,16 @@ class Window(QMainWindow, Ui_MainWindow):
     self.ui = Ui_MainWindow()
     self.ui.setupUi(self)
 
+  # error message
+    self.emsg = QtWidgets.QErrorMessage(self)
+    self.emsg.setWindowModality(QtCore.Qt.WindowModal)
   # connections
     # grid tab
     grid_save_btn = self.ui.buttonBox_grid_save.button(QtWidgets.QDialogButtonBox.Save)
     grid_save_btn.clicked.connect(self.grid_save)
+
+    grid_close_btn = self.ui.buttonBox_grid_save.button(QtWidgets.QDialogButtonBox.Close)
+    grid_close_btn.clicked.connect(QtWidgets.qApp.quit)
 
     self.radiobutton_mpc = self.ui.radioButton_MPC
     self.radiobutton_mpc.toggled.connect(self.toggle_terms)
@@ -82,22 +88,32 @@ class Window(QMainWindow, Ui_MainWindow):
 
     self.checkbox_chargewidth = self.ui.checkBox_chargewidth
     self.checkbox_chargewidth.toggled.connect(self.toggle_chargewidth)
-    
+
+    self.checkbox_vdw = self.ui.checkBox_vdw
+    self.checkbox_vdw.toggled.connect(self.toggle_vdw)    
+    self.checkbox_bf = self.ui.checkBox_bf 
+
     # plasma tab
     plasma_save_btn = self.ui.buttonBox_plasma_save.button(QtWidgets.QDialogButtonBox.Save)
     plasma_save_btn.clicked.connect(self.plasma_save)
+
+    plasma_close_btn = self.ui.buttonBox_plasma_save.button(QtWidgets.QDialogButtonBox.Close)
+    plasma_close_btn.clicked.connect(QtWidgets.qApp.quit)
 
     # nano tab
     nano_save_btn = self.ui.buttonBox_nano_save.button(QtWidgets.QDialogButtonBox.Save)
     nano_save_btn.clicked.connect(self.nano_save)
 
-    # show window
-    self.show()
+    nano_close_btn = self.ui.buttonBox_nano_save.button(QtWidgets.QDialogButtonBox.Close)
+    nano_close_btn.clicked.connect(QtWidgets.qApp.quit)
 
     self.prefix = ""
     self.dirname = "/mnt/data/ben/ndust/data/"
 
     self.server = [" guillimin:~/duster/results/", " cottos:~/duster/results/"]
+
+    # show window
+    self.show()
 
   # grid
     # h5 filename for grid
@@ -219,6 +235,22 @@ class Window(QMainWindow, Ui_MainWindow):
     value2le(self.ui.lineEdit_radius, strrad)
     return peakpos
 
+  def errorWritingH5file(self, errormessage):
+    self.emsg.showMessage(errormessage)
+
+  def open_h5file(self, filename, mode):
+    try:
+      h5f = h5py.File(filename, "w")
+    except (Exception) as e:
+      print(e)
+      self.errorWritingH5file(str(e))
+      return None
+    else:
+      print("file {} open".format(filename))
+    return h5f
+
+  #def grid_close(self):
+
   def grid_save(self):
     """ Save grid files
     """      
@@ -228,7 +260,10 @@ class Window(QMainWindow, Ui_MainWindow):
     #if self.gridfilename <> "":
         #self.prefix += "-"
 
-    h5f = h5py.File(self.dirname+self.gridfilename, "w")
+    h5f = self.open_h5file(self.dirname+self.gridfilename, "w")
+    if h5f is None:
+      return -1
+
     #h5f.attrs["gtime"] = 0.0
 
     #profile_rerr = le2float(self.ui.lineEdit_ptol)
@@ -354,6 +389,19 @@ class Window(QMainWindow, Ui_MainWindow):
     self.einteraction = mg.EInteraction(h5f, multiplier, dconstant, method,
                                         terms)
     self.einteraction.toHDF5()
+
+    vdw = 0
+    cutoff = 0.0
+    bf = 0
+    if self.checkbox_vdw.isChecked():
+      vdw = 1
+      cutoff = le2float(self.ui.lineEdit_cutoff)
+      if self.checkbox_bf.isChecked():
+        bf = 1
+    
+    self.gvdw = mg.VDWaals(h5f, vdw, cutoff, bf)
+    self.gvdw.toHDF5()
+
     # close file
     h5f.close()
     #
@@ -441,7 +489,20 @@ class Window(QMainWindow, Ui_MainWindow):
       self.ui.spinBox_chargenegwidth.setEnabled(1)
     else:
       self.ui.spinBox_chargeposwidth.setEnabled(0)
-      self.ui.spinBox_chargenegwidth.setEnabled(0)      
+      self.ui.spinBox_chargenegwidth.setEnabled(0)
+#
+  def toggle_vdw(self):
+    """ Toggle vdw
+    """
+    if self.checkbox_vdw.isChecked():
+      self.ui.label_cutoff.setEnabled(1)
+      self.ui.lineEdit_cutoff.setEnabled(1)
+      self.ui.checkBox_bf.setEnabled(1)
+    else:
+      self.ui.label_cutoff.setEnabled(0)
+      self.ui.lineEdit_cutoff.setEnabled(0)
+      self.ui.checkBox_bf.setEnabled(0)
+      self.ui.checkBox_bf.setChecked(0)
 #
   def plasma_save(self):
     """ Save plasma file
@@ -450,7 +511,9 @@ class Window(QMainWindow, Ui_MainWindow):
     self.plasmafilename = str(self.ui.lineEdit_plasma_save_name.displayText())
     # WARNING must check for empty file FIXME
 
-    h5f = h5py.File(self.dirname+self.plasmafilename, "w")
+    h5f = self.open_h5file(self.dirname+self.plasmafilename, "w")
+    if h5f is None:
+      return -1
 
   # Parameters
     # Fixed plasma check
@@ -529,11 +592,13 @@ class Window(QMainWindow, Ui_MainWindow):
     """ Save nano file
     """
     print("\n[ii] saving nano file\n")
-    self.nanofilename = str(self.ui.lineEdit_nano_save_name.displayText())
+    self.nanofilename = str(self.ui.lineEdit_nano_save_name.text())
     # WARNING must check for empty file FIXME
 
-    h5f = h5py.File(self.dirname+self.nanofilename, "w")
-
+    h5f = self.open_h5file(self.dirname+self.nanofilename, "w")
+    if h5f is None:
+      print("\n[ee] nano file error\n")
+      return -1
   # Nanoparticles
     # Tunnel current check
     tunnel = self.ui.checkBox_tunnel.isChecked()

@@ -553,10 +553,16 @@ int CRate::compute() {
 			       gm.einter.dconstant,
 			       lg);
 
-  BOOST_LOG_SEV(lg, info) << "Computing reduced particle pairs...";
-  auto start = std::chrono::system_clock::now();
-  //
-  enh.compute_reducedpairs();
+    auto start = std::chrono::system_clock::now();
+  //  
+  if (!gm.vdwinter.bf) {
+    // we compute reduced pairs when not using brute force
+    BOOST_LOG_SEV(lg, info) << "Computing reduced particle pairs...";
+    enh.compute_reducedpairs();
+  }
+  else {
+    BOOST_LOG_SEV(lg, info) << "Brute force... skipping reduced pairs";
+  }
   //
   auto end = std::chrono::system_clock::now();
   std::chrono::duration<double> elapsed_seconds = end-start;
@@ -564,53 +570,213 @@ int CRate::compute() {
   
   switch(gm.einter.method) {
     case 0:
-      BOOST_LOG_SEV(lg, info) << "Bounded method MPC : " << gm.einter.method;
-      BOOST_LOG_SEV(lg, info) << "Computing MPC potentials at contact...";
-      start = std::chrono::system_clock::now();
-      //
-      enh.compute_mpcpotential_contact();
-      //      
-      end = std::chrono::system_clock::now();
-      elapsed_seconds = end-start;
-      BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
-      BOOST_LOG_SEV(lg, info) << "Computing MPC potentials barriers...";
-      start = std::chrono::system_clock::now();
-      //
-      enh.compute_mpcpotential_barrier();
-      //
-      end = std::chrono::system_clock::now();
-      elapsed_seconds = end-start;
-      BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
+      if (gm.vdwinter.bf) {
+        BOOST_LOG_SEV(lg, info) << "Computing MPC + vdW brute force...";
+        enh.set_nterms(grid4);
+        
+        BOOST_LOG_SEV(lg, info) << "Brute force";
+        BOOST_LOG_SEV(lg, info) << "Computing MPC+vdW potentials at contact...";
+        start = std::chrono::system_clock::now();
+        //
+        //enh.compute_mpcvdwpotential_contact_bf(gm.vdwinter.cutoff);
+        enh.compute_mpcvdwpotential_contact_sym(gm.vdwinter.cutoff);
+        //
+        end = std::chrono::system_clock::now();
+        elapsed_seconds = end-start;
+        BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
+        //BOOST_LOG_SEV(lg, info) << "Terminate debug";
+        //enh.compute_bruteforce();
+        // write();
+        // close();
+        // std::cerr << "Terminate debug";
+        // std::terminate();
+        BOOST_LOG_SEV(lg, info) << "Computing MPC+vdW potentials barriers...";
+        start = std::chrono::system_clock::now();
+        //      
+        //enh.compute_mpcvdwpotential_barrier_bf(gm.vdwinter.cutoff);
+        enh.compute_mpcvdwpotential_barrier_sym(gm.vdwinter.cutoff);
+        //
+        end = std::chrono::system_clock::now();
+        elapsed_seconds = end-start;
+        BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
+
+        BOOST_LOG_SEV(lg, info) << "Computing enhancement factor grid";
+        enh.compute_bruteforce();
+      }
+      else {
+        BOOST_LOG_SEV(lg, info) << "Bounded method MPC : " << gm.einter.method;
+        BOOST_LOG_SEV(lg, info) << "Computing MPC potentials at contact...";
+        start = std::chrono::system_clock::now();
+        //
+        enh.compute_mpcpotential_contact();
+        //      
+        end = std::chrono::system_clock::now();
+        elapsed_seconds = end-start;
+        BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
+        BOOST_LOG_SEV(lg, info) << "Computing MPC potentials barriers...";
+        start = std::chrono::system_clock::now();
+        //
+        enh.compute_mpcpotential_barrier();
+        //
+        end = std::chrono::system_clock::now();
+        elapsed_seconds = end-start;
+        BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
+        
+        BOOST_LOG_SEV(lg, info) << "Computing enhancement factor grid";
+        start = std::chrono::system_clock::now();    
+        enh.compute_enhancement_factor();
+        end = std::chrono::system_clock::now();
+        elapsed_seconds = end-start;
+        BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
+      }
       break;
     case 1:
       BOOST_LOG_SEV(lg, info) << "Bounded method IPA : " << gm.einter.method;
-      BOOST_LOG_SEV(lg, info) << "Computing IPA potentials at contact...";
-      start = std::chrono::system_clock::now();
-      //
-      enh.compute_ipapotential_contact();
-      //
-      end = std::chrono::system_clock::now();
-      elapsed_seconds = end-start;
-      BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
-      BOOST_LOG_SEV(lg, info) << "Computing IPA potentials barriers...";
-      start = std::chrono::system_clock::now();
-      //      
-      enh.compute_ipapotential_barrier();
-      //
-      end = std::chrono::system_clock::now();
-      elapsed_seconds = end-start;
-      BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
+      if (gm.vdwinter.vdw) {
+        // Brute force for IPA + vdW implies compute 
+        if (gm.vdwinter.bf) {
+          BOOST_LOG_SEV(lg, info) << "Brute force";
+          BOOST_LOG_SEV(lg, info) << "Computing IPA+vdW potentials at contact...";
+
+          start = std::chrono::system_clock::now();
+          //
+          enh.compute_ipavdwpotential_contact(gm.vdwinter.cutoff);
+          //
+          end = std::chrono::system_clock::now();
+          elapsed_seconds = end-start;
+          BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
+          BOOST_LOG_SEV(lg, info) << "Computing IPA+vdW potentials barriers...";
+          start = std::chrono::system_clock::now();
+          //      
+          enh.compute_ipavdwpotential_barrier(gm.vdwinter.cutoff);
+          //
+          end = std::chrono::system_clock::now();
+          elapsed_seconds = end-start;
+          BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
+        }
+        else {
+          BOOST_LOG_SEV(lg, info) << "IPA+vdW contact and IPA barrier";
+
+          BOOST_LOG_SEV(lg, info) << "Computing IPA+vdW potentials at contact...";
+          start = std::chrono::system_clock::now();
+          //
+          enh.compute_ipavdwpotential_contact(.21e-9, 1.0);
+          //
+          end = std::chrono::system_clock::now();
+          elapsed_seconds = end-start;
+          BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
+          BOOST_LOG_SEV(lg, info) << "Computing IPA potentials barriers...";
+          start = std::chrono::system_clock::now();
+          // here 0.0 in second argument for vdw = 0.0     
+          enh.compute_ipavdwpotential_barrier(gm.vdwinter.cutoff, 1.0);
+          //
+          end = std::chrono::system_clock::now();
+          elapsed_seconds = end-start;
+          BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
+
+          BOOST_LOG_SEV(lg, info) << "Computing enhancement factor grid";
+          enh.compute_bruteforce();
+          // BOOST_LOG_SEV(lg, info) << "IPA+vdW contact and IPA barrier";
+
+          // BOOST_LOG_SEV(lg, info) << "Computing IPA potentials at contact...";
+          // start = std::chrono::system_clock::now();
+          // //
+          // enh.compute_ipapotential_contact();
+          // //
+          // end = std::chrono::system_clock::now();
+          // elapsed_seconds = end-start;
+          // BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
+          // BOOST_LOG_SEV(lg, info) << "Computing IPA potentials barriers...";
+          // start = std::chrono::system_clock::now();
+          // //      
+          // enh.compute_ipapotential_barrier();
+          // //
+          // end = std::chrono::system_clock::now();
+          // elapsed_seconds = end-start;
+          // BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
+
+          // BOOST_LOG_SEV(lg, info) << "Expanding IPA potentials barriers...";
+          // start = std::chrono::system_clock::now();
+          // enh.expand_barriers();
+          // elapsed_seconds = end-start;
+          // BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
+
+          // BOOST_LOG_SEV(lg, info) << "Computing IPA+vdW potentials at contact...";
+          // start = std::chrono::system_clock::now();
+          // //
+          // enh.compute_ipavdwpotential_contact(.21e-9);
+          // //
+          // end = std::chrono::system_clock::now();
+          // elapsed_seconds = end-start;
+        }
+        
+        BOOST_LOG_SEV(lg, info) << "Computing enhancement factor grid";
+        enh.compute_bruteforce();
+      }
+      else {
+        BOOST_LOG_SEV(lg, info) << "Computing IPA potentials at contact...";
+        start = std::chrono::system_clock::now();
+        //
+        enh.compute_ipapotential_contact();
+        //
+        end = std::chrono::system_clock::now();
+        elapsed_seconds = end-start;
+        BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
+        BOOST_LOG_SEV(lg, info) << "Computing IPA potentials barriers...";
+        start = std::chrono::system_clock::now();
+        //      
+        enh.compute_ipapotential_barrier();
+        //
+        end = std::chrono::system_clock::now();
+        elapsed_seconds = end-start;
+        BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
+        BOOST_LOG_SEV(lg, info) << "Computing enhancement factor grid";
+        start = std::chrono::system_clock::now();    
+        enh.compute_enhancement_factor();
+        end = std::chrono::system_clock::now();
+        elapsed_seconds = end-start;
+        BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
+      }
       break; 
     case 2:
-      BOOST_LOG_SEV(lg, info) << "Bounded method Coulomb : " << gm.einter.method;
-      BOOST_LOG_SEV(lg, info) << "Computing coulomb potentials at contact...";
-      start = std::chrono::system_clock::now();
-      //      
-      enh.compute_coulombpotential_contact();
-      //
-      end = std::chrono::system_clock::now();
-      elapsed_seconds = end-start;
-      BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
+      if (gm.vdwinter.vdw) {
+        BOOST_LOG_SEV(lg, info) << "Brute force";
+        BOOST_LOG_SEV(lg, info) << "Computing Coulomb + vdW potentials at contact...";
+        start = std::chrono::system_clock::now();
+        enh.compute_coulombvdwpotential_contact(gm.vdwinter.cutoff);
+        end = std::chrono::system_clock::now();
+        elapsed_seconds = end-start;
+        BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
+        
+        BOOST_LOG_SEV(lg, info) << "Computing Coulomb + vdW potentials barriers...";
+        start = std::chrono::system_clock::now();
+        //      
+        enh.compute_coulombvdwpotential_barrier(gm.vdwinter.cutoff);
+        //
+        end = std::chrono::system_clock::now();
+        elapsed_seconds = end-start;
+        BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
+
+        BOOST_LOG_SEV(lg, info) << "Computing enhancement factor grid";
+        enh.compute_bruteforce();
+      }
+      else {
+        BOOST_LOG_SEV(lg, info) << "Bounded method Coulomb : " << gm.einter.method;
+        BOOST_LOG_SEV(lg, info) << "Computing coulomb potentials at contact...";
+        start = std::chrono::system_clock::now();
+        enh.compute_coulombpotential_contact();
+        //
+        end = std::chrono::system_clock::now();
+        elapsed_seconds = end-start;
+        BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
+
+        BOOST_LOG_SEV(lg, info) << "Computing enhancement factor grid";
+        start = std::chrono::system_clock::now();    
+        enh.compute_enhancement_factor();
+        end = std::chrono::system_clock::now();
+        elapsed_seconds = end-start;
+        BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
+      }
       break;
     case 3:
       BOOST_LOG_SEV(lg, info) << "Bounded Hybrid method : " << gm.einter.method;
@@ -630,41 +796,36 @@ int CRate::compute() {
       end = std::chrono::system_clock::now();
       elapsed_seconds = end-start;
       BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
+
+      BOOST_LOG_SEV(lg, info) << "Computing enhancement factor grid";
+      start = std::chrono::system_clock::now();    
+      enh.compute_enhancement_factor();
+      end = std::chrono::system_clock::now();
+      elapsed_seconds = end-start;
+      BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
+
       break;
     case 4:
       BOOST_LOG_SEV(lg, info) << "Free / no interaction method : " << gm.einter.method;
+      BOOST_LOG_SEV(lg, info) << "No interaction efactor = 1";
+      // Enhancement factor == 1 forall
+      for (unsigned int l=0; l<gm.vols.nsections; ++l) {
+        // iterate in charges particle 1
+        for (unsigned int q=0; q<gm.chrgs.nsections; ++q) {
+          // iterate in radii particle 2
+          for (unsigned int m=0; m<gm.vols.nsections; ++m) {
+            // iterate in charges particle 2	
+            for (unsigned int p=0; p<gm.chrgs.nsections; ++p) {
+              efactor[l][q][m][p] = 1.0;
+            }
+          }
+        }
+      }
       break;
   default:
     BOOST_LOG_SEV(lg, error) << "Method " << gm.einter.method
   			     << " not known";
       std::terminate();
-  }
-
-  if(gm.einter.method != 4) {
-    BOOST_LOG_SEV(lg, info) << "Computing enhancement factor grid";
-    start = std::chrono::system_clock::now();
-    //
-    enh.compute_enhancement_factor();
-    //
-    end = std::chrono::system_clock::now();
-    elapsed_seconds = end-start;
-    BOOST_LOG_SEV(lg, info) << "Elapsed time : " << elapsed_seconds.count();
-  }
-  else {
-    BOOST_LOG_SEV(lg, info) << "No interaction efactor = 1";
-    // Enhancement factor == 1 forall
-    for (unsigned int l=0; l<gm.vols.nsections; ++l) {
-      // iterate in charges particle 1
-      for (unsigned int q=0; q<gm.chrgs.nsections; ++q) {
-	// iterate in radii particle 2
-	for (unsigned int m=0; m<gm.vols.nsections; ++m) {
-	  // iterate in charges particle 2	
-	  for (unsigned int p=0; p<gm.chrgs.nsections; ++p) {
-	    efactor[l][q][m][p] = 1.0;
-	  }
-	}
-      }
-    }
   }
   
   // // Compute electrostatic to thermal ratio
