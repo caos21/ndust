@@ -180,6 +180,7 @@ int NEvo::solve() {
     // Solve plasma without nanos to prevent numerical instabilities
     // plasma.solve(0.0, 1e-6, 1e-7, density_sourcedrain,
     //       energy_sourcedrain, plasma_pdens, plasma_ndens, min_dtq);
+    // transient 10ms
     plasma.solve(0.0, 1e-3, 1e-7, density_sourcedrain,
           energy_sourcedrain, plasma_pdens, plasma_ndens, min_dtq);
 
@@ -1905,13 +1906,13 @@ int NEvo::solve_plasma(const double ttime, const double ldtn) {
     }
   }
 
-  density_sourcedrain[0] = electron_loss;///ldtn;
-  density_sourcedrain[1] = ion_loss;///ldtn;
+  density_sourcedrain[0] = electron_loss;
+  density_sourcedrain[1] = ion_loss;
   density_sourcedrain[2] = 0.0;
   density_sourcedrain[3] = 0.0;
   density_sourcedrain[4] = 0.0;
   density_sourcedrain[5] = 0.0;
-  density_sourcedrain[6] = abs(energy_loss);///ldtn;
+  density_sourcedrain[6] = energy_loss;
   BOOST_LOG_SEV(lg, info) << "electron_loss " << electron_loss;
   BOOST_LOG_SEV(lg, info) << "ion_loss " << ion_loss;
   BOOST_LOG_SEV(lg, info) << "energy_loss " << energy_loss;
