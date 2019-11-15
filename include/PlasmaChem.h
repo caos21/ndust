@@ -256,38 +256,22 @@ int plasma_system(double t, double *n, double *dndt, void *data) {
 
 	std::vector<double> sourcedrain = plasmachem->density_sourcedrain;
 
-	//nArp = ne - nSiH3p + plasmachem->nano_qdens;
-
-	// WORKING
+	// ignore dnArp flux
     double dne = +ki*nAr*ne + kdisih4*ne*nSiH4 + kisih3*ne*nSiH3
-			 //- flux_Arp*ratio_AV*nArp - flux_SiH3p*ratio_AV*nSiH3p
-			 /*- sourcedrain[1]*volume*/ - sourcedrain[0]*volume;// + sourcedrain[0] <- workin with this term;
-    //double dnArp = dne - dSiH3p;
-	//
+			   //- flux_Arp*ratio_AV*nArp
+			   - flux_SiH3p*ratio_AV*nSiH3p
+			   - sourcedrain[0]*volume;
 
-	// double dne = +ki*nAr*ne + kdisih4*ne*nSiH4 + kisih3*ne*nSiH3
-	// 		 - flux_Arp*ratio_AV*nArp - flux_SiH3p*ratio_AV*nSiH3p
-	// 		 - sourcedrain[1]*volume - sourcedrain[0]*volume;// + sourcedrain[0] <- workin with this term;
-
-	double dnArp  = +ki*nAr*ne - flux_Arp*ratio_AV*nArp
-	 			  - sourcedrain[1]*volume;// - sourcedrain[0]*volume ;// + sourcedrain[0];
-
-	// double dne = +ki*nAr*ne + kdisih4*ne*nSiH4 + kisih3*ne*nSiH3
-	// 		 - flux_Arp*ratio_AV*nArp - flux_SiH3p*ratio_AV*nSiH3p
-	// 		 - sourcedrain[1];
-    // double dnArp  = +ki*nAr*ne - flux_Arp*ratio_AV*nArp
-	// 			  - sourcedrain[0];
-	//dnArp =0.0;
-    double dnArm  = +kex*nAr*ne -k12*nArm*nSiH4 -k13*nArm*nSiH4 -k14*nArm*nSiH3 -k15*nArm*nSiH2 -flux_Ar*ratio_AV*nArm;
-    //double #dSiH4 = -kdisih4*ne*nSiH4 -kdsih3*ne*nSiH4 -kdsih2*ne*nSiH4 -kv13*ne*nSiH4 -kv24*ne*nSiH4 
+    double dnArm  = +kex*nAr*ne -k12*nArm*nSiH4 -k13*nArm*nSiH4 -k14*nArm*nSiH3 -k15*nArm*nSiH2 
+                  -flux_Ar*ratio_AV*nArm;
+    
     double dSiH3p = +kdisih4*ne*nSiH4 + kisih3*ne*nSiH3 - flux_SiH3p*ratio_AV*nSiH3p;
     double dSiH3  = +kdsih3*ne*nSiH4  -kisih3*ne*nSiH3 +k12*nArm*nSiH4 -k14*nArm*nSiH3
 				  - flux_SiH3*ratio_AV*nSiH3;
     double dSiH2  = +kdsih2*ne*nSiH4 +k13*nArm*nSiH4 +k14*nArm*nSiH3 -k15*nArm*nSiH2
 	              - flux_SiH2*ratio_AV*nSiH2;
     
-    //double #dne = dnArp + dSiH3p
-	//double dnArp = dne - dSiH3p;
+	double dnArp = dne - dSiH3p;
     
 	double power = plasmachem->power;
 	double reactor_volume = plasmachem->reactor_volume;
@@ -310,7 +294,7 @@ int plasma_system(double t, double *n, double *dndt, void *data) {
              - ekdsih2*kdsih2*ne*nSiH4
              - ekv13*kv13*ne*nSiH4
              - ekv24*kv24*ne*nSiH4
-			 - sourcedrain[6]*volume);
+			 - sourcedrain[6]*volume*eCharge);
     
     
 	dndt[0] = dne==dne ? dne : 0.0;
