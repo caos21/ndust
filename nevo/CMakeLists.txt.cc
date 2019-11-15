@@ -80,6 +80,7 @@ include_directories("../include/")
 add_library(GridModel STATIC ../include/GridModel.cpp)
 add_library(CRate STATIC ../include/CRate.cpp)
 add_library(PlasmaModel STATIC ../include/PlasmaModel.cpp)
+add_library(PlasmaChem STATIC ../include/PlasmaChem.cpp)
 add_library(NanoModel STATIC ../include/NanoModel.cpp)
 add_library(NEvo STATIC ../NEvo.cpp)
 
@@ -140,9 +141,14 @@ endif()
 
 add_executable(nevo main.cpp)
 
+target_link_libraries(PlasmaChem
+		      lsoda
+                      ${LIBS})
+
 target_link_libraries(NEvo
                       GridModel
                       NanoModel
+		      PlasmaChem
 		      boost_log
 		      hdf5
 		      hdf5_cpp
@@ -162,6 +168,7 @@ target_link_libraries(nevo
                       NEvo
                       CRate
                       PlasmaModel
+		      PlasmaChem
                       NanoModel
 		      boost_log
 		      ndust_version
