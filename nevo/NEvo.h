@@ -75,6 +75,7 @@ extern "C" {
 #include "blas.h" 
 }
 
+#define DTOL 1e-4
 
 // forward declaration of qsystem
 struct qsystem;
