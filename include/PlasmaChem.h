@@ -117,7 +117,7 @@ public:
 					     double arsih4_ratio = 29.0/30.0,
 						 double armass =   6.6335209e-26,
 						 double sih4mass = 5.3150534e-26,
-						 double power = 1.0);
+						 double power = 1.0);//20.0
 
 	// WARNING useless
 	void update_density(std::vector<double> pdens, std::vector<double> ndens);
@@ -202,13 +202,11 @@ private:
 	
 };
 
+
 inline
 int plasma_system(double t, double *n, double *dndt, void *data) {
 
   	PlasmaChem* plasmachem = static_cast< PlasmaChem* >(data);
-
-	// std::shared_ptr<RateSpec> ki = plasmachem->rates_map["R2:ki"];	
-	// n[0] = (*ki)(t);
 	
 	double ne     = n[0];
     double nArp   = n[1];
@@ -223,13 +221,14 @@ int plasma_system(double t, double *n, double *dndt, void *data) {
 	double kel = plasmachem->rates_map["R1:kel"]->operator()(energy);
 	double ki  = plasmachem->rates_map["R2:ki"]->operator()(energy);
 	double kex = plasmachem->rates_map["R3:kex"]->operator()(energy);
-	double kelsih4 = plasmachem->rates_map["R4:kelsih4"]->operator()(energy);
-	double kdisih4 = plasmachem->rates_map["R5:kdisih4"]->operator()(energy);
-	double kdsih3 = plasmachem->rates_map["R6:kdsih3"]->operator()(energy);
-	double kdsih2 = plasmachem->rates_map["R7:kdsih2"]->operator()(energy);
-	double kisih3 = plasmachem->rates_map["R8:kisih3"]->operator()(energy);
-	double kv13 = plasmachem->rates_map["R9:kv13"]->operator()(energy);
-	double kv24 = plasmachem->rates_map["R10:kv24"]->operator()(energy);
+    double kiarm  = plasmachem->rates_map["R4:kiarm"]->operator()(energy);
+	double kelsih4 = plasmachem->rates_map["R5:kelsih4"]->operator()(energy);
+	double kdisih4 = plasmachem->rates_map["R6:kdisih4"]->operator()(energy);
+	double kdsih3 = plasmachem->rates_map["R7:kdsih3"]->operator()(energy);
+	double kdsih2 = plasmachem->rates_map["R8:kdsih2"]->operator()(energy);
+	double kisih3 = plasmachem->rates_map["R9:kisih3"]->operator()(energy);
+	double kv13 = plasmachem->rates_map["R10:kv13"]->operator()(energy);
+	double kv24 = plasmachem->rates_map["R11:kv24"]->operator()(energy);
 	double k12 = plasmachem->rates_map["R12:k12"]->operator()(energy);
 	double k13 = plasmachem->rates_map["R13:k13"]->operator()(energy);
 	double k14 = plasmachem->rates_map["R14:k14"]->operator()(energy);
@@ -237,12 +236,13 @@ int plasma_system(double t, double *n, double *dndt, void *data) {
 
 	double eki = plasmachem->rates_map["R2:ki"]->bvar;
 	double ekex = plasmachem->rates_map["R3:kex"]->bvar;
-	double ekdisih4 = plasmachem->rates_map["R5:kdisih4"]->bvar;
-	double ekdsih3 = plasmachem->rates_map["R6:kdsih3"]->bvar;
-	double ekdsih2 = plasmachem->rates_map["R7:kdsih2"]->bvar;
-	double ekisih3 = plasmachem->rates_map["R8:kisih3"]->bvar;
-	double ekv13 = plasmachem->rates_map["R9:kv13"]->bvar;
-	double ekv24 = plasmachem->rates_map["R10:kv24"]->bvar;
+    double ekiarm = plasmachem->rates_map["R4:kiarm"]->bvar;
+	double ekdisih4 = plasmachem->rates_map["R6:kdisih4"]->bvar;
+	double ekdsih3 = plasmachem->rates_map["R7:kdsih3"]->bvar;
+	double ekdsih2 = plasmachem->rates_map["R8:kdsih2"]->bvar;
+	double ekisih3 = plasmachem->rates_map["R9:kisih3"]->bvar;
+	double ekv13 = plasmachem->rates_map["R10:kv13"]->bvar;
+	double ekv24 = plasmachem->rates_map["R11:kv24"]->bvar;
 
 	double nAr = plasmachem->nAr;
 	double nSiH4 = plasmachem->nSiH4;
@@ -256,22 +256,54 @@ int plasma_system(double t, double *n, double *dndt, void *data) {
 
 	std::vector<double> sourcedrain = plasmachem->density_sourcedrain;
 
+    double qdens = plasmachem->nano_qdens;
+    //nArp = ne - nSiH3p - qdens;
+    nSiH3p = ne - nArp - qdens;
+//     kiarm = 0.0;
+//     ekiarm = 0.0;
 	// ignore dnArp flux
-    double dne = +ki*nAr*ne + kdisih4*ne*nSiH4 + kisih3*ne*nSiH3
-			   //- flux_Arp*ratio_AV*nArp
-			   - flux_SiH3p*ratio_AV*nSiH3p
-			   - sourcedrain[0]*volume;
+    double dne = + ki*nAr*ne
+                 + kiarm*ne*nArm
+                 + kdisih4*ne*nSiH4
+                 + kisih3*ne*nSiH3
+			     - flux_Arp*ratio_AV*nArp
+			     - flux_SiH3p*ratio_AV*nSiH3p
+			     - sourcedrain[0]*ne
+			     + sourcedrain[4];
 
-    double dnArm  = +kex*nAr*ne -k12*nArm*nSiH4 -k13*nArm*nSiH4 -k14*nArm*nSiH3 -k15*nArm*nSiH2 
-                  -flux_Ar*ratio_AV*nArm;
+    double dnArp = + ki*nAr*ne
+                   + kiarm*ne*nArm 
+                   - flux_Arp*ratio_AV*nArp
+                   - sourcedrain[1]*nArp;
+
+    double dnArm  = + kex*nAr*ne
+                    - kiarm*ne*nArm
+                    - k12*nArm*nSiH4
+                    - k13*nArm*nSiH4
+                    - k14*nArm*nSiH3
+                    - k15*nArm*nSiH2 
+                    - flux_Ar*ratio_AV*nArm;
     
-    double dSiH3p = +kdisih4*ne*nSiH4 + kisih3*ne*nSiH3 - flux_SiH3p*ratio_AV*nSiH3p;
-    double dSiH3  = +kdsih3*ne*nSiH4  -kisih3*ne*nSiH3 +k12*nArm*nSiH4 -k14*nArm*nSiH3
-				  - flux_SiH3*ratio_AV*nSiH3;
-    double dSiH2  = +kdsih2*ne*nSiH4 +k13*nArm*nSiH4 +k14*nArm*nSiH3 -k15*nArm*nSiH2
-	              - flux_SiH2*ratio_AV*nSiH2;
+    double dSiH3p = + kdisih4*ne*nSiH4
+                    + kisih3*ne*nSiH3
+                    - flux_SiH3p*ratio_AV*nSiH3p;
     
-	double dnArp = dne - dSiH3p;
+    double dSiH3  = + kdsih3*ne*nSiH4
+                    - kisih3*ne*nSiH3
+                    + k12*nArm*nSiH4
+                    - k14*nArm*nSiH3
+				    - flux_SiH3*ratio_AV*nSiH3;
+    
+    double dSiH2  = + kdsih2*ne*nSiH4
+                    + k13*nArm*nSiH4
+                    + k14*nArm*nSiH3
+                    - k15*nArm*nSiH2
+	                - flux_SiH2*ratio_AV*nSiH2;
+    
+    double qrate = plasmachem->nano_qdens_rate;
+    //double dne = dnArp + dSiH3p + qrate;
+	//double dnArp = dne - dSiH3p - qrate;
+   // double dSiH3p = dne - dnArp - qrate;
     
 	double power = plasmachem->power;
 	double reactor_volume = plasmachem->reactor_volume;
@@ -284,8 +316,11 @@ int plasma_system(double t, double *n, double *dndt, void *data) {
     double dneps = (power/reactor_volume
              - eki*ki*nAr*ne
              - ekex*kex*nAr*ne
+             - ekiarm*kiarm*nArm*ne
              - (5./3.)*plasmachem->bohm_velocity(armass)*ratio_AV*neps
              - e*vsheath*plasmachem->bohm_velocity(armass)*ratio_AV*ne
+             - (5./3.)*plasmachem->bohm_velocity(sih4mass)*ratio_AV*neps
+             - e*vsheath*plasmachem->bohm_velocity(sih4mass)*ratio_AV*ne
              - 3.0*(emass/armass)*kel*neps*nAr
              - 3.0*(emass/sih4mass)*kelsih4*neps*nSiH4
              - ekisih3*kisih3*ne*nSiH3
@@ -294,7 +329,8 @@ int plasma_system(double t, double *n, double *dndt, void *data) {
              - ekdsih2*kdsih2*ne*nSiH4
              - ekv13*kv13*ne*nSiH4
              - ekv24*kv24*ne*nSiH4
-			 - sourcedrain[6]*volume*eCharge);
+			 - sourcedrain[6]*ne
+             + sourcedrain[5]);//*volume/**e*/);
     
     
 	dndt[0] = dne==dne ? dne : 0.0;
@@ -307,6 +343,112 @@ int plasma_system(double t, double *n, double *dndt, void *data) {
 
 	return 0;
 }
+
+// inline
+// int plasma_system(double t, double *n, double *dndt, void *data) {
+// 
+//   	PlasmaChem* plasmachem = static_cast< PlasmaChem* >(data);
+// 
+// 	// std::shared_ptr<RateSpec> ki = plasmachem->rates_map["R2:ki"];	
+// 	// n[0] = (*ki)(t);
+// 	
+// 	double ne     = n[0];
+//     double nArp   = n[1];
+//     double nArm   = n[2];
+//     double nSiH3p = n[3];
+//     double nSiH3  = n[4];
+//     double nSiH2  = n[5];
+//     double neps   = n[6];
+// 
+// 	double energy = neps/ne;
+//     
+// 	double kel = plasmachem->rates_map["R1:kel"]->operator()(energy);
+// 	double ki  = plasmachem->rates_map["R2:ki"]->operator()(energy);
+// 	double kex = plasmachem->rates_map["R3:kex"]->operator()(energy);
+// 	double kelsih4 = plasmachem->rates_map["R4:kelsih4"]->operator()(energy);
+// 	double kdisih4 = plasmachem->rates_map["R5:kdisih4"]->operator()(energy);
+// 	double kdsih3 = plasmachem->rates_map["R6:kdsih3"]->operator()(energy);
+// 	double kdsih2 = plasmachem->rates_map["R7:kdsih2"]->operator()(energy);
+// 	double kisih3 = plasmachem->rates_map["R8:kisih3"]->operator()(energy);
+// 	double kv13 = plasmachem->rates_map["R9:kv13"]->operator()(energy);
+// 	double kv24 = plasmachem->rates_map["R10:kv24"]->operator()(energy);
+// 	double k12 = plasmachem->rates_map["R12:k12"]->operator()(energy);
+// 	double k13 = plasmachem->rates_map["R13:k13"]->operator()(energy);
+// 	double k14 = plasmachem->rates_map["R14:k14"]->operator()(energy);
+// 	double k15 = plasmachem->rates_map["R15:k15"]->operator()(energy);	
+// 
+// 	double eki = plasmachem->rates_map["R2:ki"]->bvar;
+// 	double ekex = plasmachem->rates_map["R3:kex"]->bvar;
+// 	double ekdisih4 = plasmachem->rates_map["R5:kdisih4"]->bvar;
+// 	double ekdsih3 = plasmachem->rates_map["R6:kdsih3"]->bvar;
+// 	double ekdsih2 = plasmachem->rates_map["R7:kdsih2"]->bvar;
+// 	double ekisih3 = plasmachem->rates_map["R8:kisih3"]->bvar;
+// 	double ekv13 = plasmachem->rates_map["R9:kv13"]->bvar;
+// 	double ekv24 = plasmachem->rates_map["R10:kv24"]->bvar;
+// 
+// 	double nAr = plasmachem->nAr;
+// 	double nSiH4 = plasmachem->nSiH4;
+// 	double flux_Arp = plasmachem->flux_Arp;
+// 	double flux_Ar = plasmachem->flux_Ar;
+// 	double flux_SiH3p = plasmachem->flux_SiH3p;
+// 	double flux_SiH3 = plasmachem->flux_SiH3;
+// 	double flux_SiH2 = plasmachem->flux_SiH2;
+// 	double ratio_AV = plasmachem->ratio_AV;
+// 	double volume = plasmachem->reactor_volume;
+// 
+// 	std::vector<double> sourcedrain = plasmachem->density_sourcedrain;
+// 
+// 	// ignore dnArp flux
+//     double dne = +ki*nAr*ne + kdisih4*ne*nSiH4 + kisih3*ne*nSiH3
+// 			   //- flux_Arp*ratio_AV*nArp
+// 			   - flux_SiH3p*ratio_AV*nSiH3p
+// 			   - sourcedrain[0]*volume;
+// 
+//     double dnArm  = +kex*nAr*ne -k12*nArm*nSiH4 -k13*nArm*nSiH4 -k14*nArm*nSiH3 -k15*nArm*nSiH2 
+//                   -flux_Ar*ratio_AV*nArm;
+//     
+//     double dSiH3p = +kdisih4*ne*nSiH4 + kisih3*ne*nSiH3 - flux_SiH3p*ratio_AV*nSiH3p;
+//     double dSiH3  = +kdsih3*ne*nSiH4  -kisih3*ne*nSiH3 +k12*nArm*nSiH4 -k14*nArm*nSiH3
+// 				  - flux_SiH3*ratio_AV*nSiH3;
+//     double dSiH2  = +kdsih2*ne*nSiH4 +k13*nArm*nSiH4 +k14*nArm*nSiH3 -k15*nArm*nSiH2
+// 	              - flux_SiH2*ratio_AV*nSiH2;
+//     
+// 	double dnArp = dne - dSiH3p;
+//     
+// 	double power = plasmachem->power;
+// 	double reactor_volume = plasmachem->reactor_volume;
+// 	double vsheath = plasmachem->vsheath;
+// 	double emass = eMass;
+// 	double e = eCharge;
+// 	double armass = plasmachem->armass;
+// 	double sih4mass = plasmachem->sih4mass;
+// 
+//     double dneps = (power/reactor_volume
+//              - eki*ki*nAr*ne
+//              - ekex*kex*nAr*ne
+//              //- (5./3.)*plasmachem->bohm_velocity(armass)*ratio_AV*neps
+//              //- e*vsheath*plasmachem->bohm_velocity(armass)*ratio_AV*ne
+//              //- 3.0*(emass/armass)*kel*neps*nAr
+//              //- 3.0*(emass/sih4mass)*kelsih4*neps*nSiH4
+//              //- ekisih3*kisih3*ne*nSiH3
+//              //- ekdisih4*kdisih4*ne*nSiH4
+//              //- ekdsih3*kdsih3*ne*nSiH4
+//              //- ekdsih2*kdsih2*ne*nSiH4
+//              //- ekv13*kv13*ne*nSiH4
+//              //- ekv24*kv24*ne*nSiH4
+// 			 - sourcedrain[6]*volume);
+//     
+//     
+// 	dndt[0] = dne==dne ? dne : 0.0;
+// 	dndt[1] = dnArp==dnArp? dnArp : 0.0;
+// 	dndt[2] = dnArm==dnArm? dnArm : 0.0;
+// 	dndt[3] = dSiH3p==dSiH3p? dSiH3p : 0.0;
+// 	dndt[4] = dSiH3==dSiH3? dSiH3 : 0.0;
+// 	dndt[5] = dSiH2==dSiH2? dSiH2 : 0.0;
+// 	dndt[6] = dneps==dneps? dneps : 0.0;
+// 
+// 	return 0;
+// }
 
 
 // WARNING lorenz system test

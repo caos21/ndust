@@ -32,77 +32,87 @@ void RateSpec::print() const {
 }
 
 void PlasmaChem::init_rates() {
-    rates_map["R1:kel"] = std::make_shared<RateSpec>(RateSpec("a1expb",
-                                                        1.8560282921521678e-13,
-                                                        0.1633129254054345,
-                                                        0.0));
-    rates_map["R2:ki"] = std::make_shared<RateSpec>(RateSpec("arrhenius",
-                                                                7.41485579e-14,
-                                                                15.8,
-                                                                5.00954185e-3));
-    rates_map["R3:kex"] = std::make_shared<RateSpec>(RateSpec("arrhenius",
-                                                    3.364506180166679e-14,
-                                                    11.5,
-                                                    3.7596917572476254e-09));
-    // rates_map["stepwise_ionization"]  = std::make_shared<RateSpec>(
-    //                         RateSpec("arrhenius", 7.52e16, 124191.0, 0.00));	
-    // rates_map["superelastic_colision"] = std::make_shared<RateSpec>(
-    //                     RateSpec("arrhenius", 2.60e14, 0.0, 0.74));
-    // rates_map["metastable_pooling"] = std::make_shared<RateSpec>(
-    //                     RateSpec("arrhenius", 3.70e14, 0.0, 0.0));
-    // in m3/s
-    // rates_map["quenching_toresonant"] = std::make_shared<RateSpec>(
-    //                                         RateSpec("constant", 2.0e-13));
-    // rates_map["twobody_quenching"] = std::make_shared<RateSpec>(
-    //                                         RateSpec("constant", 3.0e-21));
-    // rates_map["threebody_quenching"] = std::make_shared<RateSpec>(
-    //                                         RateSpec("constant", 1.1e-43));
-    rates_map["R4:kelsih4"] = std::make_shared<RateSpec>(RateSpec("a1expb",
-                                                        2.663032076381496e-13,
-                                                        0.27729017757606,
-                                                        0.0));
-    rates_map["R5:kdisih4"] = std::make_shared<RateSpec>(RateSpec("arrhenius",
-                                                               3.6864532111053647e-14,
-                                                               12.3,
-                                                               7.585426699230944e-09));
-    rates_map["R6:kdsih3"] = std::make_shared<RateSpec>(RateSpec("arrhenius",
-                                                               1.060628946494521e-13,
-                                                               8.4,
-                                                               0.07797295284736888));
-    rates_map["R7:kdsih2"] = std::make_shared<RateSpec>(RateSpec("arrhenius",
-                                                               8.999280746645033e-14,
-                                                               7.7,
-                                                               9.918880635931725e-10));
 
-    rates_map["R8:kisih3"] = std::make_shared<RateSpec>(RateSpec("arrhenius",
-                                                               4.6999933119522564e-14,
-                                                               8.0,
-                                                               0.1625740097963909));
-    rates_map["R9:kv13"] = std::make_shared<RateSpec>(RateSpec("arrhenius",
-                                                               5.2570315025458126e-15,
-                                                               0.27,
-                                                               7.675878736753314e-09));
-    rates_map["R10:kv24"] = std::make_shared<RateSpec>(RateSpec("arrhenius",
-                                                               9.646752429918597e-15,
-                                                               0.113,
-                                                               1.5565618639018595e-08));
-    rates_map["R12:k12"] = std::make_shared<RateSpec>(RateSpec("constant",
+  rates_map["R1:kel"] = std::make_shared<RateSpec>(RateSpec("a1expb",
+                                                        1.8560282921521678e-13,
+                                                                0.0,
+                                                                0.1633129254054345));
+
+  rates_map["R3:kex"] = std::make_shared<RateSpec>(RateSpec("arrhenius",
+                                                                3.364506180166679e-14,
+                                                                11.5,
+                                                                3.7596917572476254e-09));
+
+  rates_map["R2:ki"] = std::make_shared<RateSpec>(RateSpec("arrhenius",
+                                                                7.414855785805018e-14,
+                                                                15.8,
+                                                                0.005009541848474537));
+
+  rates_map["R4:kiarm"] = std::make_shared<RateSpec>(RateSpec("arrhenius",
+                                                                1.911868293754553e-13,
+                                                                4.2,
+                                                                2.6193020484482345e-09));
+
+//   rates_map["R16"] = std::make_shared<RateSpec>(RateSpec("arrhenius",
+//                                                                 1.0,
+//                                                                 0.0,
+//                                                                 1.0));
+
+  rates_map["R5:kelsih4"] = std::make_shared<RateSpec>(RateSpec("a1expb",
+                                                                2.663032076381496e-13,
+                                                                0.0,
+                                                                0.27729017757606));
+
+  rates_map["R11:kv24"] = std::make_shared<RateSpec>(RateSpec("arrhenius",
+                                                                9.646752429918597e-15,
+                                                                0.113,
+                                                                1.5565618639018595e-08));
+
+  rates_map["R10:kv13"] = std::make_shared<RateSpec>(RateSpec("arrhenius",
+                                                                5.2570315025458126e-15,
+                                                                0.27,
+                                                                7.675878736753314e-09));
+
+  rates_map["R8:kdsih2"] = std::make_shared<RateSpec>(RateSpec("arrhenius",
+                                                                8.999280746645033e-14,
+                                                                7.7,
+                                                                9.918880635931725e-10));
+
+  rates_map["R7:kdsih3"] = std::make_shared<RateSpec>(RateSpec("arrhenius",
+                                                                1.060628946494521e-13,
+                                                                8.4,
+                                                                0.07797295284736888));
+
+  rates_map["R6:kdisih4"] = std::make_shared<RateSpec>(RateSpec("arrhenius",
+                                                                3.6864532111053647e-14,
+                                                                12.3,
+                                                                7.585426699230944e-09));
+
+  rates_map["R9:kisih3"] = std::make_shared<RateSpec>(RateSpec("arrhenius",
+                                                                4.6999933119522564e-14,
+                                                                8.0,
+                                                                0.1625740097963909));
+
+  rates_map["R12:k12"] = std::make_shared<RateSpec>(RateSpec("constant",
                                                                 1.4e-16,
                                                                 0.0,
                                                                 0.0));
-    rates_map["R13:k13"] = std::make_shared<RateSpec>(RateSpec("constant",
+
+  rates_map["R13:k13"] = std::make_shared<RateSpec>(RateSpec("constant",
                                                                 2.59e-16,
                                                                 0.0,
                                                                 0.0));
-    rates_map["R14:k14"] = std::make_shared<RateSpec>(RateSpec("constant",
+
+  rates_map["R14:k14"] = std::make_shared<RateSpec>(RateSpec("constant",
                                                                 9.96e-17,
                                                                 0.0,
                                                                 0.0));
-    rates_map["R15:k15"] = std::make_shared<RateSpec>(RateSpec("constant",
+
+  rates_map["R15:k15"] = std::make_shared<RateSpec>(RateSpec("constant",
                                                                 9.96e-17,
                                                                 0.0,
-                                                                0.0));    
-    std::stringstream ss;
+                                                                0.0));
+std::stringstream ss;
 
     ss << std::setw(24) << "Rate";
     ss << std::setw(24) << "Constants";
@@ -154,6 +164,131 @@ void PlasmaChem::init_rates() {
     rate_file->close();
     delete(rate_file);
 }
+
+
+// void PlasmaChem::init_rates() {
+//     rates_map["R1:kel"] = std::make_shared<RateSpec>(RateSpec("a1expb",
+//                                                         1.8560282921521678e-13,
+//                                                         0.1633129254054345,
+//                                                         0.0));
+//     rates_map["R2:ki"] = std::make_shared<RateSpec>(RateSpec("arrhenius",
+//                                                                 7.41485579e-14,
+//                                                                 15.8,
+//                                                                 5.00954185e-3));
+//     rates_map["R3:kex"] = std::make_shared<RateSpec>(RateSpec("arrhenius",
+//                                                     3.364506180166679e-14,
+//                                                     11.5,
+//                                                     3.7596917572476254e-09));
+//     // rates_map["stepwise_ionization"]  = std::make_shared<RateSpec>(
+//     //                         RateSpec("arrhenius", 7.52e16, 124191.0, 0.00));	
+//     // rates_map["superelastic_colision"] = std::make_shared<RateSpec>(
+//     //                     RateSpec("arrhenius", 2.60e14, 0.0, 0.74));
+//     // rates_map["metastable_pooling"] = std::make_shared<RateSpec>(
+//     //                     RateSpec("arrhenius", 3.70e14, 0.0, 0.0));
+//     // in m3/s
+//     // rates_map["quenching_toresonant"] = std::make_shared<RateSpec>(
+//     //                                         RateSpec("constant", 2.0e-13));
+//     // rates_map["twobody_quenching"] = std::make_shared<RateSpec>(
+//     //                                         RateSpec("constant", 3.0e-21));
+//     // rates_map["threebody_quenching"] = std::make_shared<RateSpec>(
+//     //                                         RateSpec("constant", 1.1e-43));
+//     rates_map["R4:kelsih4"] = std::make_shared<RateSpec>(RateSpec("a1expb",
+//                                                         2.663032076381496e-13,
+//                                                         0.27729017757606,
+//                                                         0.0));
+//     rates_map["R5:kdisih4"] = std::make_shared<RateSpec>(RateSpec("arrhenius",
+//                                                                3.6864532111053647e-14,
+//                                                                12.3,
+//                                                                7.585426699230944e-09));
+//     rates_map["R6:kdsih3"] = std::make_shared<RateSpec>(RateSpec("arrhenius",
+//                                                                1.060628946494521e-13,
+//                                                                8.4,
+//                                                                0.07797295284736888));
+//     rates_map["R7:kdsih2"] = std::make_shared<RateSpec>(RateSpec("arrhenius",
+//                                                                8.999280746645033e-14,
+//                                                                7.7,
+//                                                                9.918880635931725e-10));
+// 
+//     rates_map["R8:kisih3"] = std::make_shared<RateSpec>(RateSpec("arrhenius",
+//                                                                4.6999933119522564e-14,
+//                                                                8.0,
+//                                                                0.1625740097963909));
+//     rates_map["R9:kv13"] = std::make_shared<RateSpec>(RateSpec("arrhenius",
+//                                                                5.2570315025458126e-15,
+//                                                                0.27,
+//                                                                7.675878736753314e-09));
+//     rates_map["R10:kv24"] = std::make_shared<RateSpec>(RateSpec("arrhenius",
+//                                                                9.646752429918597e-15,
+//                                                                0.113,
+//                                                                1.5565618639018595e-08));
+//     rates_map["R12:k12"] = std::make_shared<RateSpec>(RateSpec("constant",
+//                                                                 1.4e-16,
+//                                                                 0.0,
+//                                                                 0.0));
+//     rates_map["R13:k13"] = std::make_shared<RateSpec>(RateSpec("constant",
+//                                                                 2.59e-16,
+//                                                                 0.0,
+//                                                                 0.0));
+//     rates_map["R14:k14"] = std::make_shared<RateSpec>(RateSpec("constant",
+//                                                                 9.96e-17,
+//                                                                 0.0,
+//                                                                 0.0));
+//     rates_map["R15:k15"] = std::make_shared<RateSpec>(RateSpec("constant",
+//                                                                 9.96e-17,
+//                                                                 0.0,
+//                                                                 0.0));    
+//     std::stringstream ss;
+// 
+//     ss << std::setw(24) << "Rate";
+//     ss << std::setw(24) << "Constants";
+//     // std::cout << std::endl <<  << ss.str();
+//     // std::cout << std::endl <<  << "---------------------------------"
+//     // 							"---------------------------------";  
+//     for (auto m : rates_map) {
+//         ss.str("");
+//         ss << std::setw(24);
+//         //ss << m.first;
+//         ss << std::endl << m.first << '\t' << m.second->rate_function;
+//         for (auto v: m.second->params) {
+//             ss << std::setw(12);
+//             ss << v;
+//         }
+//         // std::cout << std::endl <<  << ss.str();
+//         std::cout << ss.str();
+//     }
+//     std::cout << std::endl;
+//     std::cout << std::endl;
+// 
+//     // ratemap rates_map;
+// 
+//     // for (auto m : rates) {
+//     // 	std::shared_ptr<Rate> r(new Rate(m.first, m.second[1], m.second[0], m.second[2]));
+//     // 	rates_map[m.first] = r;
+//     // }
+// 
+//     double epsi = 0.1;
+//     double epsf = 25.0;
+//     size_t N = 100;
+//     double step = (epsf-epsi) / (N-1);
+// 
+//     std::fstream *rate_file = 
+//                     new std::fstream("init_rates.dat",
+//                                     std::fstream::out);
+// 
+//     double eps = epsi;
+//     for (size_t i=0; i<N; ++i) {
+//         *rate_file << eps;
+//         for (auto mr : rates_map) {
+//             RateSpec &r = *mr.second;
+//             *rate_file << '\t' << r(eps);
+//         }
+//         *rate_file << std::endl;
+//         eps += step;
+//     }
+// 
+//     rate_file->close();
+//     delete(rate_file);
+// }
 
 void PlasmaChem::init_parameters(double length,
                                  double radius,
